@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+bun.lockb
+
+# Build output
+dist/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Logs
+src/logs/*.log
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+temp/
