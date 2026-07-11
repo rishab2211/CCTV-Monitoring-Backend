@@ -1,13 +1,21 @@
 import { Router } from "express";
 import authRoutes from "./auth.routes";
+import userRoutes from "./user.routes";
+import adminRoutes from "./admin.routes";
+import roleUserRoutes from "./roleUser.routes";
 
 const router = Router();
 
-// ─── Mount Module Routes ──────────────────────────────────────────────────────
+// ─── Module 1: Auth ───────────────────────────────────────────────────────────
 router.use("/auth", authRoutes);
 
-// Future modules will be added here as they are built:
-// router.use("/users", userRoutes);
+// ─── Module 2: User Management ───────────────────────────────────────────────
+router.use("/users", userRoutes);
+router.use("/admins", adminRoutes);
+// /operators, /technicians, /customers are mounted at root level inside roleUserRoutes
+router.use("/", roleUserRoutes);
+
+// ─── Future Modules (uncomment as built) ─────────────────────────────────────
 // router.use("/roles", roleRoutes);
 // router.use("/cameras", cameraRoutes);
 // router.use("/streams", streamRoutes);

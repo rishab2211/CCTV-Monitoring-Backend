@@ -137,18 +137,28 @@ const userSchema = new Schema<UserDocument>(
     operatorDetails: operatorDetailsSchema,
     technicianDetails: technicianDetailsSchema,
     customerDetails: customerDetailsSchema,
+
+    // Soft delete
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
     toJSON: {
       transform: (_doc, ret) => {
-        delete ret.password;
+        delete (ret as { password?: string }).password;
         return ret;
       },
     },
     toObject: {
       transform: (_doc, ret) => {
-        delete ret.password;
+        delete (ret as { password?: string }).password;
         return ret;
       },
     },
@@ -159,7 +169,9 @@ const userSchema = new Schema<UserDocument>(
 
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
+userSchema.index({ isDeleted: 1 });
 userSchema.index({ createdAt: -1 });
+userSchema.index({ role: 1, isDeleted: 1, isActive: 1 }); // fast role-filtered list queries
 userSchema.index({ "operatorDetails.isOnShift": 1 });
 
 // ─── Pre-save Hook: Hash Password ─────────────────────────────────────────────
@@ -193,7 +205,9 @@ userSchema.methods.generateAccessToken = function (sessionId: string): string {
       email: this.email,
     },
     env.ACCESS_TOKEN_SECRET,
-    { expiresIn: env.ACCESS_TOKEN_EXPIRY }
+    // @types/jsonwebtoken v9 requires StringValue (branded ms type), not plain string.
+    // Cast via unknown to satisfy the type — runtime values like "15m" work correctly.
+    { expiresIn: env.ACCESS_TOKEN_EXPIRY as unknown as number }
   );
 };
 
@@ -201,7 +215,7 @@ userSchema.methods.generateRefreshToken = function (): string {
   return jwt.sign(
     { userId: this._id.toString() },
     env.REFRESH_TOKEN_SECRET,
-    { expiresIn: env.REFRESH_TOKEN_EXPIRY }
+    { expiresIn: env.REFRESH_TOKEN_EXPIRY as unknown as number }
   );
 };
 

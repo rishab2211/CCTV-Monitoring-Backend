@@ -5,6 +5,7 @@ import { User, UserDocument } from "../models/User";
 import { RefreshToken } from "../models/RefreshToken";
 import { DeviceSession } from "../models/DeviceSession";
 import { OTPVerification } from "../models/OTPVerification";
+import { logActivity } from "../models/ActivityLog";
 import { ApiError } from "../utils/ApiError";
 import { hashToken, generateOTP, generateSecureToken, addMinutes } from "../utils/helpers";
 import { sendOTPEmail } from "./email.service";
@@ -19,6 +20,7 @@ import {
   ChangePasswordInput,
 } from "../validators/auth.validator";
 import { logger } from "../utils/logger";
+
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -129,6 +131,14 @@ export const register = async (
   // Issue tokens and create session
   const tokens = await issueTokens(user, parseDeviceInfo(deviceInfo.userAgent, deviceInfo.ipAddress));
 
+  logActivity({
+    userId: user._id,
+    action: "REGISTER",
+    description: `New ${user.role} account registered`,
+    ipAddress: deviceInfo.ipAddress,
+    userAgent: deviceInfo.userAgent,
+  });
+
   logger.info(`✅ New user registered: ${user.email} (${user.role})`);
 
   return { user, tokens };
@@ -142,9 +152,10 @@ export const login = async (
   deviceInfo: IDeviceInfo
 ): Promise<{ user: UserDocument; tokens: AuthTokens }> => {
   // Find user — must explicitly select password (it's excluded by default)
+  // Also exclude soft-deleted accounts
   const query = input.email
-    ? { email: input.email }
-    : { phone: input.phone };
+    ? { email: input.email, isDeleted: false }
+    : { phone: input.phone, isDeleted: false };
 
   const user = await User.findOne(query).select("+password");
 
@@ -164,6 +175,14 @@ export const login = async (
 
   // Issue tokens and create session
   const tokens = await issueTokens(user, parseDeviceInfo(deviceInfo.userAgent, deviceInfo.ipAddress));
+
+  logActivity({
+    userId: user._id,
+    action: "LOGIN",
+    description: `Logged in from ${deviceInfo.ipAddress ?? "unknown IP"}`,
+    ipAddress: deviceInfo.ipAddress,
+    userAgent: deviceInfo.userAgent,
+  });
 
   logger.info(`🔓 User logged in: ${user.email}`);
 
@@ -246,6 +265,13 @@ export const logout = async (
       { isActive: false }
     ),
   ]);
+
+  logActivity({
+    userId,
+    action: "LOGOUT",
+    description: `Logged out from session`,
+    metadata: { sessionId },
+  });
 
   logger.info(`👋 User ${userId} logged out from session ${sessionId}`);
 };
@@ -382,6 +408,12 @@ export const resetPassword = async (
   await RefreshToken.updateMany({ userId: user._id }, { isRevoked: true });
   await DeviceSession.updateMany({ userId: user._id }, { isActive: false });
 
+  logActivity({
+    userId: user._id,
+    action: "PASSWORD_RESET",
+    description: "Password reset via OTP flow — all sessions invalidated",
+  });
+
   logger.info(`🔑 Password reset for user: ${user.email}`);
 };
 
@@ -402,6 +434,12 @@ export const changePassword = async (
 
   user.password = input.newPassword;
   await user.save();
+
+  logActivity({
+    userId: user._id,
+    action: "PASSWORD_CHANGED",
+    description: "Password changed by user",
+  });
 
   logger.info(`🔑 Password changed for user: ${user.email}`);
 };
