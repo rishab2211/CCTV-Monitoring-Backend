@@ -159,6 +159,9 @@ export const login = async (
 
   const user = await User.findOne(query).select("+password");
 
+  console.log("USER DETAILS",user);
+  
+
   if (!user) {
     throw ApiError.unauthorized("Invalid credentials");
   }

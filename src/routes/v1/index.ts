@@ -3,6 +3,7 @@ import authRoutes from "./auth.routes";
 import userRoutes from "./user.routes";
 import adminRoutes from "./admin.routes";
 import roleUserRoutes from "./roleUser.routes";
+import roleRoutes from "./role.routes";
 
 const router = Router();
 
@@ -15,8 +16,11 @@ router.use("/admins", adminRoutes);
 // /operators, /technicians, /customers are mounted at root level inside roleUserRoutes
 router.use("/", roleUserRoutes);
 
+// ─── Module 3: Role & Permission Management ──────────────────────────────────
+// roleRoutes handles: /roles, /permissions, and /users/:id/roles
+router.use("/", roleRoutes);
+
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
-// router.use("/roles", roleRoutes);
 // router.use("/cameras", cameraRoutes);
 // router.use("/streams", streamRoutes);
 // router.use("/recordings", recordingRoutes);

@@ -2,6 +2,7 @@ import { app } from "./app";
 import { connectDB } from "./config/database";
 import { configureCloudinary } from "./config/cloudinary";
 import { verifyEmailConnection } from "./services/email.service";
+import { seedPermissionsAndRoles } from "./config/permissions.seed";
 import { env } from "./config/env";
 import { logger } from "./utils/logger";
 
@@ -9,6 +10,9 @@ const startServer = async (): Promise<void> => {
   try {
     // ── Connect to MongoDB ────────────────────────────────────────────────────
     await connectDB();
+
+    // ── Seed permissions and roles (idempotent) ───────────────────────────
+    await seedPermissionsAndRoles();
 
     // ── Configure external services ───────────────────────────────────────────
     configureCloudinary();
