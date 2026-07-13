@@ -140,7 +140,13 @@ export type ActivityAction =
   | "USER_ACTIVATED"
   | "USER_DEACTIVATED"
   | "SESSION_REVOKED"
-  | "ALL_SESSIONS_REVOKED";
+  | "ALL_SESSIONS_REVOKED"
+  | "CAMERA_CREATED"
+  | "CAMERA_UPDATED"
+  | "CAMERA_DELETED"
+  | "CAMERA_ASSIGNED"
+  | "CAMERA_TRANSFERRED"
+  | "CAMERA_RESTARTED";
 
 export interface IActivityLog {
   _id: Types.ObjectId;
@@ -152,3 +158,51 @@ export interface IActivityLog {
   metadata?: Record<string, unknown>;
   createdAt: Date;
 }
+
+// ─── Camera Types ─────────────────────────────────────────────────────────────
+
+export type CameraStatus = "online" | "offline" | "maintenance";
+
+export interface ICamera {
+  _id: Types.ObjectId;
+  name: string;
+  serialNumber: string;
+  rtspUrl: string;
+  status: CameraStatus;
+  customerId?: Types.ObjectId;
+  operatorIds: Types.ObjectId[];
+  franchiseId?: Types.ObjectId;
+  location?: ICameraLocation;
+  health: ICameraHealth;
+  settings: ICameraSettings;
+  qrCode?: string;
+  isDeleted: boolean;
+  deletedAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ICameraLocation {
+  street?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface ICameraHealth {
+  cpuUsage?: number;
+  memoryUsage?: number;
+  temperature?: number;
+  storageUsage?: number;
+  lastPing?: Date;
+}
+
+export interface ICameraSettings {
+  recordingEnabled: boolean;
+  motionDetectionEnabled: boolean;
+  aiFeaturesEnabled: boolean;
+  recordingRetentionDays: number;
+}
+

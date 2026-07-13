@@ -63,7 +63,11 @@ const envSchema = z.object({
 
   // CORS
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
+
+  // System API Key
+  SYSTEM_API_KEY: z.string().default("system_dev_secret_key"),
 });
+
 
 const _env = envSchema.safeParse(process.env);
 

@@ -15,7 +15,7 @@ const router = Router();
 
 /** GET /api/v1/operators */
 router.get(
-  "/",
+  "/operators",
   authenticate,
   authorize("super_admin", "admin"),
   validate(listUsersQuerySchema, "query"),
@@ -24,12 +24,13 @@ router.get(
 
 /** POST /api/v1/operators */
 router.post(
-  "/",
+  "/operators",
   authenticate,
   authorize("super_admin", "admin"),
   validate(createUserSchema),
   userController.createOperator
 );
+
 
 // ─── /api/v1/technicians ─────────────────────────────────────────────────────
 

@@ -4,6 +4,7 @@ import userRoutes from "./user.routes";
 import adminRoutes from "./admin.routes";
 import roleUserRoutes from "./roleUser.routes";
 import roleRoutes from "./role.routes";
+import cameraRoutes from "./camera.routes";
 
 const router = Router();
 
@@ -20,8 +21,10 @@ router.use("/", roleUserRoutes);
 // roleRoutes handles: /roles, /permissions, and /users/:id/roles
 router.use("/", roleRoutes);
 
+// ─── Module 4: Camera Management ─────────────────────────────────────────────
+router.use("/cameras", cameraRoutes);
+
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
-// router.use("/cameras", cameraRoutes);
 // router.use("/streams", streamRoutes);
 // router.use("/recordings", recordingRoutes);
 // router.use("/alerts", alertRoutes);

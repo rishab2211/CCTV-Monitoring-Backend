@@ -17,6 +17,18 @@ export const authenticate = (
   next: NextFunction
 ): void => {
   try {
+    // ── Check System API Key (bypass JWT for internal hardware/cron requests) ──
+    const systemKey = req.headers["x-system-key"];
+    if (systemKey && systemKey === env.SYSTEM_API_KEY) {
+      req.user = {
+        userId: "system",
+        role: "super_admin",
+        sessionId: "system-session",
+        email: "system@cctvmonitor.com",
+      };
+      return next();
+    }
+
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
