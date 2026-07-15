@@ -8,6 +8,8 @@ import {
   listAlertsQuerySchema,
   resolveAlertSchema,
   alertIdParamSchema,
+  verifyAlertSchema,
+  updateAlertRulesSchema,
 } from "../../validators/alert.validator";
 import { cameraIdParamSchema } from "../../validators/stream.validator"; // Reuse camera ID param validator
 
@@ -49,6 +51,33 @@ router.patch(
   permit("alerts:manage"),
   validate(alertIdParamSchema, "params"),
   alertController.escalateAlert
+);
+
+// Verify an alert
+router.post(
+  "/:id/verify",
+  permit("alerts:manage"),
+  validate(alertIdParamSchema, "params"),
+  validate(verifyAlertSchema),
+  alertController.verifyAlert
+);
+
+// ─── Alert Rules Config ───────────────────────────────────────────────────────
+
+// Configure alert rules
+router.put(
+  "/rules",
+  permit("alerts:manage", "cameras:manage"), // Need admin/manage privileges
+  validate(updateAlertRulesSchema),
+  alertController.updateAlertRules
+);
+
+// Get alert rules for camera
+router.get(
+  "/rules/:cameraId",
+  permit("alerts:view", "cameras:view"),
+  validate(cameraIdParamSchema, "params"),
+  alertController.getAlertRules
 );
 
 // ─── Queries & Aggregations ───────────────────────────────────────────────────

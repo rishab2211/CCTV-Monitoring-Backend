@@ -238,6 +238,7 @@ export interface ICameraSettings {
   aiFeaturesEnabled: boolean;
   recordingRetentionDays: number;
   talkbackEnabled: boolean;
+  alertRules?: any; // Generic rules configuration
 }
 
 // ─── Stream Session Types ─────────────────────────────────────────────────────
@@ -350,6 +351,7 @@ export interface IAlert {
   acknowledgedAt?: Date;
   resolvedAt?: Date;
   resolutionNotes?: string;
+  isVerified?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -9,6 +9,26 @@ export const createAlertSchema = z.object({
   description: z.string().max(500).optional(),
 });
 
+/**
+ * Schema for verifying an alert
+ */
+export const verifyAlertSchema = z.object({
+  body: z.object({
+    isVerified: z.boolean({ required_error: "isVerified is required" }),
+    notes: z.string().optional(),
+  }),
+});
+
+/**
+ * Schema for updating alert rules
+ */
+export const updateAlertRulesSchema = z.object({
+  body: z.object({
+    cameraId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid Camera ID"),
+    rules: z.record(z.any(), { required_error: "Rules object is required" }),
+  }),
+});
+
 export const listAlertsQuerySchema = paginationSchema.extend({
   cameraId: objectIdSchema.optional(),
   status: z.enum(["new", "acknowledged", "resolved", "escalated"]).optional(),

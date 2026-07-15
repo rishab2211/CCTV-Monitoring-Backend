@@ -52,6 +52,9 @@ const alertSchema = new Schema<AlertDocument>(
     resolutionNotes: {
       type: String,
     },
+    isVerified: {
+      type: Boolean,
+    },
   },
   { timestamps: true }
 );

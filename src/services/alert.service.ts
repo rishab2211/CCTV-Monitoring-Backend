@@ -292,3 +292,67 @@ export const getAlertStats = async (user: JwtAccessPayload) => {
 
   return formattedStats;
 };
+
+/**
+ * Verify an alert (True/False alarm)
+ */
+export const verifyAlert = async (
+  id: string,
+  isVerified: boolean,
+  notes?: string,
+  user?: JwtAccessPayload
+) => {
+  const alert = await Alert.findById(id);
+  if (!alert) throw ApiError.notFound("Alert");
+
+  const camera = await Camera.findOne({ _id: alert.cameraId, isDeleted: false });
+  if (camera && user) {
+    await validateCameraAccess(camera, user);
+  }
+
+  alert.isVerified = isVerified;
+  if (notes) {
+    alert.resolutionNotes = alert.resolutionNotes ? `${alert.resolutionNotes}\nVerification Notes: ${notes}` : `Verification Notes: ${notes}`;
+  }
+
+  await alert.save();
+  return alert;
+};
+
+/**
+ * Configure Alert Rules for a specific camera
+ */
+export const updateAlertRules = async (
+  cameraId: string,
+  rules: any,
+  user?: JwtAccessPayload
+) => {
+  const camera = await Camera.findOne({ _id: cameraId, isDeleted: false });
+  if (!camera) throw ApiError.notFound("Camera");
+
+  if (user) {
+    await validateCameraAccess(camera, user);
+  }
+
+  camera.settings.alertRules = { ...(camera.settings.alertRules || {}), ...rules };
+  await camera.save();
+
+  return camera.settings.alertRules;
+};
+
+/**
+ * Get Alert Rules for a specific camera
+ */
+export const getAlertRules = async (
+  cameraId: string,
+  user?: JwtAccessPayload
+) => {
+  const camera = await Camera.findOne({ _id: cameraId, isDeleted: false });
+  if (!camera) throw ApiError.notFound("Camera");
+
+  if (user) {
+    await validateCameraAccess(camera, user);
+  }
+
+  return camera.settings.alertRules || {};
+};

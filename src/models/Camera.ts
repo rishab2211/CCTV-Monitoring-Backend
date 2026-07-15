@@ -85,11 +85,12 @@ const cameraSchema = new Schema<CameraDocument>(
       lastPing: { type: Date, default: null },
     },
     settings: {
-      recordingEnabled: { type: Boolean, default: false },
-      motionDetectionEnabled: { type: Boolean, default: false },
+      recordingEnabled: { type: Boolean, default: true },
+      motionDetectionEnabled: { type: Boolean, default: true },
       aiFeaturesEnabled: { type: Boolean, default: false },
       recordingRetentionDays: { type: Number, default: 30 },
       talkbackEnabled: { type: Boolean, default: false },
+      alertRules: { type: Schema.Types.Mixed, default: {} },
     },
     qrCode: {
       type: String,
