@@ -75,6 +75,8 @@ const activityLogSchema = new Schema<ActivityLogDocument>(
         "TALKBACK_STARTED",
         "TALKBACK_STOPPED",
         "ROLE_CREATED",
+        "SYSTEM_CONFIG_UPDATED",
+        "PAYMENT_REFUNDED",
       ] as ActivityAction[],
     },
     description: {

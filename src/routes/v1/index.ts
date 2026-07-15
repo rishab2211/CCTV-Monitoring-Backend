@@ -17,6 +17,7 @@ import jobRoutes from "./job.routes";
 import operatorRoutes from "./operator.routes";
 import operatorPanelRoutes from "./operatorPanel.routes";
 import customerRoutes from "./customer.routes";
+import { planRouter, subscriptionRouter, paymentRouter, invoiceRouter } from "./billing.routes";
 
 const router = Router();
 
@@ -77,15 +78,14 @@ router.use("/customer", customerRoutes);
 // /customers (plural) — legacy alias kept for backwards compatibility
 router.use("/customers", customerRoutes);
 
+// ─── Module 16: Payment & Subscription Module ──────────────────
+router.use("/plans", planRouter);
+router.use("/subscriptions", subscriptionRouter);
+router.use("/payments", paymentRouter);
+router.use("/invoices", invoiceRouter);
+
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
 // router.use("/reports", reportRoutes);
-// router.use("/billing", billingRoutes);
-// router.use("/installations", installationRoutes);
-// router.use("/operator", operatorRoutes);
-// router.use("/customer", customerRoutes);
-// router.use("/plans", planRoutes);
-// router.use("/subscriptions", subscriptionRoutes);
-// router.use("/payments", paymentRoutes);
 // router.use("/analytics", analyticsRoutes);
 // router.use("/audit-logs", auditRoutes);
 // router.use("/tickets", ticketRoutes);

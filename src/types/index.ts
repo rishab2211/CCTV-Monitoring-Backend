@@ -183,7 +183,9 @@ export type ActivityAction =
   | "INCIDENT_MEDIA_UPLOADED"
   | "INCIDENT_CLOSED"
   | "INCIDENT_VERIFIED"
-  | "SOS_NOTE_ADDED";
+  | "SOS_NOTE_ADDED"
+  | "SYSTEM_CONFIG_UPDATED"
+  | "PAYMENT_REFUNDED";
 
 export interface IActivityLog {
   _id: Types.ObjectId;
@@ -536,6 +538,7 @@ export type SubscriptionStatus = "active" | "past_due" | "canceled";
 export interface ISubscription {
   _id: Types.ObjectId;
   customerId: Types.ObjectId;
+  planId: Types.ObjectId;
   planName: string;
   status: SubscriptionStatus;
   startDate: Date;

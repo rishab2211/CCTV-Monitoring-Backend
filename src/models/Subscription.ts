@@ -14,6 +14,11 @@ const subscriptionSchema = new Schema<SubscriptionDocument>(
       ref: "User",
       required: true,
     },
+    planId: {
+      type: Schema.Types.ObjectId,
+      ref: "Plan",
+      required: true,
+    },
     planName: {
       type: String,
       required: true,
