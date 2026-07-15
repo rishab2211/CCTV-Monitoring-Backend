@@ -20,6 +20,7 @@ import customerRoutes from "./customer.routes";
 import { planRouter, subscriptionRouter, paymentRouter, invoiceRouter } from "./billing.routes";
 import analyticsRoutes from "./analytics.routes";
 import { auditRouter, activityRouter } from "./audit.routes";
+import ticketRoutes from "./ticket.routes";
 
 const router = Router();
 
@@ -90,11 +91,12 @@ router.use("/invoices", invoiceRouter);
 router.use("/audit-logs", auditRouter);
 router.use("/activity-logs", activityRouter);
 
+// ─── Module 19: Support Tickets ────────────────────────────────────────────────
+router.use("/tickets", ticketRoutes);
+
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
 // router.use("/reports", reportRoutes);
 router.use("/analytics", analyticsRoutes);
-// router.use("/tickets", ticketRoutes);
-// router.use("/tickets", ticketRoutes);
 // router.use("/settings", settingsRoutes);
 
 export default router;

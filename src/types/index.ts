@@ -185,7 +185,12 @@ export type ActivityAction =
   | "INCIDENT_VERIFIED"
   | "SOS_NOTE_ADDED"
   | "SYSTEM_CONFIG_UPDATED"
-  | "PAYMENT_REFUNDED";
+  | "PAYMENT_REFUNDED"
+  | "TICKET_CREATED"
+  | "TICKET_UPDATED"
+  | "TICKET_COMMENTED"
+  | "TICKET_ASSIGNED"
+  | "TICKET_CLOSED";
 
 export interface IActivityLog {
   _id: Types.ObjectId;

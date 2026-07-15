@@ -77,6 +77,11 @@ const activityLogSchema = new Schema<ActivityLogDocument>(
         "ROLE_CREATED",
         "SYSTEM_CONFIG_UPDATED",
         "PAYMENT_REFUNDED",
+        "TICKET_CREATED",
+        "TICKET_UPDATED",
+        "TICKET_COMMENTED",
+        "TICKET_ASSIGNED",
+        "TICKET_CLOSED",
       ] as ActivityAction[],
     },
     description: {
