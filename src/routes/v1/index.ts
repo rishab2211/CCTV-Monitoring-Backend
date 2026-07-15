@@ -9,6 +9,7 @@ import streamRoutes from "./stream.routes";
 import recordingRoutes from "./recording.routes";
 import alertRoutes from "./alert.routes";
 import talkbackRoutes from "./talkback.routes";
+import notificationRoutes from "./notification.routes";
 
 const router = Router();
 
@@ -41,8 +42,10 @@ router.use("/alerts", alertRoutes);
 // ─── Module 8: Audio Talkback ──────────────────────────────────────────────────
 router.use("/talkback", talkbackRoutes);
 
+// ─── Module 9: Notification Module ───────────────────────────────────────────
+router.use("/notifications", notificationRoutes);
+
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
-// router.use("/notifications", notificationRoutes);
 // router.use("/sos", sosRoutes);
 // router.use("/incidents", incidentRoutes);
 // router.use("/franchises", franchiseRoutes);

@@ -138,6 +138,19 @@ const userSchema = new Schema<UserDocument>(
     technicianDetails: technicianDetailsSchema,
     customerDetails: customerDetailsSchema,
 
+    notificationPreferences: {
+      alerts: {
+        push: { type: Boolean, default: true },
+        inApp: { type: Boolean, default: true },
+        email: { type: Boolean, default: false },
+      },
+      system: {
+        push: { type: Boolean, default: false },
+        inApp: { type: Boolean, default: true },
+        email: { type: Boolean, default: true },
+      },
+    },
+
     // Soft delete
     isDeleted: {
       type: Boolean,

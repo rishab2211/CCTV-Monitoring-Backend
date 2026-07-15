@@ -27,6 +27,8 @@ export interface IUser {
   technicianDetails?: ITechnicianDetails;
   customerDetails?: ICustomerDetails;
 
+  notificationPreferences?: INotificationPreference;
+
   // Soft delete
   isDeleted: boolean;
   deletedAt?: Date | null;
@@ -305,6 +307,11 @@ export interface ISystemSetting {
   updatedAt: Date;
 }
 
+export interface INotificationPreference {
+  alerts: { push: boolean; inApp: boolean; email: boolean };
+  system: { push: boolean; inApp: boolean; email: boolean };
+}
+
 // ─── Alert Engine Types ───────────────────────────────────────────────────────
 
 export type AlertType = "motion" | "fire" | "hazard" | "tampering" | "other";
@@ -339,6 +346,33 @@ export interface ITalkbackSession {
   endedAt?: Date;
   durationSeconds?: number;
   status: TalkbackStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Notification & Device Types ──────────────────────────────────────────────
+
+export type NotificationType = "alert" | "system" | "message";
+
+export interface INotification {
+  _id: Types.ObjectId;
+  userId: Types.ObjectId;
+  title: string;
+  body: string;
+  type: NotificationType;
+  referenceId?: Types.ObjectId;
+  isRead: boolean;
+  readAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IDeviceToken {
+  _id: Types.ObjectId;
+  userId: Types.ObjectId;
+  token: string;
+  deviceType: "android" | "ios" | "web";
+  lastUsedAt: Date;
   createdAt: Date;
   updatedAt: Date;
 }
