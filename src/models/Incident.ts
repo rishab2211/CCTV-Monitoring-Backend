@@ -51,6 +51,22 @@ const incidentSchema = new Schema<IncidentDocument>(
     resolutionNotes: {
       type: String,
     },
+    isVerified: {
+      // Whether an operator has formally verified/confirmed this incident
+      type: Boolean,
+      default: false,
+    },
+    closedAt: {
+      type: Date,
+    },
+    notes: [
+      {
+        // Chronological operator notes during investigation
+        text: { type: String, required: true },
+        addedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+        addedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );

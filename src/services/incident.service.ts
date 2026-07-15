@@ -267,3 +267,215 @@ export const assignIncident = async (id: string, assignedTo: string, user: JwtAc
 
   return incident;
 };
+
+/**
+ * Add Note to Incident
+ * Appends a free-text operator note to an incident's notes array.
+ * Logs the activity for auditability.
+ *
+ * @param id - The incident ID
+ * @param text - The note content
+ * @param user - The operator adding the note
+ * @returns The updated Incident document
+ * @throws ApiError if the incident is not found
+ */
+export const addIncidentNote = async (id: string, text: string, user: JwtAccessPayload) => {
+  const incident = await Incident.findById(id);
+  if (!incident) throw ApiError.notFound("Incident not found");
+
+  if (!incident.notes) incident.notes = [];
+  incident.notes.push({
+    text,
+    addedBy: new mongoose.Types.ObjectId(user.userId),
+    addedAt: new Date(),
+  });
+
+  await incident.save();
+
+  logActivity({
+    userId: new mongoose.Types.ObjectId(user.userId),
+    action: "INCIDENT_NOTE_ADDED",
+    description: `Added a note to incident ${incident._id}`,
+    metadata: { incidentId: id },
+  });
+
+  return incident;
+};
+
+/**
+ * Upload Media to Incident
+ * Appends one or more media file paths (photos/clips) to the incident's
+ * attachments array. Files are uploaded via multer before this is called.
+ *
+ * @param id - The incident ID
+ * @param filePaths - Array of server-relative file paths from multer
+ * @param user - The operator uploading the media
+ * @returns The updated Incident document
+ * @throws ApiError if the incident is not found
+ */
+export const uploadIncidentMedia = async (id: string, filePaths: string[], user: JwtAccessPayload) => {
+  const incident = await Incident.findById(id);
+  if (!incident) throw ApiError.notFound("Incident not found");
+
+  // Append new file paths; existing attachments are preserved
+  incident.attachments = [...incident.attachments, ...filePaths];
+  await incident.save();
+
+  logActivity({
+    userId: new mongoose.Types.ObjectId(user.userId),
+    action: "INCIDENT_MEDIA_UPLOADED",
+    description: `Uploaded ${filePaths.length} media file(s) to incident ${incident._id}`,
+    metadata: { incidentId: id, files: filePaths },
+  });
+
+  return incident;
+};
+
+/**
+ * Close Incident
+ * Explicitly marks an incident as 'closed' with mandatory resolution notes.
+ * Records the closure timestamp.
+ *
+ * @param id - The incident ID
+ * @param resolutionNotes - Notes explaining how the incident was resolved
+ * @param user - The operator or admin closing the incident
+ * @returns The updated Incident document
+ * @throws ApiError if already closed or resolution notes are missing
+ */
+export const closeIncident = async (id: string, resolutionNotes: string, user: JwtAccessPayload) => {
+  if (user.role === "customer") {
+    throw ApiError.forbidden("Customers cannot close incidents");
+  }
+
+  const incident = await Incident.findById(id);
+  if (!incident) throw ApiError.notFound("Incident not found");
+  if (incident.status === "closed") throw ApiError.badRequest("Incident is already closed");
+
+  incident.status = "closed";
+  incident.resolutionNotes = resolutionNotes;
+  incident.closedAt = new Date();
+  await incident.save();
+
+  logActivity({
+    userId: new mongoose.Types.ObjectId(user.userId),
+    action: "INCIDENT_CLOSED",
+    description: `Closed incident ${incident._id}`,
+    metadata: { incidentId: id },
+  });
+
+  socketService.emitToUser(incident.reportedBy.toString(), "incident_closed", incident);
+
+  return incident;
+};
+
+/**
+ * Verify Incident
+ * Allows an operator to formally confirm the incident is valid.
+ * Sets the isVerified flag and optionally appends a note.
+ *
+ * @param id - The incident ID
+ * @param notes - Optional note to append during verification
+ * @param user - The operator verifying the incident
+ * @returns The updated Incident document
+ * @throws ApiError if the incident is not found or user lacks access
+ */
+export const verifyIncident = async (id: string, notes: string | undefined, user: JwtAccessPayload) => {
+  if (user.role === "customer") {
+    throw ApiError.forbidden("Customers cannot verify incidents");
+  }
+
+  const incident = await Incident.findById(id);
+  if (!incident) throw ApiError.notFound("Incident not found");
+
+  incident.isVerified = true;
+  if (notes) {
+    if (!incident.notes) incident.notes = [];
+    incident.notes.push({
+      text: `Verification note: ${notes}`,
+      addedBy: new mongoose.Types.ObjectId(user.userId),
+      addedAt: new Date(),
+    });
+  }
+
+  await incident.save();
+
+  logActivity({
+    userId: new mongoose.Types.ObjectId(user.userId),
+    action: "INCIDENT_VERIFIED",
+    description: `Verified incident ${incident._id}`,
+    metadata: { incidentId: id },
+  });
+
+  return incident;
+};
+
+/**
+ * Get Incident Timeline
+ * Retrieves the chronological activity log events for a specific incident.
+ * Provides a full audit trail of all actions taken on the incident.
+ *
+ * @param id - The incident ID
+ * @param user - The user requesting the timeline
+ * @returns An array of activity log documents sorted ascending by timestamp
+ * @throws ApiError if not found or access is denied
+ */
+export const getIncidentTimeline = async (id: string, user: JwtAccessPayload) => {
+  const incident = await Incident.findById(id);
+  if (!incident) throw ApiError.notFound("Incident not found");
+
+  // Customers can only see timeline of incidents they reported
+  if (user.role === "customer" && incident.reportedBy.toString() !== user.userId) {
+    throw ApiError.forbidden("Access denied");
+  }
+
+  const timeline = await mongoose.connection.collection("activitylogs")
+    .find({ "metadata.incidentId": new mongoose.Types.ObjectId(id) })
+    .sort({ createdAt: 1 })
+    .toArray();
+
+  return timeline;
+};
+
+/**
+ * Generate Incident Report
+ * Returns a comprehensive structured report for an incident.
+ * In production this could be used to generate a PDF (e.g. via puppeteer or pdfmake).
+ * Includes all populated fields, notes array, and full activity timeline.
+ *
+ * @param id - The incident ID
+ * @param user - The user requesting the report (must be operator or admin)
+ * @returns A report object with incident data, notes, timeline, and summary stats
+ * @throws ApiError if not found or user role is customer
+ */
+export const getIncidentReport = async (id: string, user: JwtAccessPayload) => {
+  if (user.role === "customer") {
+    throw ApiError.forbidden("Customers cannot generate incident reports");
+  }
+
+  const incident = await Incident.findById(id)
+    .populate("reportedBy", "name email phone")
+    .populate("assignedTo", "name email phone")
+    .populate("cameraId", "name serialNumber location")
+    .populate("notes.addedBy", "name role")
+    .lean();
+
+  if (!incident) throw ApiError.notFound("Incident not found");
+
+  const timeline = await mongoose.connection.collection("activitylogs")
+    .find({ "metadata.incidentId": new mongoose.Types.ObjectId(id) })
+    .sort({ createdAt: 1 })
+    .toArray();
+
+  return {
+    generatedAt: new Date().toISOString(),
+    incident,
+    timeline,
+    summary: {
+      totalNotes: incident.notes?.length ?? 0,
+      totalAttachments: incident.attachments?.length ?? 0,
+      isVerified: incident.isVerified ?? false,
+      status: incident.status,
+      severity: incident.severity,
+    },
+  };
+};

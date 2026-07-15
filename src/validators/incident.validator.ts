@@ -65,3 +65,30 @@ export const incidentIdParamSchema = z.object({
     id: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid Incident ID"),
   }),
 });
+
+/**
+ * Schema for adding a note to an Incident.
+ */
+export const addIncidentNoteSchema = z.object({
+  body: z.object({
+    text: z.string().min(1, "Note text is required").max(2000, "Note is too long"),
+  }),
+});
+
+/**
+ * Schema for explicitly closing an Incident with resolution notes.
+ */
+export const closeIncidentSchema = z.object({
+  body: z.object({
+    resolutionNotes: z.string().min(5, "Resolution notes are required to close an incident"),
+  }),
+});
+
+/**
+ * Schema for verifying an Incident.
+ */
+export const verifyIncidentSchema = z.object({
+  body: z.object({
+    notes: z.string().max(2000).optional(),
+  }),
+});

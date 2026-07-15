@@ -178,7 +178,12 @@ export type ActivityAction =
   | "ALERT_RESOLVED"
   | "ALERT_ESCALATED"
   | "TALKBACK_STARTED"
-  | "TALKBACK_STOPPED";
+  | "TALKBACK_STOPPED"
+  | "INCIDENT_NOTE_ADDED"
+  | "INCIDENT_MEDIA_UPLOADED"
+  | "INCIDENT_CLOSED"
+  | "INCIDENT_VERIFIED"
+  | "SOS_NOTE_ADDED";
 
 export interface IActivityLog {
   _id: Types.ObjectId;
@@ -441,6 +446,13 @@ export interface IIncident {
   assignedTo?: Types.ObjectId;
   attachments: string[]; // URLs or local file paths
   resolutionNotes?: string;
+  isVerified?: boolean;
+  closedAt?: Date;
+  notes?: {
+    text: string;
+    addedBy: Types.ObjectId;
+    addedAt: Date;
+  }[];
   createdAt: Date;
   updatedAt: Date;
 }
