@@ -25,6 +25,50 @@ export const triggerSos = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
+ * Get SOS Detail Endpoint
+ * GET /api/v1/sos/:id
+ * Retrieves the detailed information of an SOS alert.
+ */
+export const getSosDetail = catchAsync(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const sos = await sosService.getSosDetail(req.params.id, req.user);
+  res.status(200).json(new ApiResponse(200, sos));
+});
+
+/**
+ * Get Active SOS Alerts Endpoint
+ * GET /api/v1/sos/active
+ * Retrieves a list of active SOS alerts globally.
+ */
+export const getActiveSos = catchAsync(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const sosAlerts = await sosService.getActiveSos(req.user);
+  res.status(200).json(new ApiResponse(200, sosAlerts));
+});
+
+/**
+ * Add SOS Note Endpoint
+ * POST /api/v1/sos/:id/notes
+ * Appends a resolution/progress note to an SOS alert.
+ */
+export const addSosNote = catchAsync(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const sos = await sosService.addSosNote(req.params.id, req.body.text, req.user);
+  res.status(200).json(new ApiResponse(200, sos, "Note added to SOS alert"));
+});
+
+/**
+ * Get SOS Timeline Endpoint
+ * GET /api/v1/sos/:id/timeline
+ * Fetches the chronological activity log events related to a specific SOS alert.
+ */
+export const getSosTimeline = catchAsync(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const timeline = await sosService.getSosTimeline(req.params.id, req.user);
+  res.status(200).json(new ApiResponse(200, timeline));
+});
+
+/**
  * List SOS Alerts Endpoint
  * GET /api/v1/sos
  * Retrieves active/acknowledged/resolved SOS alerts.

@@ -42,3 +42,9 @@ export const sosIdParamSchema = z.object({
     id: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid SOS ID format"),
   }),
 });
+
+export const addSosNoteSchema = z.object({
+  body: z.object({
+    text: z.string().min(1, "Note text is required").max(1000, "Note is too long"),
+  }),
+});

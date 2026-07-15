@@ -294,7 +294,16 @@ export const getAlertStats = async (user: JwtAccessPayload) => {
 };
 
 /**
- * Verify an alert (True/False alarm)
+ * Verify Alert
+ * Allows an operator to confirm whether an alert is a true or false alarm.
+ * If notes are provided, they are appended to the resolution notes.
+ * 
+ * @param id - The ID of the Alert to verify
+ * @param isVerified - Boolean indicating if the alert is verified (true alarm)
+ * @param notes - Optional verification notes to append
+ * @param user - The operator verifying the alert
+ * @returns The updated Alert document
+ * @throws ApiError if the alert or camera is not found, or if user lacks access
  */
 export const verifyAlert = async (
   id: string,
@@ -320,7 +329,15 @@ export const verifyAlert = async (
 };
 
 /**
- * Configure Alert Rules for a specific camera
+ * Configure Alert Rules
+ * Updates the alert rules for a specific camera in its settings.
+ * This can include thresholds, motion sensitivity, and scheduled time windows.
+ * 
+ * @param cameraId - The ID of the Camera
+ * @param rules - An object containing the new alert rules to merge
+ * @param user - The admin/operator updating the rules
+ * @returns The merged alert rules object
+ * @throws ApiError if the camera is not found or user lacks access
  */
 export const updateAlertRules = async (
   cameraId: string,
@@ -341,7 +358,13 @@ export const updateAlertRules = async (
 };
 
 /**
- * Get Alert Rules for a specific camera
+ * Get Alert Rules
+ * Retrieves the currently configured alert rules for a specific camera.
+ * 
+ * @param cameraId - The ID of the Camera
+ * @param user - The user requesting the rules
+ * @returns The alert rules object, or an empty object if none exist
+ * @throws ApiError if the camera is not found or user lacks access
  */
 export const getAlertRules = async (
   cameraId: string,

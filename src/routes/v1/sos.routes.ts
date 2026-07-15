@@ -8,6 +8,7 @@ import {
   listSosSchema,
   resolveSosSchema,
   sosIdParamSchema,
+  addSosNoteSchema,
 } from "../../validators/sos.validator";
 
 const router = Router();
@@ -46,6 +47,36 @@ router.post(
   validate(sosIdParamSchema, "params"),
   validate(resolveSosSchema, "body"),
   sosController.resolveSos
+);
+
+// ─── Details, Notes & Timeline ────────────────────────────────────────────────
+
+router.get(
+  "/active",
+  permit("alerts:view"),
+  sosController.getActiveSos
+);
+
+router.get(
+  "/:id",
+  permit("alerts:view"),
+  validate(sosIdParamSchema, "params"),
+  sosController.getSosDetail
+);
+
+router.post(
+  "/:id/notes",
+  permit("alerts:resolve"),
+  validate(sosIdParamSchema, "params"),
+  validate(addSosNoteSchema, "body"),
+  sosController.addSosNote
+);
+
+router.get(
+  "/:id/timeline",
+  permit("alerts:view"),
+  validate(sosIdParamSchema, "params"),
+  sosController.getSosTimeline
 );
 
 export default router;

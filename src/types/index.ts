@@ -414,6 +414,11 @@ export interface ISosAlert {
   resolvedBy?: Types.ObjectId;
   resolvedAt?: Date;
   resolutionNotes?: string;
+  notes?: {
+    text: string;
+    addedBy: Types.ObjectId;
+    addedAt: Date;
+  }[];
   createdAt: Date;
   updatedAt: Date;
 }

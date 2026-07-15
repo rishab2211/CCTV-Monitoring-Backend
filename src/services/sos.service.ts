@@ -220,3 +220,98 @@ export const resolveSos = async (
 
   return populatedSos;
 };
+
+/**
+ * Get SOS Detail
+ * Retrieves the full detail of a specific SOS alert, populating referenced entities
+ * such as the triggered user, assigned camera, and any added notes.
+ * 
+ * @param id - The ID of the SOS Alert
+ * @param user - The user requesting the detail
+ * @returns The populated SOS Alert document
+ * @throws ApiError if the SOS alert is not found
+ */
+export const getSosDetail = async (id: string, user: JwtAccessPayload) => {
+  const sos = await SosAlert.findById(id)
+    .populate("triggeredBy", "name role email")
+    .populate("cameraId", "name location")
+    .populate("acknowledgedBy", "name role")
+    .populate("resolvedBy", "name role")
+    .populate("notes.addedBy", "name role")
+    .lean();
+
+  if (!sos) throw ApiError.notFound("SOS Alert not found");
+  return sos;
+};
+
+/**
+ * Get Active SOS Alerts
+ * Retrieves a list of all currently active SOS alerts across the system.
+ * Useful for displaying live emergencies on operator dashboards.
+ * 
+ * @param user - The operator requesting the list
+ * @returns An array of active SOS alerts
+ */
+export const getActiveSos = async (user: JwtAccessPayload) => {
+  const sosAlerts = await SosAlert.find({ status: "active" })
+    .populate("triggeredBy", "name role email")
+    .populate("cameraId", "name location")
+    .sort({ createdAt: -1 })
+    .lean();
+  return sosAlerts;
+};
+
+/**
+ * Add Note to SOS
+ * Appends a textual note to an SOS alert (e.g., "Dispatched security").
+ * Also logs the activity in the system's activity log.
+ * 
+ * @param id - The ID of the SOS Alert
+ * @param text - The content of the note
+ * @param user - The operator adding the note
+ * @returns The updated SOS Alert document
+ * @throws ApiError if the SOS alert is not found
+ */
+export const addSosNote = async (id: string, text: string, user: JwtAccessPayload) => {
+  const sos = await SosAlert.findById(id);
+  if (!sos) throw ApiError.notFound("SOS Alert not found");
+
+  if (!sos.notes) {
+    sos.notes = [];
+  }
+
+  sos.notes.push({
+    text,
+    addedBy: new mongoose.Types.ObjectId(user.userId),
+    addedAt: new Date(),
+  });
+
+  await sos.save();
+
+  logActivity({
+    userId: new mongoose.Types.ObjectId(user.userId),
+    action: "SOS_NOTE_ADDED",
+    description: `Added a note to SOS ${sos._id}`,
+    metadata: { sosId: sos._id },
+  });
+
+  return sos;
+};
+
+/**
+ * Get SOS Timeline
+ * Fetches the chronological activity log entries associated with a specific SOS alert.
+ * This includes creation, acknowledgment, notes added, and resolution events.
+ * 
+ * @param id - The ID of the SOS Alert
+ * @param user - The user requesting the timeline
+ * @returns An array of activity log documents
+ */
+export const getSosTimeline = async (id: string, user: JwtAccessPayload) => {
+  const timeline = await mongoose.connection.collection("activitylogs")
+    .find({ "metadata.sosId": new mongoose.Types.ObjectId(id) })
+    .sort({ createdAt: 1 })
+    .toArray();
+
+  return timeline;
+};

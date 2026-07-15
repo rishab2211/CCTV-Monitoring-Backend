@@ -55,18 +55,33 @@ export const getAlertStats = catchAsync(async (req: Request, res: Response) => {
 // The endpoint for alert history of a specific camera is essentially listAlerts with cameraId filter
 // We will route /:cameraId/history to listAlerts in the router directly.
 
+/**
+ * Verify Alert Endpoint
+ * POST /api/v1/alerts/:id/verify
+ * Allows an operator to confirm whether an alert is a true or false alarm.
+ */
 export const verifyAlert = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
   const alert = await alertService.verifyAlert(req.params.id, req.body.isVerified, req.body.notes, req.user);
   res.status(200).json(new ApiResponse(200, alert, "Alert verification updated"));
 });
 
+/**
+ * Configure Alert Rules Endpoint
+ * PUT /api/v1/alerts/rules
+ * Allows an admin or operator with manage access to configure rules for a specific camera.
+ */
 export const updateAlertRules = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
   const rules = await alertService.updateAlertRules(req.body.cameraId, req.body.rules, req.user);
   res.status(200).json(new ApiResponse(200, rules, "Alert rules updated"));
 });
 
+/**
+ * Get Alert Rules Endpoint
+ * GET /api/v1/alerts/rules/:cameraId
+ * Retrieves the currently configured alert rules for a specific camera.
+ */
 export const getAlertRules = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
   const rules = await alertService.getAlertRules(req.params.cameraId, req.user);

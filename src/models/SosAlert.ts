@@ -40,6 +40,13 @@ const sosAlertSchema = new Schema<SosAlertDocument>(
     resolutionNotes: {
       type: String,
     },
+    notes: [
+      {
+        text: { type: String, required: true },
+        addedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+        addedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );
