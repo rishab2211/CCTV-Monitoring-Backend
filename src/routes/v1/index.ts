@@ -15,6 +15,7 @@ import incidentRoutes from "./incident.routes";
 import franchiseRoutes from "./franchise.routes";
 import jobRoutes from "./job.routes";
 import operatorRoutes from "./operator.routes";
+import customerRoutes from "./customer.routes";
 
 const router = Router();
 
@@ -63,6 +64,9 @@ router.use("/jobs", jobRoutes);
 
 // ─── Module 14: Operator Module ─────────────────────────────────────────────
 router.use("/operators", operatorRoutes); 
+
+// ─── Module 15: Customer Module ─────────────────────────────────────────────
+router.use("/customers", customerRoutes); 
 
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
 // router.use("/reports", reportRoutes);

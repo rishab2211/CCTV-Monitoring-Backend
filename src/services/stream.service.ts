@@ -173,6 +173,8 @@ export const stopStream = async (input: StopStreamInput, user: JwtAccessPayload)
   };
 };
 
+import { Subscription } from "../models/Subscription";
+
 /**
  * Get a fresh stream token for a camera the user already has access to.
  * Does NOT create a new StreamSession (user is already watching).
@@ -189,6 +191,14 @@ export const getStreamToken = async (
   if (!camera) throw ApiError.notFound("Camera");
 
   await validateCameraAccess(camera, user);
+
+  // Enforce Subscription Check for Customers
+  if (user.role === "customer") {
+    const activeSub = await Subscription.findOne({ customerId: user.userId, status: "active" });
+    if (!activeSub) {
+      throw ApiError.forbidden("Active subscription required to view camera streams");
+    }
+  }
 
   // Ensure path is registered
   const pathName = toPathName(camera.serialNumber);
@@ -319,6 +329,14 @@ export const relayWebRTCOffer = async (
   if (!camera) throw ApiError.notFound("Camera");
 
   await validateCameraAccess(camera, user);
+
+  // Enforce Subscription Check for Customers
+  if (user.role === "customer") {
+    const activeSub = await Subscription.findOne({ customerId: user.userId, status: "active" });
+    if (!activeSub) {
+      throw ApiError.forbidden("Active subscription required for WebRTC streaming");
+    }
+  }
 
   const pathName = toPathName(camera.serialNumber);
 

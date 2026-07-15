@@ -51,12 +51,18 @@ const cameraSchema = new Schema<CameraDocument>(
       default: null,
       index: true,
     },
-    operatorIds: {
-      type: [Schema.Types.ObjectId],
-      ref: "User",
-      default: [],
-      index: true,
-    },
+    operatorIds: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    sharedWith: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     franchiseId: {
       type: Schema.Types.ObjectId,
       ref: "User",

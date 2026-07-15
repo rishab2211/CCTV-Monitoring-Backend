@@ -165,6 +165,9 @@ export type ActivityAction =
   | "OPERATOR_CLOCKED_IN"
   | "OPERATOR_CLOCKED_OUT"
   | "OPERATOR_CAMERAS_ASSIGNED"
+  | "SUBSCRIPTION_CREATED"
+  | "SUBSCRIPTION_CANCELED"
+  | "INVOICE_GENERATED"
   | "STREAM_STARTED"
   | "STREAM_STOPPED"
   | "RECORDING_DELETED"
@@ -200,6 +203,7 @@ export interface ICamera {
   status: CameraStatus;
   customerId?: Types.ObjectId;
   operatorIds: Types.ObjectId[];
+  sharedWith: Types.ObjectId[];
   franchiseId?: Types.ObjectId;
   location?: ICameraLocation;
   health: ICameraHealth;
@@ -484,6 +488,35 @@ export interface IOperatorShift {
     incidentsResolved: number;
     sosAcknowledged: number;
   };
+  updatedAt: Date;
+}
+
+// ─── Customer / Subscription Module ───────────────────────────────────────────
+
+export type SubscriptionStatus = "active" | "past_due" | "canceled";
+
+export interface ISubscription {
+  _id: Types.ObjectId;
+  customerId: Types.ObjectId;
+  planName: string;
+  status: SubscriptionStatus;
+  startDate: Date;
+  endDate: Date;
+  price: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type InvoiceStatus = "paid" | "pending" | "failed";
+
+export interface IBillingInvoice {
+  _id: Types.ObjectId;
+  customerId: Types.ObjectId;
+  subscriptionId: Types.ObjectId;
+  amount: number;
+  status: InvoiceStatus;
+  invoiceUrl?: string;
+  billingDate: Date;
   createdAt: Date;
   updatedAt: Date;
 }

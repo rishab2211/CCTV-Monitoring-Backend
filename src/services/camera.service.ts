@@ -9,7 +9,7 @@ import { User } from "../models/User";
 import { logActivity } from "../models/ActivityLog";
 import { ApiError } from "../utils/ApiError";
 import { parsePaginationParams } from "../utils/pagination";
-import { JwtAccessPayload } from "../types";
+import { CameraStatus, JwtAccessPayload } from "../types";
 import {
   CreateCameraInput,
   UpdateCameraInput,
@@ -69,8 +69,10 @@ export const validateCameraAccess = async (
 
   // Customer access check
   if (role === "customer") {
-    if (!camera.customerId || !camera.customerId.equals(userObjectId)) {
-      throw ApiError.forbidden("You do not own this camera");
+    const isOwner = camera.customerId && camera.customerId.equals(userObjectId);
+    const isShared = camera.sharedWith && camera.sharedWith.some(id => id.equals(userObjectId));
+    if (!isOwner && !isShared) {
+      throw ApiError.forbidden("You do not own or have shared access to this camera");
     }
     return;
   }
