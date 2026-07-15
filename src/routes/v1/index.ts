@@ -18,6 +18,7 @@ import operatorRoutes from "./operator.routes";
 import operatorPanelRoutes from "./operatorPanel.routes";
 import customerRoutes from "./customer.routes";
 import { planRouter, subscriptionRouter, paymentRouter, invoiceRouter } from "./billing.routes";
+import analyticsRoutes from "./analytics.routes";
 
 const router = Router();
 
@@ -86,7 +87,7 @@ router.use("/invoices", invoiceRouter);
 
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
 // router.use("/reports", reportRoutes);
-// router.use("/analytics", analyticsRoutes);
+router.use("/analytics", analyticsRoutes);
 // router.use("/audit-logs", auditRoutes);
 // router.use("/tickets", ticketRoutes);
 // router.use("/settings", settingsRoutes);
