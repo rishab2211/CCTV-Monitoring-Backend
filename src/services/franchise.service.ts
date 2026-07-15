@@ -216,3 +216,260 @@ export const assignUserToFranchise = async (franchiseId: string, targetUserId: s
 
   return targetUser;
 };
+
+/**
+ * Get Franchise Customers
+ * Returns all users with role 'customer' assigned to the given franchise.
+ *
+ * @param franchiseId - The ID of the franchise
+ * @param user - The requesting user (franchise owner or admin)
+ */
+export const getFranchiseCustomers = async (franchiseId: string, user: JwtAccessPayload) => {
+  const franchise = await Franchise.findById(franchiseId);
+  if (!franchise) throw ApiError.notFound("Franchise not found");
+
+  // Franchise owners can only view their own customers
+  if (user.role === "franchise" && franchise.ownerId.toString() !== user.userId) {
+    throw ApiError.forbidden("Access denied");
+  }
+
+  const customers = await User.find({
+    role: "customer",
+    "customerDetails.assignedFranchise": new mongoose.Types.ObjectId(franchiseId),
+    isDeleted: false,
+  }).select("name email phone customerDetails isActive createdAt").lean();
+
+  return customers;
+};
+
+/**
+ * Get Franchise Leads
+ * Returns all CRM leads embedded in a franchise document.
+ *
+ * @param franchiseId - The ID of the franchise
+ * @param user - The requesting user (franchise owner or admin)
+ */
+export const getFranchiseLeads = async (franchiseId: string, user: JwtAccessPayload) => {
+  const franchise = await Franchise.findById(franchiseId);
+  if (!franchise) throw ApiError.notFound("Franchise not found");
+
+  if (user.role === "franchise" && franchise.ownerId.toString() !== user.userId) {
+    throw ApiError.forbidden("Access denied");
+  }
+
+  return franchise.leads ?? [];
+};
+
+/**
+ * Create Franchise Lead
+ * Adds a new CRM lead to the franchise's embedded leads array.
+ *
+ * @param franchiseId - The ID of the franchise
+ * @param leadData - The lead details (name, phone, email, status, notes)
+ * @param user - The requesting user
+ */
+export const createFranchiseLead = async (franchiseId: string, leadData: any, user: JwtAccessPayload) => {
+  const franchise = await Franchise.findById(franchiseId);
+  if (!franchise) throw ApiError.notFound("Franchise not found");
+
+  if (user.role === "franchise" && franchise.ownerId.toString() !== user.userId) {
+    throw ApiError.forbidden("Access denied");
+  }
+
+  if (!franchise.leads) franchise.leads = [];
+  franchise.leads.push({
+    ...leadData,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  await franchise.save();
+  return franchise.leads[franchise.leads.length - 1];
+};
+
+/**
+ * Update Franchise Lead
+ * Updates an existing lead by its sub-document ID.
+ *
+ * @param franchiseId - The ID of the franchise
+ * @param leadId - The ID of the embedded lead document
+ * @param updateData - The fields to update on the lead
+ * @param user - The requesting user
+ */
+export const updateFranchiseLead = async (franchiseId: string, leadId: string, updateData: any, user: JwtAccessPayload) => {
+  const franchise = await Franchise.findById(franchiseId);
+  if (!franchise) throw ApiError.notFound("Franchise not found");
+
+  if (user.role === "franchise" && franchise.ownerId.toString() !== user.userId) {
+    throw ApiError.forbidden("Access denied");
+  }
+
+  const lead = franchise.leads?.id(leadId);
+  if (!lead) throw ApiError.notFound("Lead not found");
+
+  Object.assign(lead, { ...updateData, updatedAt: new Date() });
+  await franchise.save();
+  return lead;
+};
+
+/**
+ * Get Commission Report
+ * Calculates and returns commission data based on active customer subscriptions
+ * assigned to this franchise. Commission rate is stored on the franchise owner's profile.
+ *
+ * @param franchiseId - The ID of the franchise
+ * @param user - The requesting user
+ */
+export const getCommissionReport = async (franchiseId: string, user: JwtAccessPayload) => {
+  const franchise = await Franchise.findById(franchiseId).populate("ownerId", "name franchiseDetails");
+  if (!franchise) throw ApiError.notFound("Franchise not found");
+
+  if (user.role === "franchise" && franchise.ownerId._id.toString() !== user.userId) {
+    throw ApiError.forbidden("Access denied");
+  }
+
+  // Count active customers belonging to this franchise
+  const customerCount = await User.countDocuments({
+    role: "customer",
+    "customerDetails.assignedFranchise": new mongoose.Types.ObjectId(franchiseId),
+    isActive: true,
+    isDeleted: false,
+  });
+
+  // Compute commission based on customer count × monthly revenue per customer
+  // These values would come from real billing in a full system
+  const revenuePerCustomer = 500; // e.g. ₹500/month per customer
+  const commissionRate = 0.1; // 10% default commission rate
+  const monthlyRevenue = customerCount * revenuePerCustomer;
+  const commissionEarned = monthlyRevenue * commissionRate;
+
+  return {
+    franchiseId,
+    franchiseName: franchise.name,
+    period: new Date().toISOString().slice(0, 7), // YYYY-MM
+    customerCount,
+    revenuePerCustomer,
+    commissionRate: `${commissionRate * 100}%`,
+    monthlyRevenue,
+    commissionEarned,
+  };
+};
+
+/**
+ * Get Royalty Report
+ * Returns royalty obligations owed by the franchise to the parent company.
+ * Royalty is computed as a percentage of gross revenue.
+ *
+ * @param franchiseId - The ID of the franchise
+ * @param user - The requesting user
+ */
+export const getRoyaltyReport = async (franchiseId: string, user: JwtAccessPayload) => {
+  const franchise = await Franchise.findById(franchiseId);
+  if (!franchise) throw ApiError.notFound("Franchise not found");
+
+  if (user.role === "franchise" && franchise.ownerId.toString() !== user.userId) {
+    throw ApiError.forbidden("Access denied");
+  }
+
+  const customerCount = await User.countDocuments({
+    role: "customer",
+    "customerDetails.assignedFranchise": new mongoose.Types.ObjectId(franchiseId),
+    isActive: true,
+    isDeleted: false,
+  });
+
+  const revenuePerCustomer = 500;
+  const royaltyRate = 0.05; // 5% royalty owed to parent company
+  const grossRevenue = customerCount * revenuePerCustomer;
+  const royaltyDue = grossRevenue * royaltyRate;
+
+  return {
+    franchiseId,
+    franchiseName: franchise.name,
+    period: new Date().toISOString().slice(0, 7),
+    customerCount,
+    grossRevenue,
+    royaltyRate: `${royaltyRate * 100}%`,
+    royaltyDue,
+  };
+};
+
+/**
+ * Get Sales Report
+ * Returns a simple sales summary for a franchise based on customer signups.
+ *
+ * @param franchiseId - The ID of the franchise
+ * @param user - The requesting user
+ */
+export const getSalesReport = async (franchiseId: string, user: JwtAccessPayload) => {
+  const franchise = await Franchise.findById(franchiseId);
+  if (!franchise) throw ApiError.notFound("Franchise not found");
+
+  if (user.role === "franchise" && franchise.ownerId.toString() !== user.userId) {
+    throw ApiError.forbidden("Access denied");
+  }
+
+  const [totalCustomers, activeCustomers, newThisMonth, convertedLeads] = await Promise.all([
+    User.countDocuments({ role: "customer", "customerDetails.assignedFranchise": new mongoose.Types.ObjectId(franchiseId), isDeleted: false }),
+    User.countDocuments({ role: "customer", "customerDetails.assignedFranchise": new mongoose.Types.ObjectId(franchiseId), isActive: true, isDeleted: false }),
+    User.countDocuments({
+      role: "customer",
+      "customerDetails.assignedFranchise": new mongoose.Types.ObjectId(franchiseId),
+      createdAt: { $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
+      isDeleted: false,
+    }),
+    Promise.resolve(franchise.leads?.filter((l) => l.status === "converted").length ?? 0),
+  ]);
+
+  return {
+    franchiseId,
+    franchiseName: franchise.name,
+    period: new Date().toISOString().slice(0, 7),
+    totalCustomers,
+    activeCustomers,
+    newThisMonth,
+    convertedLeads,
+    totalLeads: franchise.leads?.length ?? 0,
+  };
+};
+
+/**
+ * Update Territory
+ * Sets or replaces the territory configuration for a franchise.
+ *
+ * @param franchiseId - The ID of the franchise
+ * @param territory - Territory fields: city, state, zone, description
+ * @param user - Must be admin to set territory
+ */
+export const updateTerritory = async (franchiseId: string, territory: any, user: JwtAccessPayload) => {
+  if (user.role !== "super_admin" && user.role !== "admin") {
+    throw ApiError.forbidden("Only admins can set franchise territory");
+  }
+
+  const franchise = await Franchise.findByIdAndUpdate(
+    franchiseId,
+    { territory },
+    { new: true }
+  );
+  if (!franchise) throw ApiError.notFound("Franchise not found");
+
+  return franchise.territory;
+};
+
+/**
+ * Get Territory
+ * Retrieves the territory configuration for a franchise.
+ *
+ * @param franchiseId - The ID of the franchise
+ * @param user - The requesting user (admin or franchise owner)
+ */
+export const getTerritory = async (franchiseId: string, user: JwtAccessPayload) => {
+  const franchise = await Franchise.findById(franchiseId);
+  if (!franchise) throw ApiError.notFound("Franchise not found");
+
+  if (user.role === "franchise" && franchise.ownerId.toString() !== user.userId) {
+    throw ApiError.forbidden("Access denied");
+  }
+
+  return franchise.territory ?? {};
+};

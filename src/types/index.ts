@@ -470,6 +470,22 @@ export interface IFranchise {
   contactPhone?: string;
   address?: string;
   status: FranchiseStatus;
+  territory?: {
+    city?: string;
+    state?: string;
+    zone?: string;
+    description?: string;
+  };
+  leads?: {
+    _id?: Types.ObjectId;
+    name: string;
+    phone?: string;
+    email?: string;
+    status: "new" | "contacted" | "qualified" | "converted" | "lost";
+    notes?: string;
+    createdAt?: Date;
+    updatedAt?: Date;
+  }[];
   createdAt: Date;
   updatedAt: Date;
 }

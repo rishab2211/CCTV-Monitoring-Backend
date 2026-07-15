@@ -48,3 +48,51 @@ export const assignUserToFranchiseSchema = z.object({
     userId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid User ID"),
   }),
 });
+
+/**
+ * Schema for creating a CRM Lead for a franchise.
+ */
+export const createLeadSchema = z.object({
+  body: z.object({
+    name: z.string().min(2, "Lead name is required"),
+    phone: z.string().optional(),
+    email: z.string().email().optional(),
+    status: z.enum(["new", "contacted", "qualified", "converted", "lost"]).optional(),
+    notes: z.string().max(2000).optional(),
+  }),
+});
+
+/**
+ * Schema for updating a CRM Lead.
+ */
+export const updateLeadSchema = z.object({
+  body: z.object({
+    name: z.string().min(2).optional(),
+    phone: z.string().optional(),
+    email: z.string().email().optional(),
+    status: z.enum(["new", "contacted", "qualified", "converted", "lost"]).optional(),
+    notes: z.string().max(2000).optional(),
+  }),
+});
+
+/**
+ * Schema for validating franchise + lead params.
+ */
+export const leadParamSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid Franchise ID"),
+    leadId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid Lead ID"),
+  }),
+});
+
+/**
+ * Schema for setting territory boundaries.
+ */
+export const updateTerritorySchema = z.object({
+  body: z.object({
+    city: z.string().optional(),
+    state: z.string().optional(),
+    zone: z.string().optional(),
+    description: z.string().optional(),
+  }),
+});

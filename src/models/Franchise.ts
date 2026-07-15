@@ -39,6 +39,25 @@ const franchiseSchema = new Schema<FranchiseDocument>(
       default: "active",
       required: true,
     },
+    // Territory definition — stored as simple string fields per the project analysis
+    territory: {
+      city: { type: String, trim: true },
+      state: { type: String, trim: true },
+      zone: { type: String, trim: true },
+      description: { type: String },
+    },
+    // CRM Leads — lightweight embedded documents for franchise-managed prospects
+    leads: [
+      {
+        name: { type: String, required: true, trim: true },
+        phone: { type: String },
+        email: { type: String, lowercase: true, trim: true },
+        status: { type: String, enum: ["new", "contacted", "qualified", "converted", "lost"], default: "new" },
+        notes: { type: String },
+        createdAt: { type: Date, default: Date.now },
+        updatedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );
