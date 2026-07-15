@@ -70,7 +70,8 @@ const cameraSchema = new Schema<CameraDocument>(
       recordingEnabled: { type: Boolean, default: false },
       motionDetectionEnabled: { type: Boolean, default: false },
       aiFeaturesEnabled: { type: Boolean, default: false },
-      recordingRetentionDays: { type: Number, default: 7 },
+      recordingRetentionDays: { type: Number, default: 30 },
+      talkbackEnabled: { type: Boolean, default: false },
     },
     qrCode: {
       type: String,

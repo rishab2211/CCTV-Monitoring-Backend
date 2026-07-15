@@ -155,7 +155,9 @@ export type ActivityAction =
   | "ALERT_CREATED"
   | "ALERT_ACKNOWLEDGED"
   | "ALERT_RESOLVED"
-  | "ALERT_ESCALATED";
+  | "ALERT_ESCALATED"
+  | "TALKBACK_STARTED"
+  | "TALKBACK_STOPPED";
 
 export interface IActivityLog {
   _id: Types.ObjectId;
@@ -213,6 +215,7 @@ export interface ICameraSettings {
   motionDetectionEnabled: boolean;
   aiFeaturesEnabled: boolean;
   recordingRetentionDays: number;
+  talkbackEnabled: boolean;
 }
 
 // ─── Stream Session Types ─────────────────────────────────────────────────────
@@ -320,6 +323,22 @@ export interface IAlert {
   acknowledgedAt?: Date;
   resolvedAt?: Date;
   resolutionNotes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Audio Talkback Types ─────────────────────────────────────────────────────
+
+export type TalkbackStatus = "active" | "completed" | "failed";
+
+export interface ITalkbackSession {
+  _id: Types.ObjectId;
+  cameraId: Types.ObjectId;
+  operatorId: Types.ObjectId;
+  startedAt: Date;
+  endedAt?: Date;
+  durationSeconds?: number;
+  status: TalkbackStatus;
   createdAt: Date;
   updatedAt: Date;
 }

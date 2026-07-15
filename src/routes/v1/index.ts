@@ -8,6 +8,7 @@ import cameraRoutes from "./camera.routes";
 import streamRoutes from "./stream.routes";
 import recordingRoutes from "./recording.routes";
 import alertRoutes from "./alert.routes";
+import talkbackRoutes from "./talkback.routes";
 
 const router = Router();
 
@@ -36,6 +37,9 @@ router.use("/recordings", recordingRoutes);
 
 // ─── Module 7: Alert Engine ────────────────────────────────────────────────────
 router.use("/alerts", alertRoutes);
+
+// ─── Module 8: Audio Talkback ──────────────────────────────────────────────────
+router.use("/talkback", talkbackRoutes);
 
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
 // router.use("/notifications", notificationRoutes);

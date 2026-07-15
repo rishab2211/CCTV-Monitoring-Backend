@@ -8,6 +8,14 @@ import { logActivity } from "../models/ActivityLog";
 import { socketService } from "./socket.service";
 import { sendPushNotification } from "./notification.service";
 
+/**
+ * Create Manual Alert
+ * Logs a new manually triggered alert from an operator or customer.
+ * Emits a real-time 'new_alert' Socket.IO event and triggers a push notification.
+ * 
+ * @param data - The alert payload (type, priority, description, etc.)
+ * @param user - The authenticated user triggering the alert
+ */
 export const createAlert = async (data: any, user: JwtAccessPayload) => {
   const camera = await Camera.findOne({ _id: data.cameraId, isDeleted: false });
   if (!camera) throw ApiError.notFound("Camera");
@@ -42,6 +50,14 @@ export const createAlert = async (data: any, user: JwtAccessPayload) => {
   return alert;
 };
 
+/**
+ * List Alerts (Paginated & Filtered)
+ * Retrieves a list of alerts based on query filters.
+ * Automatically restricts access so non-admins only see alerts for cameras they are assigned to.
+ * 
+ * @param query - Filtering and pagination parameters
+ * @param user - The requesting user
+ */
 export const listAlerts = async (query: any, user: JwtAccessPayload) => {
   const { page, limit, cameraId, status, priority, type } = query;
   const filter: any = {};
@@ -80,6 +96,14 @@ export const listAlerts = async (query: any, user: JwtAccessPayload) => {
   return { alerts, total, page, limit, totalPages: Math.ceil(total / limit) };
 };
 
+/**
+ * Get Alert Details
+ * Fetches the full details of a specific alert, including populated camera and user references.
+ * Ensures the requesting user has access to the camera associated with the alert.
+ * 
+ * @param id - The alert ID
+ * @param user - The requesting user
+ */
 export const getAlertDetails = async (id: string, user: JwtAccessPayload) => {
   const alert = await Alert.findById(id)
     .populate("cameraId", "name serialNumber operatorIds customerId")
@@ -97,6 +121,14 @@ export const getAlertDetails = async (id: string, user: JwtAccessPayload) => {
   return alert;
 };
 
+/**
+ * Acknowledge Alert
+ * Claims an alert by setting its status to 'acknowledged' and assigning it to the operator.
+ * Emits an 'alert_acknowledged' socket event to notify other dashboards.
+ * 
+ * @param id - The alert ID
+ * @param user - The operator claiming the alert
+ */
 export const acknowledgeAlert = async (id: string, user: JwtAccessPayload) => {
   const alert = await Alert.findById(id);
   if (!alert) throw ApiError.notFound("Alert");
@@ -126,6 +158,15 @@ export const acknowledgeAlert = async (id: string, user: JwtAccessPayload) => {
   return alert;
 };
 
+/**
+ * Resolve Alert
+ * Closes an alert, adding resolution notes. 
+ * Emits an 'alert_resolved' socket event to clear it from active dashboards.
+ * 
+ * @param id - The alert ID
+ * @param resolutionNotes - Notes explaining how the alert was resolved
+ * @param user - The operator resolving the alert
+ */
 export const resolveAlert = async (id: string, resolutionNotes: string, user: JwtAccessPayload) => {
   const alert = await Alert.findById(id);
   if (!alert) throw ApiError.notFound("Alert");
@@ -162,6 +203,14 @@ export const resolveAlert = async (id: string, resolutionNotes: string, user: Jw
   return alert;
 };
 
+/**
+ * Escalate Alert
+ * Elevates the status of an alert to 'escalated'.
+ * Emits an 'alert_escalated' socket event.
+ * 
+ * @param id - The alert ID
+ * @param user - The operator escalating the alert
+ */
 export const escalateAlert = async (id: string, user: JwtAccessPayload) => {
   const alert = await Alert.findById(id);
   if (!alert) throw ApiError.notFound("Alert");
@@ -185,6 +234,13 @@ export const escalateAlert = async (id: string, user: JwtAccessPayload) => {
   return alert;
 };
 
+/**
+ * Get Pending Alerts
+ * Fetches all 'new' and 'acknowledged' alerts for the dashboard.
+ * Filtered by the cameras the requesting operator is assigned to.
+ * 
+ * @param user - The requesting operator
+ */
 export const getPendingAlerts = async (user: JwtAccessPayload) => {
   // Get all 'new' and 'acknowledged' alerts for cameras accessible by this user
   let filter: any = { status: { $in: ["new", "acknowledged"] } };
@@ -205,6 +261,12 @@ export const getPendingAlerts = async (user: JwtAccessPayload) => {
   return alerts;
 };
 
+/**
+ * Get Global Alert Stats (Admin Only)
+ * Aggregates all alerts across the system to provide a status breakdown.
+ * 
+ * @param user - The requesting admin user
+ */
 export const getAlertStats = async (user: JwtAccessPayload) => {
   // Only admins get global stats
   if (user.role !== "super_admin" && user.role !== "admin") {
