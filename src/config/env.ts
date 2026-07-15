@@ -51,6 +51,7 @@ const envSchema = z.object({
   MEDIAMTX_URL: z.string().default("http://localhost:9997"),
   MEDIAMTX_API_URL: z.string().default("http://localhost:9997/v3"),
   MEDIAMTX_STREAM_SECRET: z.string().optional(),
+  STREAM_TOKEN_EXPIRY: z.string().default("24h"),
 
   // Razorpay
   RAZORPAY_KEY_ID: z.string().optional(),

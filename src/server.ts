@@ -3,6 +3,7 @@ import { connectDB } from "./config/database";
 import { configureCloudinary } from "./config/cloudinary";
 import { verifyEmailConnection } from "./services/email.service";
 import { seedPermissionsAndRoles } from "./config/permissions.seed";
+import { syncMediaMTXPaths } from "./config/mediamtx.service";
 import { env } from "./config/env";
 import { logger } from "./utils/logger";
 
@@ -13,6 +14,9 @@ const startServer = async (): Promise<void> => {
 
     // ── Seed permissions and roles (idempotent) ───────────────────────────
     await seedPermissionsAndRoles();
+
+    // ── Sync camera paths to MediaMTX (non-fatal if MediaMTX not running) ──
+    await syncMediaMTXPaths();
 
     // ── Configure external services ───────────────────────────────────────────
     configureCloudinary();

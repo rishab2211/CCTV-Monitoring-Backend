@@ -146,7 +146,9 @@ export type ActivityAction =
   | "CAMERA_DELETED"
   | "CAMERA_ASSIGNED"
   | "CAMERA_TRANSFERRED"
-  | "CAMERA_RESTARTED";
+  | "CAMERA_RESTARTED"
+  | "STREAM_STARTED"
+  | "STREAM_STOPPED";
 
 export interface IActivityLog {
   _id: Types.ObjectId;
@@ -206,3 +208,43 @@ export interface ICameraSettings {
   recordingRetentionDays: number;
 }
 
+// ─── Stream Session Types ─────────────────────────────────────────────────────
+
+export interface IStreamSession {
+  _id: Types.ObjectId;
+  sessionId: string;         // UUID — matches stream token payload
+  cameraId: Types.ObjectId;  // ref: Camera
+  userId: Types.ObjectId;    // ref: User — who is watching
+  role: UserRole;
+  startedAt: Date;
+  endedAt?: Date | null;
+  isActive: boolean;
+  tokenHash: string;         // SHA-256 of the issued stream token (for revocation)
+  ipAddress?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── MediaMTX Types ─────────────────────────────────────────────────────────
+
+export interface IMediaMTXPathConfig {
+  source: string;              // RTSP URL of the camera
+  sourceProtocol?: "udp" | "tcp" | "tls";
+  sourceOnDemand?: boolean;    // Only pull RTSP when a client actually connects
+  maxReaders?: number;
+}
+
+export interface IMediaMTXPath {
+  name: string;
+  ready: boolean;
+  readyTime?: string;
+  tracks: string[];
+  bytesReceived: number;
+  bytesSent: number;
+  readers: number;
+}
+
+export interface IMediaMTXPathListResponse {
+  pageCount: number;
+  items: IMediaMTXPath[];
+}
