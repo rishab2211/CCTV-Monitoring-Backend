@@ -5,7 +5,8 @@ import { ApiError } from "../utils/ApiError";
 import * as notificationService from "../services/notification.service";
 
 /**
- * Register a Device for FCM Push Notifications
+ * Register Device Endpoint
+ * POST /api/v1/notifications/device
  * Extracts the user ID from the authenticated token and saves the provided FCM token.
  */
 export const registerDevice = catchAsync(async (req: Request, res: Response) => {
@@ -16,7 +17,8 @@ export const registerDevice = catchAsync(async (req: Request, res: Response) => 
 });
 
 /**
- * Get User Notifications
+ * List User Notifications Endpoint
+ * GET /api/v1/notifications
  * Fetches a paginated list of In-App notifications for the authenticated user.
  */
 export const getNotifications = catchAsync(async (req: Request, res: Response) => {
@@ -26,7 +28,8 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
 });
 
 /**
- * Get Notification Detail
+ * Get Notification Detail Endpoint
+ * GET /api/v1/notifications/:id
  * Retrieves a single notification by its ID.
  */
 export const getNotificationDetail = catchAsync(async (req: Request, res: Response) => {
@@ -36,7 +39,8 @@ export const getNotificationDetail = catchAsync(async (req: Request, res: Respon
 });
 
 /**
- * Mark Notification as Read
+ * Mark Notification as Read Endpoint
+ * POST /api/v1/notifications/:id/read
  * Flags a specific in-app notification as read.
  */
 export const markAsRead = catchAsync(async (req: Request, res: Response) => {
@@ -46,7 +50,8 @@ export const markAsRead = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
- * Mark All Notifications as Read
+ * Mark All Notifications as Read Endpoint
+ * POST /api/v1/notifications/read-all
  * Flags all unread in-app notifications for the authenticated user as read.
  */
 export const markAllAsRead = catchAsync(async (req: Request, res: Response) => {
@@ -56,7 +61,8 @@ export const markAllAsRead = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
- * Delete Notification
+ * Delete Notification Endpoint
+ * DELETE /api/v1/notifications/:id
  * Permanently deletes a specific notification belonging to the authenticated user.
  */
 export const deleteNotification = catchAsync(async (req: Request, res: Response) => {

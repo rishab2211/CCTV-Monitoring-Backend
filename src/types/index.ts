@@ -376,3 +376,22 @@ export interface IDeviceToken {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// ─── SOS Module ───────────────────────────────────────────────────────────────
+
+export type SosStatus = "active" | "acknowledged" | "resolved";
+
+export interface ISosAlert {
+  _id: Types.ObjectId;
+  triggeredBy: Types.ObjectId;
+  cameraId?: Types.ObjectId;
+  location?: string;
+  status: SosStatus;
+  acknowledgedBy?: Types.ObjectId;
+  acknowledgedAt?: Date;
+  resolvedBy?: Types.ObjectId;
+  resolvedAt?: Date;
+  resolutionNotes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}

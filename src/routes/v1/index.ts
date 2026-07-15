@@ -10,6 +10,7 @@ import recordingRoutes from "./recording.routes";
 import alertRoutes from "./alert.routes";
 import talkbackRoutes from "./talkback.routes";
 import notificationRoutes from "./notification.routes";
+import sosRoutes from "./sos.routes";
 
 const router = Router();
 
@@ -44,11 +45,12 @@ router.use("/talkback", talkbackRoutes);
 
 // ─── Module 9: Notification Module ───────────────────────────────────────────
 router.use("/notifications", notificationRoutes);
+// ─── Module 10: SOS Module ────────────────────────────────────────────────────
+router.use("/sos", sosRoutes);
 
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
-// router.use("/sos", sosRoutes);
-// router.use("/incidents", incidentRoutes);
-// router.use("/franchises", franchiseRoutes);
+// router.use("/reports", reportRoutes);
+// router.use("/billing", billingRoutes);
 // router.use("/installations", installationRoutes);
 // router.use("/operator", operatorRoutes);
 // router.use("/customer", customerRoutes);

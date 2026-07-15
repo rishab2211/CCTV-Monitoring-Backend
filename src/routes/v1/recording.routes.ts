@@ -54,7 +54,7 @@ router.post(
   authenticate,
   permit("recordings:manage"), // Admins/franchise, or customers managing their own (handled in service)
   validate(setScheduleSchema),
-  recordingController.setSchedule
+  recordingController.updateSchedule
 );
 
 router.get(
