@@ -156,6 +156,9 @@ export type ActivityAction =
   | "SOS_ACKNOWLEDGED"
   | "SOS_RESOLVED"
   | "ROLE_CREATED"
+  | "FRANCHISE_CREATED"
+  | "FRANCHISE_UPDATED"
+  | "FRANCHISE_SUSPENDED"
   | "STREAM_STARTED"
   | "STREAM_STOPPED"
   | "RECORDING_DELETED"
@@ -421,6 +424,23 @@ export interface IIncident {
   assignedTo?: Types.ObjectId;
   attachments: string[]; // URLs or local file paths
   resolutionNotes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Franchise Management Module ──────────────────────────────────────────────
+
+export type FranchiseStatus = "active" | "suspended";
+
+export interface IFranchise {
+  _id: Types.ObjectId;
+  name: string;
+  franchiseCode: string;
+  ownerId: Types.ObjectId;
+  contactEmail?: string;
+  contactPhone?: string;
+  address?: string;
+  status: FranchiseStatus;
   createdAt: Date;
   updatedAt: Date;
 }

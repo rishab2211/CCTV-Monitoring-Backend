@@ -13,6 +13,11 @@ import * as sosService from "../services/sos.service";
  * POST /api/v1/sos
  * Creates an emergency SOS alert.
  */
+/**
+ * Trigger SOS Alert Endpoint
+ * POST /api/v1/sos/trigger
+ * Allows users to trigger an emergency SOS alert.
+ */
 export const triggerSos = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
   const alert = await sosService.triggerSos(req.body, req.user);
@@ -23,6 +28,11 @@ export const triggerSos = catchAsync(async (req: Request, res: Response) => {
  * List SOS Alerts Endpoint
  * GET /api/v1/sos
  * Retrieves active/acknowledged/resolved SOS alerts.
+ */
+/**
+ * List SOS Alerts Endpoint
+ * GET /api/v1/sos
+ * Retrieves a paginated list of SOS alerts.
  */
 export const listSosAlerts = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -35,6 +45,11 @@ export const listSosAlerts = catchAsync(async (req: Request, res: Response) => {
  * POST /api/v1/sos/:id/acknowledge
  * Acknowledges an active SOS alert.
  */
+/**
+ * Acknowledge SOS Alert Endpoint
+ * POST /api/v1/sos/:id/acknowledge
+ * Allows an operator to acknowledge an active SOS alert.
+ */
 export const acknowledgeSos = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
   const alert = await sosService.acknowledgeSos(req.params.id, req.user);
@@ -45,6 +60,11 @@ export const acknowledgeSos = catchAsync(async (req: Request, res: Response) => 
  * Resolve SOS Endpoint
  * POST /api/v1/sos/:id/resolve
  * Resolves an SOS alert with notes.
+ */
+/**
+ * Resolve SOS Alert Endpoint
+ * POST /api/v1/sos/:id/resolve
+ * Allows an operator to resolve an acknowledged SOS alert with resolution notes.
  */
 export const resolveSos = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();

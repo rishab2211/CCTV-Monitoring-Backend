@@ -12,6 +12,7 @@ import talkbackRoutes from "./talkback.routes";
 import notificationRoutes from "./notification.routes";
 import sosRoutes from "./sos.routes";
 import incidentRoutes from "./incident.routes";
+import franchiseRoutes from "./franchise.routes";
 
 const router = Router();
 
@@ -51,6 +52,9 @@ router.use("/sos", sosRoutes);
 
 // ─── Module 11: Incident Management ──────────────────────────────────────────
 router.use("/incidents", incidentRoutes);
+
+// ─── Module 12: Franchise Management ─────────────────────────────────────────
+router.use("/franchises", franchiseRoutes);
 
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
 // router.use("/reports", reportRoutes);

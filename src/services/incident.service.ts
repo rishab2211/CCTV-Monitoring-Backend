@@ -16,8 +16,12 @@ import { logger } from "../utils/logger";
 /**
  * Report an Incident
  * Creates a new incident, optionally attached with files.
+ * Validates camera access if a camera ID is provided.
+ * 
  * @param input - Incident details and file URLs
  * @param user - Requesting user
+ * @returns The populated Incident document
+ * @throws ApiError if the camera is not found or user lacks access
  */
 export const reportIncident = async (input: any, user: JwtAccessPayload) => {
   const { title, description, type, severity, cameraId, attachments = [] } = input;
@@ -81,8 +85,14 @@ export const reportIncident = async (input: any, user: JwtAccessPayload) => {
 
 /**
  * List Incidents
- * @param query - Pagination and filters
+ * Retrieves a paginated list of incidents with RBAC filtering.
+ * Customers see only their own reported incidents.
+ * Operators see incidents assigned to them or on their assigned cameras.
+ * Admins see all incidents.
+ * 
+ * @param query - Pagination and filters (status, severity, cameraId)
  * @param user - Requesting user
+ * @returns Object containing incidents array and pagination metadata
  */
 export const listIncidents = async (query: any, user: JwtAccessPayload) => {
   const { page, limit, status, severity, cameraId } = query;
@@ -127,6 +137,13 @@ export const listIncidents = async (query: any, user: JwtAccessPayload) => {
 
 /**
  * Get Incident Details
+ * Retrieves full details for a specific incident.
+ * Customers can only view incidents they reported.
+ * 
+ * @param id - The incident ID
+ * @param user - Requesting user
+ * @returns The populated Incident document
+ * @throws ApiError if not found or access denied
  */
 export const getIncidentDetails = async (id: string, user: JwtAccessPayload) => {
   const incident = await Incident.findById(id)
@@ -146,6 +163,15 @@ export const getIncidentDetails = async (id: string, user: JwtAccessPayload) => 
 
 /**
  * Update Incident Status
+ * Changes the status of an incident and records resolution notes.
+ * Operators can only update incidents assigned to them.
+ * Customers are not permitted to change status.
+ * 
+ * @param id - The incident ID
+ * @param updateData - Object containing status and optional resolutionNotes
+ * @param user - Requesting user
+ * @returns The updated Incident document
+ * @throws ApiError if missing notes on resolution, or unauthorized
  */
 export const updateIncidentStatus = async (id: string, updateData: any, user: JwtAccessPayload) => {
   const { status, resolutionNotes } = updateData;
@@ -198,7 +224,13 @@ export const updateIncidentStatus = async (id: string, updateData: any, user: Jw
 
 /**
  * Assign Incident
- * Admins/Franchise assign an incident to an operator/technician.
+ * Admins or Franchise managers can assign an incident to an operator/technician for investigation.
+ * 
+ * @param id - The incident ID
+ * @param assignedTo - The User ID to assign to
+ * @param user - Requesting user (must be admin/super_admin/franchise)
+ * @returns The updated Incident document
+ * @throws ApiError if user lacks permission, or if assignee/incident is not found
  */
 export const assignIncident = async (id: string, assignedTo: string, user: JwtAccessPayload) => {
   if (user.role !== "admin" && user.role !== "super_admin" && user.role !== "franchise") {

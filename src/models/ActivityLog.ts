@@ -41,6 +41,9 @@ const activityLogSchema = new Schema<ActivityLogDocument>(
         "SOS_TRIGGERED",
         "SOS_ACKNOWLEDGED",
         "SOS_RESOLVED",
+        "FRANCHISE_CREATED",
+        "FRANCHISE_UPDATED",
+        "FRANCHISE_SUSPENDED",
       ] as ActivityAction[],
     },
     description: {

@@ -21,6 +21,8 @@ import { logger } from "../utils/logger";
  * 
  * @param input - Contains optional cameraId and location
  * @param user - The user triggering the SOS
+ * @returns The populated SosAlert document
+ * @throws ApiError if the camera is not found
  */
 export const triggerSos = async (
   input: { cameraId?: string; location?: string },
@@ -87,8 +89,9 @@ export const triggerSos = async (
  * List SOS Alerts
  * Fetches paginated list of SOS alerts.
  * 
- * @param query - Pagination and filter parameters
+ * @param query - Pagination and filter parameters (page, limit, status, cameraId)
  * @param user - Requesting user
+ * @returns An object containing the populated SOS alerts array and pagination metadata
  */
 export const listSosAlerts = async (query: any, user: JwtAccessPayload) => {
   const { page, limit, status, cameraId } = query;
@@ -130,11 +133,14 @@ export const listSosAlerts = async (query: any, user: JwtAccessPayload) => {
 };
 
 /**
- * Acknowledge SOS
- * Operator acknowledges the SOS, letting others know it is being handled.
+ * Acknowledge SOS Alert
+ * Moves the alert status from 'active' to 'acknowledged' and records the responder.
+ * Broadcasts an `sos_acknowledged` event globally.
  * 
- * @param sosId - The SOS Alert ID
- * @param user - The responding operator
+ * @param sosId - The ID of the SOS Alert
+ * @param user - The user acknowledging the alert (must be an operator/admin)
+ * @returns The populated and acknowledged SosAlert document
+ * @throws ApiError if the user lacks permissions, the alert is not found, or it is not in the 'active' state
  */
 export const acknowledgeSos = async (sosId: string, user: JwtAccessPayload) => {
   const sosAlert = await SosAlert.findById(sosId);
@@ -168,12 +174,15 @@ export const acknowledgeSos = async (sosId: string, user: JwtAccessPayload) => {
 };
 
 /**
- * Resolve SOS
- * Operator resolves the SOS with notes.
+ * Resolve SOS Alert
+ * Marks the alert as 'resolved' with accompanying notes.
+ * Broadcasts an `sos_resolved` event globally.
  * 
- * @param sosId - The SOS Alert ID
- * @param notes - Resolution notes
- * @param user - The responding operator
+ * @param sosId - The ID of the SOS Alert
+ * @param resolutionNotes - Notes explaining how the emergency was resolved
+ * @param user - The user resolving the alert (must be an operator/admin)
+ * @returns The populated and resolved SosAlert document
+ * @throws ApiError if the user lacks permissions, the alert is not found, or it is not in the 'acknowledged' state
  */
 export const resolveSos = async (
   sosId: string,

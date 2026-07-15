@@ -9,6 +9,8 @@ import UAParser from "ua-parser-js";
 import { User, UserDocument } from "../models/User";
 import { RefreshToken } from "../models/RefreshToken";
 import { DeviceSession } from "../models/DeviceSession";
+import { DeviceToken } from "../models/DeviceToken";
+import { Franchise } from "../models/Franchise";
 import { OTPVerification } from "../models/OTPVerification";
 import { logActivity } from "../models/ActivityLog";
 import { ApiError } from "../utils/ApiError";
@@ -183,6 +185,27 @@ export const login = async (
 
   if (!user.isActive) {
     throw ApiError.forbidden("Your account has been deactivated. Please contact support.");
+  }
+
+  // Check Franchise Suspension
+  let franchiseIdToCheck = null;
+  if (user.role === "customer" && user.customerDetails?.assignedFranchise) {
+    franchiseIdToCheck = user.customerDetails.assignedFranchise;
+  } else if (user.role === "operator" && user.operatorDetails?.assignedFranchise) {
+    franchiseIdToCheck = user.operatorDetails.assignedFranchise;
+  } else if (user.role === "franchise") {
+    // For franchise owner, find the franchise they own
+    const ownedFranchise = await Franchise.findOne({ ownerId: user._id });
+    if (ownedFranchise && ownedFranchise.status === "suspended") {
+      throw ApiError.forbidden("Your franchise account is suspended. Please contact the administrator.");
+    }
+  }
+
+  if (franchiseIdToCheck) {
+    const franchise = await Franchise.findById(franchiseIdToCheck);
+    if (franchise && franchise.status === "suspended") {
+      throw ApiError.forbidden("Your assigned franchise is suspended. Please contact support.");
+    }
   }
 
   // Verify password

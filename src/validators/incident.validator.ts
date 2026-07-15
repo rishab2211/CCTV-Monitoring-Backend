@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+/**
+ * Schema for creating a new Incident.
+ * Validates title, description, type, severity, and optional camera ID.
+ */
 export const createIncidentSchema = z.object({
   body: z.object({
     title: z.string().min(3, "Title must be at least 3 characters").max(100),
@@ -10,6 +14,10 @@ export const createIncidentSchema = z.object({
   }),
 });
 
+/**
+ * Schema for updating an Incident's status.
+ * Requires resolutionNotes if the status is being set to 'resolved' or 'closed'.
+ */
 export const updateIncidentStatusSchema = z.object({
   body: z.object({
     status: z.enum(["open", "investigating", "resolved", "closed"]),
@@ -25,12 +33,20 @@ export const updateIncidentStatusSchema = z.object({
   }),
 });
 
+/**
+ * Schema for assigning an Incident to a user.
+ * Validates the assignedTo field as a MongoDB ObjectId.
+ */
 export const assignIncidentSchema = z.object({
   body: z.object({
     assignedTo: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid User ID"),
   }),
 });
 
+/**
+ * Schema for listing Incidents.
+ * Validates pagination params and filters (status, severity, cameraId).
+ */
 export const listIncidentsSchema = z.object({
   query: z.object({
     page: z.string().regex(/^\d+$/).optional().transform(Number).default("1"),
@@ -41,6 +57,9 @@ export const listIncidentsSchema = z.object({
   }),
 });
 
+/**
+ * Schema for validating an Incident ID in route parameters.
+ */
 export const incidentIdParamSchema = z.object({
   params: z.object({
     id: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid Incident ID"),
