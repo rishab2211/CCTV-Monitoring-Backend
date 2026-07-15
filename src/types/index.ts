@@ -148,7 +148,10 @@ export type ActivityAction =
   | "CAMERA_TRANSFERRED"
   | "CAMERA_RESTARTED"
   | "STREAM_STARTED"
-  | "STREAM_STOPPED";
+  | "STREAM_STOPPED"
+  | "RECORDING_DELETED"
+  | "SCHEDULE_UPDATED"
+  | "RETENTION_UPDATED";
 
 export interface IActivityLog {
   _id: Types.ObjectId;
@@ -247,4 +250,50 @@ export interface IMediaMTXPath {
 export interface IMediaMTXPathListResponse {
   pageCount: number;
   items: IMediaMTXPath[];
+}
+
+// ─── Recording Types ──────────────────────────────────────────────────────────
+
+export type RecordingType = "continuous" | "motion" | "scheduled";
+export type RecordingStatus = "recording" | "completed" | "failed" | "deleted";
+
+export interface IRecording {
+  _id: Types.ObjectId;
+  cameraId: Types.ObjectId;
+  startTime: Date;
+  endTime?: Date;
+  type: RecordingType;
+  status: RecordingStatus;
+  url: string;
+  publicId?: string;
+  sizeBytes: number;
+  durationSeconds: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IRecordingScheduleRule {
+  daysOfWeek: number[]; // 0=Sunday, 6=Saturday
+  startTime: string;    // HH:mm
+  endTime: string;      // HH:mm
+  type: RecordingType;
+}
+
+export interface IRecordingSchedule {
+  _id: Types.ObjectId;
+  cameraId: Types.ObjectId;
+  rules: IRecordingScheduleRule[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── System Settings Types ────────────────────────────────────────────────────
+
+export interface ISystemSetting {
+  _id: Types.ObjectId;
+  key: string;
+  value: any;
+  description?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }

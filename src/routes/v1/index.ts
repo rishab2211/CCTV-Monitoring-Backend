@@ -6,6 +6,7 @@ import roleUserRoutes from "./roleUser.routes";
 import roleRoutes from "./role.routes";
 import cameraRoutes from "./camera.routes";
 import streamRoutes from "./stream.routes";
+import recordingRoutes from "./recording.routes";
 
 const router = Router();
 
@@ -29,8 +30,10 @@ router.use("/cameras", cameraRoutes);
 // streamRoutes handles: /streams/start, /streams/stop, /streams/auth, /streams/:cameraId/...
 router.use("/streams", streamRoutes);
 
+// ─── Module 6: Recording ─────────────────────────────────────────────────────────
+router.use("/recordings", recordingRoutes);
+
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
-// router.use("/recordings", recordingRoutes);
 // router.use("/alerts", alertRoutes);
 // router.use("/notifications", notificationRoutes);
 // router.use("/sos", sosRoutes);
