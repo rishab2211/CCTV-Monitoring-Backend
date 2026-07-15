@@ -35,6 +35,12 @@ const activityLogSchema = new Schema<ActivityLogDocument>(
         "USER_DEACTIVATED",
         "SESSION_REVOKED",
         "ALL_SESSIONS_REVOKED",
+        "INCIDENT_REPORTED",
+        "INCIDENT_STATUS_UPDATED",
+        "INCIDENT_ASSIGNED",
+        "SOS_TRIGGERED",
+        "SOS_ACKNOWLEDGED",
+        "SOS_RESOLVED",
       ] as ActivityAction[],
     },
     description: {

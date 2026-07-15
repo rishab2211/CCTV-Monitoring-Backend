@@ -149,6 +149,13 @@ export type ActivityAction =
   | "CAMERA_ASSIGNED"
   | "CAMERA_TRANSFERRED"
   | "CAMERA_RESTARTED"
+  | "INCIDENT_REPORTED"
+  | "INCIDENT_STATUS_UPDATED"
+  | "INCIDENT_ASSIGNED"
+  | "SOS_TRIGGERED"
+  | "SOS_ACKNOWLEDGED"
+  | "SOS_RESOLVED"
+  | "ROLE_CREATED"
   | "STREAM_STARTED"
   | "STREAM_STOPPED"
   | "RECORDING_DELETED"
@@ -391,6 +398,28 @@ export interface ISosAlert {
   acknowledgedAt?: Date;
   resolvedBy?: Types.ObjectId;
   resolvedAt?: Date;
+  resolutionNotes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Incident Management Module ───────────────────────────────────────────────
+
+export type IncidentType = "theft" | "vandalism" | "technical_issue" | "other";
+export type IncidentSeverity = "low" | "medium" | "high" | "critical";
+export type IncidentStatus = "open" | "investigating" | "resolved" | "closed";
+
+export interface IIncident {
+  _id: Types.ObjectId;
+  title: string;
+  description: string;
+  type: IncidentType;
+  severity: IncidentSeverity;
+  status: IncidentStatus;
+  cameraId?: Types.ObjectId;
+  reportedBy: Types.ObjectId;
+  assignedTo?: Types.ObjectId;
+  attachments: string[]; // URLs or local file paths
   resolutionNotes?: string;
   createdAt: Date;
   updatedAt: Date;

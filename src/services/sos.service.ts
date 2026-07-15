@@ -71,14 +71,13 @@ export const triggerSos = async (
   // Send individually to all responders
   // In a production system with thousands of operators, this might need chunking or topic messaging
   for (const responder of emergencyResponders) {
-    await notificationService.sendNotification({
-      userId: responder._id.toString(),
-      title: "🚨 EMERGENCY: SOS Alert Triggered",
-      body: `An SOS has been triggered${location ? ` at ${location}` : ""}. Immediate action required.`,
-      type: "alert",
-      referenceId: sosAlert._id.toString(),
-      // Bypassing 'isFirebaseInitialized' check internally inside sendNotification
-    }).catch(err => logger.error(`Failed to send SOS push to ${responder._id}`, err));
+    await notificationService.sendNotification(
+      responder._id.toString(),
+      "🚨 EMERGENCY: SOS Alert Triggered",
+      `An SOS has been triggered${location ? ` at ${location}` : ""}. Immediate action required.`,
+      "alert",
+      sosAlert._id.toString()
+    ).catch(err => logger.error(`Failed to send SOS push to ${responder._id}`, err));
   }
 
   return populatedSos;

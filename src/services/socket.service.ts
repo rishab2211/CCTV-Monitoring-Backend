@@ -100,6 +100,19 @@ class SocketService {
     if (!this.io) return;
     this.io.emit(event, data);
   }
+
+  /**
+   * Emit to a specific user
+   * Because users can have multiple sockets, we could use a user-specific room
+   * But for simplicity with global emits, we emit globally with a user-specific event name,
+   * OR we could maintain a map of user to socket IDs.
+   * Assuming the client listens to `event_name` globally and filters, or listens to `event_name:${userId}`.
+   * We will emit `event:${userId}` globally.
+   */
+  public emitToUser(userId: string, event: string, data: any) {
+    if (!this.io) return;
+    this.io.emit(`${event}:${userId}`, data);
+  }
 }
 
 export const socketService = new SocketService();

@@ -11,6 +11,7 @@ import alertRoutes from "./alert.routes";
 import talkbackRoutes from "./talkback.routes";
 import notificationRoutes from "./notification.routes";
 import sosRoutes from "./sos.routes";
+import incidentRoutes from "./incident.routes";
 
 const router = Router();
 
@@ -47,6 +48,9 @@ router.use("/talkback", talkbackRoutes);
 router.use("/notifications", notificationRoutes);
 // ─── Module 10: SOS Module ────────────────────────────────────────────────────
 router.use("/sos", sosRoutes);
+
+// ─── Module 11: Incident Management ──────────────────────────────────────────
+router.use("/incidents", incidentRoutes);
 
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
 // router.use("/reports", reportRoutes);
