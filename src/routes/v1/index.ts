@@ -19,6 +19,7 @@ import operatorPanelRoutes from "./operatorPanel.routes";
 import customerRoutes from "./customer.routes";
 import { planRouter, subscriptionRouter, paymentRouter, invoiceRouter } from "./billing.routes";
 import analyticsRoutes from "./analytics.routes";
+import { auditRouter, activityRouter } from "./audit.routes";
 
 const router = Router();
 
@@ -85,10 +86,14 @@ router.use("/subscriptions", subscriptionRouter);
 router.use("/payments", paymentRouter);
 router.use("/invoices", invoiceRouter);
 
+// ─── Module 18: Audit Logs ─────────────────────────────────────────────────────
+router.use("/audit-logs", auditRouter);
+router.use("/activity-logs", activityRouter);
+
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
 // router.use("/reports", reportRoutes);
 router.use("/analytics", analyticsRoutes);
-// router.use("/audit-logs", auditRoutes);
+// router.use("/tickets", ticketRoutes);
 // router.use("/tickets", ticketRoutes);
 // router.use("/settings", settingsRoutes);
 
