@@ -57,3 +57,37 @@ export const reassignJobSchema = z.object({
     assignedTechnician: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid User ID"),
   }),
 });
+
+/**
+ * Schema for submitting/updating a job checklist.
+ * Each entry is a string description of the checklist item.
+ */
+export const submitChecklistSchema = z.object({
+  body: z.object({
+    items: z.array(
+      z.object({
+        item: z.string().min(1),
+        checked: z.boolean(),
+      })
+    ).min(1, "At least one checklist item is required"),
+  }),
+});
+
+/**
+ * Schema for updating a technician's GPS location.
+ */
+export const updateGpsSchema = z.object({
+  body: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  }),
+});
+
+/**
+ * Schema for technician ID param (for schedule and GPS endpoints).
+ */
+export const technicianIdParamSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid Technician User ID"),
+  }),
+});

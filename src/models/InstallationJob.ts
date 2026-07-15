@@ -55,6 +55,24 @@ const installationJobSchema = new Schema<InstallationJobDocument>(
         type: String,
       },
     ],
+    // Customer signature URL after job completion
+    customerSignature: {
+      type: String,
+    },
+    // Installation checklist — an array of { item, checked } sub-documents
+    checklist: [
+      {
+        item: { type: String, required: true },
+        checked: { type: Boolean, default: false },
+        checkedAt: { type: Date },
+      },
+    ],
+    // Technician's last known GPS location for live tracking
+    gpsLocation: {
+      lat: { type: Number },
+      lng: { type: Number },
+      updatedAt: { type: Date },
+    },
   },
   { timestamps: true }
 );

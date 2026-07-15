@@ -507,7 +507,10 @@ export interface IInstallationJob {
   scheduledAt: Date;
   completedAt?: Date;
   notes?: string;
-  attachments: string[]; // URLs or local file paths
+  attachments: string[];
+  customerSignature?: string;
+  checklist?: { item: string; checked: boolean; checkedAt?: Date }[];
+  gpsLocation?: { lat: number; lng: number; updatedAt: Date };
   updatedAt: Date;
 }
 

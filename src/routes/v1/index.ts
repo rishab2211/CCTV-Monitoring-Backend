@@ -60,7 +60,9 @@ router.use("/incidents", incidentRoutes);
 router.use("/franchises", franchiseRoutes);
 
 // ─── Module 13: Technician / Installation Module ─────────────────────────────
-router.use("/jobs", jobRoutes);
+// Mounted at /installations per the project spec; /jobs is kept as a legacy alias
+router.use("/installations", jobRoutes);
+router.use("/jobs", jobRoutes); // legacy alias — both resolve to the same router
 
 // ─── Module 14: Operator Module ─────────────────────────────────────────────
 router.use("/operators", operatorRoutes); 
