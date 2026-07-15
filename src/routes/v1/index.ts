@@ -15,6 +15,7 @@ import incidentRoutes from "./incident.routes";
 import franchiseRoutes from "./franchise.routes";
 import jobRoutes from "./job.routes";
 import operatorRoutes from "./operator.routes";
+import operatorPanelRoutes from "./operatorPanel.routes";
 import customerRoutes from "./customer.routes";
 
 const router = Router();
@@ -64,8 +65,11 @@ router.use("/franchises", franchiseRoutes);
 router.use("/installations", jobRoutes);
 router.use("/jobs", jobRoutes); // legacy alias — both resolve to the same router
 
-// ─── Module 14: Operator Module ─────────────────────────────────────────────
-router.use("/operators", operatorRoutes); 
+// ─── Module 14: Operator Module ────────────────────────────────
+// /operators (plural) — admin-facing CRUD: shift list, camera assignment, performance
+router.use("/operators", operatorRoutes);
+// /operator (singular) — self-service panel for the logged-in operator
+router.use("/operator", operatorPanelRoutes); 
 
 // ─── Module 15: Customer Module ─────────────────────────────────────────────
 router.use("/customers", customerRoutes); 

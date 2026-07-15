@@ -243,3 +243,234 @@ export const getOperatorPerformance = async (operatorId: string, user: JwtAccess
     performance: stats
   };
 };
+
+/**
+ * Get Operator Dashboard
+ * Returns a comprehensive at-a-glance summary for the operator panel:
+ * shift status, assigned camera count, open incidents, active SOS, and recent alerts.
+ *
+ * @param user - The authenticated operator
+ * @returns Dashboard summary object
+ */
+export const getOperatorDashboard = async (user: JwtAccessPayload) => {
+  if (user.role !== "operator") throw ApiError.forbidden("Operators only");
+
+  const operator = await User.findById(user.userId).lean();
+  if (!operator) throw ApiError.notFound("Operator not found");
+
+  const assignedCameraIds = operator.operatorDetails?.assignedCameras ?? [];
+
+  const [assignedCameras, openIncidents, activeSos, activeShift] = await Promise.all([
+    Camera.countDocuments({ _id: { $in: assignedCameraIds }, isDeleted: false }),
+    Incident.countDocuments({ assignedTo: user.userId, status: { $in: ["open", "in_progress"] } }),
+    SosAlert.countDocuments({ status: { $in: ["active", "acknowledged"] } }),
+    OperatorShift.findOne({ operatorId: user.userId, endTime: { $exists: false } }).lean(),
+  ]);
+
+  return {
+    operator: { name: operator.name, email: operator.email, isOnShift: operator.operatorDetails?.isOnShift || false },
+    shift: activeShift
+      ? { shiftId: activeShift._id, startTime: activeShift.startTime, durationMs: Date.now() - new Date(activeShift.startTime).getTime() }
+      : null,
+    stats: { assignedCameras, openIncidents, activeSos },
+  };
+};
+
+/**
+ * Get Operator's Assigned Cameras
+ * Returns the full Camera documents for all cameras assigned to this operator.
+ *
+ * @param user - The authenticated operator
+ * @returns Array of Camera documents
+ */
+export const getAssignedCameras = async (user: JwtAccessPayload) => {
+  if (user.role !== "operator") throw ApiError.forbidden("Operators only");
+
+  const operator = await User.findById(user.userId).lean();
+  if (!operator) throw ApiError.notFound("Operator not found");
+
+  const assignedCameraIds = operator.operatorDetails?.assignedCameras ?? [];
+
+  const cameras = await Camera.find({ _id: { $in: assignedCameraIds }, isDeleted: false })
+    .select("name serialNumber location status streamUrl")
+    .lean();
+
+  return cameras;
+};
+
+/**
+ * Get Pending Alerts
+ * Returns all `pending` (unacknowledged) alerts for cameras assigned to this operator.
+ *
+ * @param user - The authenticated operator
+ * @returns Array of pending Alert documents
+ */
+export const getPendingAlerts = async (user: JwtAccessPayload) => {
+  if (user.role !== "operator") throw ApiError.forbidden("Operators only");
+
+  const operator = await User.findById(user.userId).lean();
+  if (!operator) throw ApiError.notFound("Operator not found");
+
+  const assignedCameraIds = operator.operatorDetails?.assignedCameras ?? [];
+
+  // Import Alert dynamically to avoid circular dep; use require-style import from model path
+  const { Alert } = await import("../models/Alert");
+  const alerts = await Alert.find({ cameraId: { $in: assignedCameraIds }, status: "pending" })
+    .populate("cameraId", "name serialNumber location")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return alerts;
+};
+
+/**
+ * Get Active Alerts
+ * Returns all `acknowledged` (in-progress) alerts for cameras assigned to this operator.
+ *
+ * @param user - The authenticated operator
+ * @returns Array of active Alert documents
+ */
+export const getActiveAlerts = async (user: JwtAccessPayload) => {
+  if (user.role !== "operator") throw ApiError.forbidden("Operators only");
+
+  const operator = await User.findById(user.userId).lean();
+  if (!operator) throw ApiError.notFound("Operator not found");
+
+  const assignedCameraIds = operator.operatorDetails?.assignedCameras ?? [];
+
+  const { Alert } = await import("../models/Alert");
+  const alerts = await Alert.find({ cameraId: { $in: assignedCameraIds }, status: "acknowledged" })
+    .populate("cameraId", "name serialNumber location")
+    .sort({ updatedAt: -1 })
+    .lean();
+
+  return alerts;
+};
+
+/**
+ * Get Operator Calls (Talkback Sessions)
+ * Returns recent talkback sessions initiated from cameras assigned to this operator.
+ *
+ * @param user - The authenticated operator
+ * @returns Array of TalkbackSession documents
+ */
+export const getOperatorCalls = async (user: JwtAccessPayload) => {
+  if (user.role !== "operator") throw ApiError.forbidden("Operators only");
+
+  const operator = await User.findById(user.userId).lean();
+  if (!operator) throw ApiError.notFound("Operator not found");
+
+  const assignedCameraIds = operator.operatorDetails?.assignedCameras ?? [];
+
+  const { TalkbackSession } = await import("../models/TalkbackSession");
+  const calls = await TalkbackSession.find({ cameraId: { $in: assignedCameraIds } })
+    .populate("cameraId", "name serialNumber location")
+    .populate("initiatedBy", "name role")
+    .sort({ startedAt: -1 })
+    .limit(50)
+    .lean();
+
+  return calls;
+};
+
+/**
+ * Get Shift Status
+ * Returns the operator's current shift state: active shift details if on shift, or last shift info.
+ *
+ * @param user - The authenticated operator
+ * @returns Shift status object
+ */
+export const getShiftStatus = async (user: JwtAccessPayload) => {
+  if (user.role !== "operator") throw ApiError.forbidden("Operators only");
+
+  const operator = await User.findById(user.userId).lean();
+  if (!operator) throw ApiError.notFound("Operator not found");
+
+  const isOnShift = operator.operatorDetails?.isOnShift || false;
+
+  if (isOnShift) {
+    // Find active shift (no endTime)
+    const activeShift = await OperatorShift.findOne({ operatorId: user.userId, endTime: { $exists: false } })
+      .sort({ startTime: -1 })
+      .lean();
+
+    return {
+      isOnShift: true,
+      currentShift: activeShift,
+      durationMs: activeShift ? Date.now() - new Date(activeShift.startTime).getTime() : null,
+    };
+  }
+
+  // Not on shift — return the most recent completed shift
+  const lastShift = await OperatorShift.findOne({ operatorId: user.userId, endTime: { $exists: true } })
+    .sort({ endTime: -1 })
+    .lean();
+
+  return { isOnShift: false, lastShift };
+};
+
+/**
+ * Get Operator Event Timeline
+ * Returns a chronological list of recent activity log entries for this operator:
+ * alert acknowledgements, SOS events, incidents handled, and shift events.
+ *
+ * @param user - The authenticated operator
+ * @returns Array of ActivityLog entries (most recent first)
+ */
+export const getOperatorTimeline = async (user: JwtAccessPayload) => {
+  if (user.role !== "operator") throw ApiError.forbidden("Operators only");
+
+  const { ActivityLog } = await import("../models/ActivityLog");
+
+  const events = await ActivityLog.find({ userId: user.userId })
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .lean();
+
+  return events;
+};
+
+/**
+ * Get Operator Reports
+ * Returns a structured performance report for the operator:
+ * per-shift metrics, totals, and overall resolution rate.
+ *
+ * @param user - The authenticated operator
+ * @returns Reports object with shift breakdown and aggregated totals
+ */
+export const getOperatorReports = async (user: JwtAccessPayload) => {
+  if (user.role !== "operator") throw ApiError.forbidden("Operators only");
+
+  const operator = await User.findById(user.userId).lean();
+  if (!operator) throw ApiError.notFound("Operator not found");
+
+  // Get last 30 shifts
+  const shifts = await OperatorShift.find({ operatorId: user.userId })
+    .sort({ startTime: -1 })
+    .limit(30)
+    .lean();
+
+  // Aggregate totals
+  const totalIncidentsResolved = shifts.reduce((sum, s) => sum + (s.metrics?.incidentsResolved || 0), 0);
+  const totalSosAcknowledged = shifts.reduce((sum, s) => sum + (s.metrics?.sosAcknowledged || 0), 0);
+  const totalShifts = shifts.length;
+
+  return {
+    operatorName: operator.name,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      totalShifts,
+      totalIncidentsResolved,
+      totalSosAcknowledged,
+      avgIncidentsPerShift: totalShifts > 0 ? (totalIncidentsResolved / totalShifts).toFixed(2) : 0,
+    },
+    shifts: shifts.map((s) => ({
+      shiftId: s._id,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      durationMs: s.endTime ? new Date(s.endTime).getTime() - new Date(s.startTime).getTime() : null,
+      metrics: s.metrics,
+      handoverNotes: s.handoverNotes,
+    })),
+  };
+};
