@@ -21,6 +21,7 @@ import { planRouter, subscriptionRouter, paymentRouter, invoiceRouter } from "./
 import analyticsRoutes from "./analytics.routes";
 import { auditRouter, activityRouter } from "./audit.routes";
 import ticketRoutes from "./ticket.routes";
+import settingRoutes from "./setting.routes";
 
 const router = Router();
 
@@ -94,9 +95,11 @@ router.use("/activity-logs", activityRouter);
 // ─── Module 19: Support Tickets ────────────────────────────────────────────────
 router.use("/tickets", ticketRoutes);
 
+// ─── Module 20: System Settings ──────────────────────────────────────────────
+router.use("/settings", settingRoutes);
+
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
 // router.use("/reports", reportRoutes);
 router.use("/analytics", analyticsRoutes);
-// router.use("/settings", settingsRoutes);
 
 export default router;
