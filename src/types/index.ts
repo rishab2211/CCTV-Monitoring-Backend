@@ -151,7 +151,11 @@ export type ActivityAction =
   | "STREAM_STOPPED"
   | "RECORDING_DELETED"
   | "SCHEDULE_UPDATED"
-  | "RETENTION_UPDATED";
+  | "RETENTION_UPDATED"
+  | "ALERT_CREATED"
+  | "ALERT_ACKNOWLEDGED"
+  | "ALERT_RESOLVED"
+  | "ALERT_ESCALATED";
 
 export interface IActivityLog {
   _id: Types.ObjectId;
@@ -294,6 +298,28 @@ export interface ISystemSetting {
   key: string;
   value: any;
   description?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Alert Engine Types ───────────────────────────────────────────────────────
+
+export type AlertType = "motion" | "fire" | "hazard" | "tampering" | "other";
+export type AlertPriority = "low" | "medium" | "high" | "critical";
+export type AlertStatus = "new" | "acknowledged" | "resolved" | "escalated";
+
+export interface IAlert {
+  _id: Types.ObjectId;
+  cameraId: Types.ObjectId;
+  createdBy: Types.ObjectId;
+  type: AlertType;
+  priority: AlertPriority;
+  status: AlertStatus;
+  description?: string;
+  assignedTo?: Types.ObjectId;
+  acknowledgedAt?: Date;
+  resolvedAt?: Date;
+  resolutionNotes?: string;
   createdAt: Date;
   updatedAt: Date;
 }

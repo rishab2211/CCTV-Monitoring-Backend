@@ -6,6 +6,7 @@ import { seedPermissionsAndRoles } from "./config/permissions.seed";
 import { syncMediaMTXPaths } from "./config/mediamtx.service";
 import { env } from "./config/env";
 import { logger } from "./utils/logger";
+import { socketService } from "./services/socket.service";
 
 const startServer = async (): Promise<void> => {
   try {
@@ -36,6 +37,9 @@ const startServer = async (): Promise<void> => {
 ╚══════════════════════════════════════════════════════╝
       `.trim());
     });
+
+    // ── Initialize WebSockets ─────────────────────────────────────────────────
+    socketService.initialize(server);
 
     // ── Graceful Shutdown ─────────────────────────────────────────────────────
     const gracefulShutdown = async (signal: string): Promise<void> => {

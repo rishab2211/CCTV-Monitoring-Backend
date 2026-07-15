@@ -9,21 +9,23 @@
     "build": "bun build src/server.ts --outdir dist --target bun"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "mongoose": "^8.4.4",
-    "jsonwebtoken": "^9.0.2",
+    "@types/socket.io": "^3.0.2",
     "bcryptjs": "^2.4.3",
-    "zod": "^3.23.8",
-    "nodemailer": "^6.9.14",
-    "helmet": "^7.1.0",
+    "cloudinary": "^2.3.1",
     "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
     "express-rate-limit": "^7.3.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.4.4",
+    "nodemailer": "^6.9.14",
+    "socket.io": "^4.8.3",
+    "ua-parser-js": "^1.0.38",
+    "uuid": "^10.0.0",
     "winston": "^3.13.0",
     "winston-daily-rotate-file": "^5.0.0",
-    "cloudinary": "^2.3.1",
-    "dotenv": "^16.4.5",
-    "uuid": "^10.0.0",
-    "ua-parser-js": "^1.0.38"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
