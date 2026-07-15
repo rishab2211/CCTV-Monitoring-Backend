@@ -57,13 +57,13 @@ export interface IFranchiseDetails {
     zone: string;
   };
   commissionRate?: number; // percentage
-  royaltyRate?: number;    // percentage
+  royaltyRate?: number; // percentage
   franchiseCode?: string;
 }
 
 export interface IOperatorDetails {
   shiftStart?: string; // "09:00"
-  shiftEnd?: string;   // "21:00"
+  shiftEnd?: string; // "21:00"
   isOnShift?: boolean;
   assignedCameras?: Types.ObjectId[];
 }
@@ -159,6 +159,9 @@ export type ActivityAction =
   | "FRANCHISE_CREATED"
   | "FRANCHISE_UPDATED"
   | "FRANCHISE_SUSPENDED"
+  | "JOB_CREATED"
+  | "JOB_UPDATED"
+  | "JOB_COMPLETED"
   | "STREAM_STARTED"
   | "STREAM_STOPPED"
   | "RECORDING_DELETED"
@@ -175,7 +178,7 @@ export interface IActivityLog {
   _id: Types.ObjectId;
   userId: Types.ObjectId;
   action: ActivityAction;
-  description: string;   // human-readable summary
+  description: string; // human-readable summary
   ipAddress?: string;
   userAgent?: string;
   metadata?: Record<string, unknown>;
@@ -234,14 +237,14 @@ export interface ICameraSettings {
 
 export interface IStreamSession {
   _id: Types.ObjectId;
-  sessionId: string;         // UUID — matches stream token payload
-  cameraId: Types.ObjectId;  // ref: Camera
-  userId: Types.ObjectId;    // ref: User — who is watching
+  sessionId: string; // UUID — matches stream token payload
+  cameraId: Types.ObjectId; // ref: Camera
+  userId: Types.ObjectId; // ref: User — who is watching
   role: UserRole;
   startedAt: Date;
   endedAt?: Date | null;
   isActive: boolean;
-  tokenHash: string;         // SHA-256 of the issued stream token (for revocation)
+  tokenHash: string; // SHA-256 of the issued stream token (for revocation)
   ipAddress?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -250,9 +253,9 @@ export interface IStreamSession {
 // ─── MediaMTX Types ─────────────────────────────────────────────────────────
 
 export interface IMediaMTXPathConfig {
-  source: string;              // RTSP URL of the camera
+  source: string; // RTSP URL of the camera
   sourceProtocol?: "udp" | "tcp" | "tls";
-  sourceOnDemand?: boolean;    // Only pull RTSP when a client actually connects
+  sourceOnDemand?: boolean; // Only pull RTSP when a client actually connects
   maxReaders?: number;
 }
 
@@ -293,8 +296,8 @@ export interface IRecording {
 
 export interface IRecordingScheduleRule {
   daysOfWeek: number[]; // 0=Sunday, 6=Saturday
-  startTime: string;    // HH:mm
-  endTime: string;      // HH:mm
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
   type: RecordingType;
 }
 
@@ -441,6 +444,28 @@ export interface IFranchise {
   contactPhone?: string;
   address?: string;
   status: FranchiseStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Technician / Installation Module ──────────────────────────────────────────
+
+export type JobType = "installation" | "repair" | "maintenance";
+export type JobStatus = "scheduled" | "in-progress" | "completed" | "cancelled";
+
+export interface IInstallationJob {
+  _id: Types.ObjectId;
+  title: string;
+  description: string;
+  type: JobType;
+  status: JobStatus;
+  assignedTechnician: Types.ObjectId;
+  franchiseId?: Types.ObjectId;
+  cameraId?: Types.ObjectId;
+  scheduledAt: Date;
+  completedAt?: Date;
+  notes?: string;
+  attachments: string[]; // URLs or local file paths
   createdAt: Date;
   updatedAt: Date;
 }

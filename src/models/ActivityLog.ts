@@ -4,8 +4,7 @@ import { ActivityAction, IActivityLog } from "../types";
 // ─── Document Interface ───────────────────────────────────────────────────────
 
 export interface ActivityLogDocument
-  extends Omit<IActivityLog, "_id">,
-    Document {}
+  extends Omit<IActivityLog, "_id">, Document {}
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -44,6 +43,9 @@ const activityLogSchema = new Schema<ActivityLogDocument>(
         "FRANCHISE_CREATED",
         "FRANCHISE_UPDATED",
         "FRANCHISE_SUSPENDED",
+        "JOB_CREATED",
+        "JOB_UPDATED",
+        "JOB_COMPLETED",
       ] as ActivityAction[],
     },
     description: {
@@ -67,7 +69,7 @@ const activityLogSchema = new Schema<ActivityLogDocument>(
   },
   {
     timestamps: { createdAt: true, updatedAt: false }, // only createdAt — logs are immutable
-  }
+  },
 );
 
 // ─── Indexes ──────────────────────────────────────────────────────────────────
@@ -75,7 +77,7 @@ const activityLogSchema = new Schema<ActivityLogDocument>(
 // TTL — auto-delete logs older than 90 days
 activityLogSchema.index(
   { createdAt: 1 },
-  { expireAfterSeconds: 90 * 24 * 60 * 60 }
+  { expireAfterSeconds: 90 * 24 * 60 * 60 },
 );
 
 // Fast activity feed per user (newest first)

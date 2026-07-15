@@ -13,6 +13,7 @@ import notificationRoutes from "./notification.routes";
 import sosRoutes from "./sos.routes";
 import incidentRoutes from "./incident.routes";
 import franchiseRoutes from "./franchise.routes";
+import jobRoutes from "./job.routes";
 
 const router = Router();
 
@@ -55,6 +56,9 @@ router.use("/incidents", incidentRoutes);
 
 // ─── Module 12: Franchise Management ─────────────────────────────────────────
 router.use("/franchises", franchiseRoutes);
+
+// ─── Module 13: Technician / Installation Module ─────────────────────────────
+router.use("/jobs", jobRoutes);
 
 // ─── Future Modules (uncomment as built) ─────────────────────────────────────
 // router.use("/reports", reportRoutes);
