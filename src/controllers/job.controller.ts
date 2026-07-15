@@ -13,6 +13,10 @@ import fs from "fs";
  * Create Job Endpoint
  * POST /api/v1/jobs
  * Creates a new installation/maintenance job.
+ * Only Admins and Franchise managers can perform this action.
+ * 
+ * @param req - Express Request object containing job payload
+ * @param res - Express Response object
  */
 export const createJob = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -24,6 +28,10 @@ export const createJob = catchAsync(async (req: Request, res: Response) => {
  * List Jobs Endpoint
  * GET /api/v1/jobs
  * Retrieves a paginated list of jobs.
+ * Filters output automatically using RBAC (Technicians only see theirs).
+ * 
+ * @param req - Express Request object containing query filters
+ * @param res - Express Response object
  */
 export const listJobs = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -34,7 +42,11 @@ export const listJobs = catchAsync(async (req: Request, res: Response) => {
 /**
  * Get Job Details Endpoint
  * GET /api/v1/jobs/:id
- * Retrieves details for a specific job.
+ * Retrieves details for a specific job, including populated relations 
+ * for technician, franchise, and camera.
+ * 
+ * @param req - Express Request object
+ * @param res - Express Response object
  */
 export const getJobDetails = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -46,7 +58,10 @@ export const getJobDetails = catchAsync(async (req: Request, res: Response) => {
  * Update Job Status Endpoint
  * PUT /api/v1/jobs/:id/status
  * Updates the status of a job (e.g. to 'completed').
- * Handles multipart/form-data for uploading proof-of-work photos.
+ * Handles multipart/form-data for uploading proof-of-work photos using Multer.
+ * 
+ * @param req - Express Request object containing multer files and status updates
+ * @param res - Express Response object
  */
 export const updateJobStatus = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -69,6 +84,10 @@ export const updateJobStatus = catchAsync(async (req: Request, res: Response) =>
  * Reassign Job Endpoint
  * PUT /api/v1/jobs/:id/reassign
  * Changes the assigned technician for a job.
+ * Dispatches a push notification to the new technician.
+ * 
+ * @param req - Express Request object containing new technician ID
+ * @param res - Express Response object
  */
 export const reassignJob = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();

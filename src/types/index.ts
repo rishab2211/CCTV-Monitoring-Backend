@@ -162,6 +162,9 @@ export type ActivityAction =
   | "JOB_CREATED"
   | "JOB_UPDATED"
   | "JOB_COMPLETED"
+  | "OPERATOR_CLOCKED_IN"
+  | "OPERATOR_CLOCKED_OUT"
+  | "OPERATOR_CAMERAS_ASSIGNED"
   | "STREAM_STARTED"
   | "STREAM_STOPPED"
   | "RECORDING_DELETED"
@@ -466,6 +469,21 @@ export interface IInstallationJob {
   completedAt?: Date;
   notes?: string;
   attachments: string[]; // URLs or local file paths
+  updatedAt: Date;
+}
+
+// ─── Operator Module ──────────────────────────────────────────────────────────
+
+export interface IOperatorShift {
+  _id: Types.ObjectId;
+  operatorId: Types.ObjectId;
+  startTime: Date;
+  endTime?: Date;
+  handoverNotes?: string;
+  metrics: {
+    incidentsResolved: number;
+    sosAcknowledged: number;
+  };
   createdAt: Date;
   updatedAt: Date;
 }

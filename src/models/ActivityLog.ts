@@ -46,6 +46,9 @@ const activityLogSchema = new Schema<ActivityLogDocument>(
         "JOB_CREATED",
         "JOB_UPDATED",
         "JOB_COMPLETED",
+        "OPERATOR_CLOCKED_IN",
+        "OPERATOR_CLOCKED_OUT",
+        "OPERATOR_CAMERAS_ASSIGNED",
       ] as ActivityAction[],
     },
     description: {
