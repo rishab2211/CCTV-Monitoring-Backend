@@ -1,3 +1,8 @@
+/**
+ * @file camera.service.ts
+ * @description Manages camera entities, including registration, status updates, 
+ * assignment to operators, and tracking network configurations.
+ */
 import mongoose from "mongoose";
 import { Camera, CameraDocument } from "../models/Camera";
 import { User } from "../models/User";
@@ -118,7 +123,12 @@ export const createCamera = async (
 };
 
 /**
- * List cameras based on user's role and pagination.
+ * List Cameras
+ * Retrieves a paginated, filtered list of cameras. Enforces RBAC so that 
+ * Operators only see their assigned cameras, and Customers only see their owned cameras.
+ * 
+ * @param query - Pagination and filtering query params
+ * @param user - The authenticated user requesting the list
  */
 export const listCameras = async (
   query: ListCamerasQuery,
@@ -199,7 +209,11 @@ export const listCameras = async (
 };
 
 /**
- * Get a single camera. Verifies ownership/assignments.
+ * Get Camera Details
+ * Retrieves a single camera by ID, ensuring the requesting user has permission to view it.
+ * 
+ * @param id - The target camera ID
+ * @param user - The authenticated user
  */
 export const getCameraById = async (
   id: string,
@@ -218,7 +232,11 @@ export const getCameraById = async (
 };
 
 /**
- * Update general camera information.
+ * Update Camera
+ * Modifies an existing camera's settings or credentials.
+ * 
+ * @param id - The target camera ID
+ * @param data - Partial update payload
  */
 export const updateCamera = async (
   id: string,
@@ -263,7 +281,10 @@ export const updateCamera = async (
 };
 
 /**
- * Soft delete/decommission a camera.
+ * Delete Camera
+ * Soft deletes a camera, preventing it from appearing in standard queries.
+ * 
+ * @param id - The target camera ID
  */
 export const softDeleteCamera = async (id: string, deletedBy: string): Promise<void> => {
   const camera = await Camera.findOne({ _id: id, isDeleted: false });
@@ -426,8 +447,12 @@ export const updateCameraHealth = async (
 };
 
 /**
- * Remote Restart Camera.
- * Returns mock success.
+ * Register Camera
+ * Adds a new camera to the system. Automatically assigns it to the creating customer
+ * if the requester is a Customer.
+ * 
+ * @param data - The camera configuration payload
+ * @param user - The authenticated user creating the camera
  */
 export const restartCamera = async (
   id: string,

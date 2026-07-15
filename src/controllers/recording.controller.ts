@@ -1,3 +1,7 @@
+/**
+ * @file recording.controller.ts
+ * @description Express request handlers for VOD recording chunks and schedules.
+ */
 import { Request, Response } from "express";
 import { catchAsync } from "../utils/catchAsync";
 import { ApiResponse } from "../utils/ApiResponse";
@@ -5,8 +9,9 @@ import { ApiError } from "../utils/ApiError";
 import * as recordingService from "../services/recording.service";
 
 /**
- * POST /api/v1/recordings
- * Internal/System endpoint to log a new recording chunk.
+ * Internal Webhook Endpoint
+ * POST /api/v1/recordings/internal/chunk
+ * Called by external FFmpeg processes to log a new recording chunk in the DB.
  */
 export const createRecordingChunk = catchAsync(async (req: Request, res: Response) => {
   // Only accessible via system token (handled by middleware)
@@ -66,6 +71,17 @@ export const setSchedule = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const getSchedule = catchAsync(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const result = await recordingService.getSchedule(req.params.cameraId, req.user);
+  res.status(200).json(new ApiResponse(200, result));
+});
+
+/**
+ * Delete Schedule Endpoint
+ * DELETE /api/v1/recordings/schedule/:cameraId
+ * Stops all automated recordings for the camera.
+ */
+export const deleteSchedule = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
   const result = await recordingService.getSchedule(req.params.cameraId, req.user);
   res.status(200).json(new ApiResponse(200, result));

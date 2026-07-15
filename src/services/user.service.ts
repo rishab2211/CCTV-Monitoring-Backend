@@ -1,3 +1,8 @@
+/**
+ * @file user.service.ts
+ * @description Core business logic for managing users, roles, and profiles.
+ * Includes paginated list retrieval, soft deletions, and role-specific updates.
+ */
 import mongoose from "mongoose";
 import { User, UserDocument } from "../models/User";
 import { ActivityLog, logActivity } from "../models/ActivityLog";
@@ -64,8 +69,12 @@ const revokeUserSessions = async (userId: string): Promise<void> => {
 // ─── Service Functions ────────────────────────────────────────────────────────
 
 /**
- * List users with pagination, role filter, active filter, and search.
- * Excludes soft-deleted users.
+ * List Users
+ * Retrieves a paginated and optionally filtered list of active users.
+ * Automatically excludes soft-deleted records.
+ * 
+ * @param query - The parsed query string containing pagination and filter rules
+ * @returns Paginated results containing the users list
  */
 export const listUsers = async (
   query: ListUsersQuery,
@@ -99,7 +108,10 @@ export const listUsers = async (
 };
 
 /**
- * Get a single user by ID. Throws 404 if not found or soft-deleted.
+ * Get User Details
+ * Fetches a specific user by ID, excluding their password hash.
+ * 
+ * @param id - The target user ID
  */
 export const getUserById = async (id: string): Promise<UserDocument> => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -112,8 +124,11 @@ export const getUserById = async (id: string): Promise<UserDocument> => {
 };
 
 /**
- * Create a new user (admin-initiated).
- * Password is set by the admin and will be hashed via pre-save hook.
+ * Create a New User
+ * Bypasses self-registration. Used by admins to provision new accounts.
+ * 
+ * @param input - The raw user creation payload
+ * @returns The instantiated user document
  */
 export const createUser = async (
   input: CreateUserInput,
@@ -142,8 +157,11 @@ export const createUser = async (
 };
 
 /**
- * Update a user's details (admin-initiated).
- * Role and email cannot be changed here.
+ * Update User Details
+ * Applies partial updates to a user document. Uses `$set` internally via Mongoose `findByIdAndUpdate`.
+ * 
+ * @param id - The target user ID
+ * @param input - The fields to modify
  */
 export const updateUser = async (
   id: string,
@@ -199,9 +217,11 @@ export const updateUser = async (
 };
 
 /**
- * Soft-delete a user.
- * Sets isDeleted: true, deletedAt: now.
- * Revokes all sessions — user cannot log in after deletion.
+ * Soft Delete User
+ * Marks a user as deleted instead of removing them from the database,
+ * preserving referential integrity for audits and logs.
+ * 
+ * @param id - The target user ID
  */
 export const softDeleteUser = async (id: string): Promise<void> => {
   const user = await getUserById(id);

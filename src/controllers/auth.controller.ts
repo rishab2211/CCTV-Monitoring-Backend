@@ -1,3 +1,8 @@
+/**
+ * @file auth.controller.ts
+ * @description Express request handlers for user authentication.
+ * Wraps service calls with `catchAsync` to forward errors to the global error handler.
+ */
 import { Request, Response } from "express";
 import { catchAsync } from "../utils/catchAsync";
 import { ApiResponse } from "../utils/ApiResponse";
@@ -23,8 +28,8 @@ const getDeviceInfo = (req: Request): IDeviceInfo => ({
 // Controllers
 
 /**
+ * Register User Endpoint
  * POST /api/v1/auth/register
- * Register a new user account.
  */
 export const register = catchAsync(async (req: Request, res: Response) => {
   const { user, tokens } = await authService.register(req.body, getDeviceInfo(req));
@@ -36,8 +41,8 @@ export const register = catchAsync(async (req: Request, res: Response) => {
 
 
 /**
+ * Login User Endpoint
  * POST /api/v1/auth/login
- * Login with email or phone + password.
  */
 export const login = catchAsync(async (req: Request, res: Response) => {
   const { user, tokens } = await authService.login(req.body, getDeviceInfo(req));
@@ -49,8 +54,9 @@ export const login = catchAsync(async (req: Request, res: Response) => {
 
 
 /**
- * POST /api/v1/auth/refresh-token
- * Get a new access token using a valid refresh token.
+ * Refresh Token Endpoint
+ * POST /api/v1/auth/refresh
+ * Exchanges a valid refresh token for a new access token.
  */
 export const refreshToken = catchAsync(async (req: Request, res: Response) => {
   const { refreshToken: rawRefreshToken } = req.body as { refreshToken: string };
@@ -65,8 +71,9 @@ export const refreshToken = catchAsync(async (req: Request, res: Response) => {
 
 
 /**
+ * Logout User Endpoint
  * POST /api/v1/auth/logout
- * Logout — revoke current session's refresh token.
+ * Revokes the current session.
  */
 export const logout = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -203,8 +210,9 @@ export const revokeAllSessions = catchAsync(async (req: Request, res: Response) 
 
 
 /**
+ * Get Current User Details Endpoint
  * GET /api/v1/auth/me
- * Get current authenticated user's profile.
+ * Uses the JWT payload to fetch the full user profile.
  */
 export const getMe = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();

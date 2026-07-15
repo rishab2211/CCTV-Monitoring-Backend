@@ -1,3 +1,8 @@
+/**
+ * @file stream.controller.ts
+ * @description Express request handlers for live WebRTC/RTSP streaming.
+ * Exposes endpoints to start, stop, and track active sessions.
+ */
 import { Request, Response } from "express";
 import { catchAsync } from "../utils/catchAsync";
 import { ApiResponse } from "../utils/ApiResponse";
@@ -6,8 +11,9 @@ import * as streamService from "../services/stream.service";
 import { env } from "../config/env";
 
 /**
+ * Start Live Stream Endpoint
  * POST /api/v1/streams/start
- * Start a live stream session for a camera.
+ * Generates an access token and provisions the RTSP path in MediaMTX.
  */
 export const startStream = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -22,8 +28,9 @@ export const startStream = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
+ * Stop Live Stream Endpoint
  * POST /api/v1/streams/stop
- * Stop an active stream session.
+ * Revokes the stream session and instructs MediaMTX to drop the connection.
  */
 export const stopStream = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();

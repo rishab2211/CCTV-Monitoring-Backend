@@ -1,3 +1,7 @@
+/**
+ * @file camera.controller.ts
+ * @description Express request handlers for camera management.
+ */
 import { Request, Response } from "express";
 import { catchAsync } from "../utils/catchAsync";
 import { ApiResponse } from "../utils/ApiResponse";
@@ -6,8 +10,9 @@ import * as cameraService from "../services/camera.service";
 import { ListCamerasQuery } from "../validators/camera.validator";
 
 /**
+ * Register Camera Endpoint
  * POST /api/v1/cameras
- * Add a new camera.
+ * Provisions a new camera in the system.
  */
 export const createCamera = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -16,8 +21,9 @@ export const createCamera = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
+ * List Cameras Endpoint
  * GET /api/v1/cameras
- * List all cameras (filtered based on user's role).
+ * Retrieves a paginated, RBAC-filtered list of cameras.
  */
 export const listCameras = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -29,8 +35,8 @@ export const listCameras = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
+ * Get Camera Details Endpoint
  * GET /api/v1/cameras/:id
- * Get camera details by ID.
  */
 export const getCameraById = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -39,8 +45,9 @@ export const getCameraById = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
+ * Update Camera Endpoint
  * PUT /api/v1/cameras/:id
- * Update camera information.
+ * Modifies camera settings or network credentials.
  */
 export const updateCamera = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -49,8 +56,9 @@ export const updateCamera = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
+ * Delete Camera Endpoint
  * DELETE /api/v1/cameras/:id
- * Soft delete / decommission camera.
+ * Soft deletes the camera.
  */
 export const deleteCamera = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -59,8 +67,9 @@ export const deleteCamera = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/v1/cameras/:id/assign
- * Assign camera to customer, operators, and/or franchise.
+ * Assign Operators Endpoint
+ * POST /api/v1/cameras/:id/assign-operators
+ * Grants monitoring access to specific operators.
  */
 export const assignCamera = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();

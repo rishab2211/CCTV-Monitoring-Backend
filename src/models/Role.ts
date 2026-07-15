@@ -1,3 +1,8 @@
+/**
+ * @file Role.ts
+ * @description Mongoose model for dynamic Role-Based Access Control (RBAC).
+ * Defines granular permission arrays (e.g. ['cameras:view', 'alerts:resolve']) assigned to a role.
+ */
 import mongoose, { Schema, Document, Model } from "mongoose";
 
 // ─── Interface ────────────────────────────────────────────────────────────────
@@ -17,6 +22,10 @@ export interface RoleDocument extends Omit<IRole, "_id">, Document {}
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
+/**
+ * Role Schema
+ * Enables the creation of custom roles beyond the standard built-in ones.
+ */
 const roleSchema = new Schema<RoleDocument>(
   {
     name: {

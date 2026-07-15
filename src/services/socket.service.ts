@@ -1,3 +1,9 @@
+/**
+ * @file socket.service.ts
+ * @description Manages real-time WebSocket connections using Socket.IO.
+ * Handles JWT authentication for socket handshakes and provides pub/sub rooms 
+ * for camera-specific alerts and global notifications.
+ */
 import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
 import jwt from "jsonwebtoken";
@@ -8,6 +14,10 @@ import { JwtAccessPayload } from "../types";
 class SocketService {
   private io: Server | null = null;
 
+  /**
+   * Initializes the Socket.IO server attached to the main HTTP server.
+   * Sets up CORS and the JWT authentication middleware.
+   */
   public initialize(server: HttpServer) {
     this.io = new Server(server, {
       cors: {
@@ -60,24 +70,35 @@ class SocketService {
   }
 
   /**
-   * Emit an event to all users subscribed to a specific camera.
+   * Emit Event to Camera Room
+   * Broadcasts an event to all clients currently joined to a specific camera's room.
+   * Useful for camera-specific alerts, talkback statuses, and streaming events.
+   * 
+   * @param cameraId - Target camera ID
+   * @param event - Event name (e.g., 'new_alert')
+   * @param data - Payload to send
    */
-  public emitToCamera(cameraId: string, event: string, payload: any) {
+  public emitToCamera(cameraId: string, event: string, data: any) {
     if (!this.io) {
       logger.warn("[Socket.IO] Cannot emit event, server not initialized");
       return;
     }
     const roomName = `camera_${cameraId}`;
-    this.io.to(roomName).emit(event, payload);
+    this.io.to(roomName).emit(event, data);
     logger.debug(`[Socket.IO] Emitted '${event}' to ${roomName}`);
   }
 
   /**
-   * Emit an event globally to all connected clients.
+   * Emit Global Event
+   * Broadcasts an event to all connected clients globally.
+   * Used for system-wide notifications or targeted user notifications via uniquely named events.
+   * 
+   * @param event - Event name (e.g., 'notification:1234')
+   * @param data - Payload to send
    */
-  public emitGlobal(event: string, payload: any) {
+  public emitGlobal(event: string, data: any) {
     if (!this.io) return;
-    this.io.emit(event, payload);
+    this.io.emit(event, data);
   }
 }
 

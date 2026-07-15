@@ -1,3 +1,8 @@
+/**
+ * @file auth.service.ts
+ * @description Handles user authentication, token generation, and password management.
+ * Interfaces with the Redis-backed session store to maintain active logins.
+ */
 import { v4 as uuidv4 } from "uuid";
 import jwt from "jsonwebtoken";
 import UAParser from "ua-parser-js";
@@ -101,7 +106,12 @@ const issueTokens = async (
 // ─── Service Functions ────────────────────────────────────────────────────────
 
 /**
- * Register a new user.
+ * Register a new User
+ * Hashes the password and sets default notification preferences.
+ * 
+ * @param input - User registration details
+ * @param deviceInfo - Device metadata
+ * @returns Object containing the created user document and auth tokens
  */
 export const register = async (
   input: RegisterInput,
@@ -145,7 +155,12 @@ export const register = async (
 };
 
 /**
- * Login with email or phone + password.
+ * Login User
+ * Authenticates credentials, generates a new session ID, and issues JWT tokens.
+ * 
+ * @param input - Email or phone and plain-text password
+ * @param deviceInfo - Device metadata
+ * @returns Access token, refresh token, and user details
  */
 export const login = async (
   input: LoginInput,
@@ -193,8 +208,13 @@ export const login = async (
 };
 
 /**
- * Refresh an access token using a valid refresh token.
- * Implements refresh token rotation — old token is invalidated on use.
+ * Refresh Access Token
+ * Validates a refresh token and issues a new access token if the session is still valid.
+ * 
+ * @param rawRefreshToken - The unexpired refresh token string
+ * @param userAgent - Device user agent
+ * @param ipAddress - Request IP address
+ * @returns A fresh token pair
  */
 export const refreshAccessToken = async (
   rawRefreshToken: string,
@@ -252,7 +272,12 @@ export const refreshAccessToken = async (
 };
 
 /**
- * Logout — revoke the refresh token and deactivate the device session.
+ * Logout User
+ * Invalidates the current session ID in the database, effectively rendering
+ * the current access token unusable.
+ * 
+ * @param userId - ID of the user logging out
+ * @param sessionId - The specific session ID to invalidate
  */
 export const logout = async (
   userId: string,

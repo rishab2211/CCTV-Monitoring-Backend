@@ -1,3 +1,8 @@
+/**
+ * @file stream.service.ts
+ * @description Orchestrates live WebRTC/RTSP video streaming via MediaMTX.
+ * Handles stream session tokens, MediaMTX path generation, and stream lifecycles.
+ */
 import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import jwt from "jsonwebtoken";
@@ -116,14 +121,13 @@ export const startStream = async (
 };
 
 /**
- * Stop a live stream session.
- * Marks the session as inactive in the DB.
- * Optionally removes the MediaMTX path if no other sessions are active.
+ * Stop Stream
+ * Invalidates the active stream session. Instructs MediaMTX to drop readers on the path.
+ * 
+ * @param input - Camera ID
+ * @param user - Requesting user
  */
-export const stopStream = async (
-  input: StopStreamInput,
-  user: JwtAccessPayload
-) => {
+export const stopStream = async (input: StopStreamInput, user: JwtAccessPayload) => {
   const { cameraId, sessionId } = input;
 
   const session = await StreamSession.findOne({
@@ -237,8 +241,10 @@ export const getStreamStatus = async (
 };
 
 /**
- * List all active stream sessions.
- * Admin sees all; operators/customers see only their own.
+ * List Active Streams
+ * Returns a list of ongoing stream sessions for cameras the user can access.
+ * 
+ * @param user - Requesting user
  */
 export const listActiveStreams = async (user: JwtAccessPayload) => {
   const filter: Record<string, unknown> = { isActive: true };

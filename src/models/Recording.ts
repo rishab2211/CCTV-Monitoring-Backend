@@ -1,3 +1,8 @@
+/**
+ * @file Recording.ts
+ * @description Mongoose model for Video Recordings (VOD).
+ * Records metadata about saved footage (S3 URLs, durations, and retention periods).
+ */
 import mongoose, { Schema, Document, Model } from "mongoose";
 import { IRecording } from "../types";
 
@@ -46,14 +51,19 @@ const recordingSchema = new Schema<RecordingDocument>(
       required: true,
       default: 0,
     },
+    expiresAt: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );
 
-// Indexes for querying timelines and managing status
+// ─── Indexes ──────────────────────────────────────────────────────────────────
+// Optimized for the Recording Module's list filters (time-range, camera, retention)
+
 recordingSchema.index({ cameraId: 1, startTime: -1 });
 recordingSchema.index({ status: 1 });
-recordingSchema.index({ createdAt: 1 });
+recordingSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // TTL index for automatic pruning
 
 export const Recording: Model<RecordingDocument> = mongoose.model<RecordingDocument>(
   "Recording",

@@ -1,3 +1,8 @@
+/**
+ * @file User.ts
+ * @description Mongoose model for User accounts, integrating Role-Based Access Control (RBAC),
+ * specific subdocuments for different user types, and soft deletion.
+ */
 import mongoose, { Schema, Document, Model } from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -29,6 +34,10 @@ const addressSchema = new Schema<IAddress>(
   { _id: false }
 );
 
+/**
+ * Sub-schema for Franchise details.
+ * Kept separate to ensure clear domain boundaries.
+ */
 const franchiseDetailsSchema = new Schema<IFranchiseDetails>(
   {
     territory: {
@@ -43,6 +52,10 @@ const franchiseDetailsSchema = new Schema<IFranchiseDetails>(
   { _id: false }
 );
 
+/**
+ * Sub-schema for Operator details.
+ * Tracks shifts and specific cameras an operator is assigned to monitor.
+ */
 const operatorDetailsSchema = new Schema<IOperatorDetails>(
   {
     shiftStart: { type: String, default: "09:00" },
@@ -53,6 +66,10 @@ const operatorDetailsSchema = new Schema<IOperatorDetails>(
   { _id: false }
 );
 
+/**
+ * Sub-schema for Technician details.
+ * Handles skillsets and geographic assignments.
+ */
 const technicianDetailsSchema = new Schema<ITechnicianDetails>(
   {
     skills: [String],
@@ -62,6 +79,10 @@ const technicianDetailsSchema = new Schema<ITechnicianDetails>(
   { _id: false }
 );
 
+/**
+ * Sub-schema for Customer details.
+ * Tracks billing cycles and subscription plans for standard clients.
+ */
 const customerDetailsSchema = new Schema<ICustomerDetails>(
   {
     billingAddress: addressSchema,
@@ -77,6 +98,14 @@ const customerDetailsSchema = new Schema<ICustomerDetails>(
 
 // ─── Main User Schema ─────────────────────────────────────────────────────────
 
+/**
+ * Main User Schema
+ * Combines core authentication fields with role-specific sub-schemas.
+ * 
+ * Design Note: 
+ * We use `select: false` on the password field to ensure it is never accidentally 
+ * returned in API responses. It must be explicitly selected when verifying credentials.
+ */
 const userSchema = new Schema<UserDocument>(
   {
     name: {
@@ -179,16 +208,22 @@ const userSchema = new Schema<UserDocument>(
 );
 
 // ─── Indexes ──────────────────────────────────────────────────────────────────
+// Optimized for the most common querying patterns (e.g., fetching active operators)
 
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 userSchema.index({ isDeleted: 1 });
 userSchema.index({ createdAt: -1 });
-userSchema.index({ role: 1, isDeleted: 1, isActive: 1 }); // fast role-filtered list queries
+// Compound index for fast role-filtered list queries
+userSchema.index({ role: 1, isDeleted: 1, isActive: 1 }); 
 userSchema.index({ "operatorDetails.isOnShift": 1 });
 
 // ─── Pre-save Hook: Hash Password ─────────────────────────────────────────────
 
+/**
+ * Automatically hashes passwords before saving to the database.
+ * Only runs if the password field was modified (new user or password reset).
+ */
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 
@@ -203,12 +238,17 @@ userSchema.pre("save", async function (next) {
 
 // ─── Instance Methods ─────────────────────────────────────────────────────────
 
-userSchema.methods.comparePassword = async function (
-  candidatePassword: string
-): Promise<boolean> {
+/**
+ * Compares a plain-text password candidate against the hashed password.
+ */
+userSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
   return bcrypt.compare(candidatePassword, this.password as string);
 };
 
+/**
+ * Generates a short-lived JWT Access Token.
+ * Includes the current session ID to allow remote logout/invalidation.
+ */
 userSchema.methods.generateAccessToken = function (sessionId: string): string {
   return jwt.sign(
     {
@@ -224,6 +264,10 @@ userSchema.methods.generateAccessToken = function (sessionId: string): string {
   );
 };
 
+/**
+ * Generates a long-lived JWT Refresh Token.
+ * Does NOT contain the session ID, as it is only used to obtain a new access token.
+ */
 userSchema.methods.generateRefreshToken = function (): string {
   return jwt.sign(
     { userId: this._id.toString() },

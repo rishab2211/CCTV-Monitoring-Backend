@@ -1,3 +1,8 @@
+/**
+ * @file Camera.ts
+ * @description Mongoose model representing a physical IP camera connected to the system.
+ * Includes network credentials, stream configuration, talkback settings, and status tracking.
+ */
 import mongoose, { Schema, Document, Model } from "mongoose";
 import { ICamera, CameraStatus } from "../types";
 
@@ -7,6 +12,13 @@ export interface CameraDocument extends Omit<ICamera, "_id">, Document {}
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
+/**
+ * Camera Schema
+ * 
+ * Design Note:
+ * Passwords and network credentials (ip, port, username, password) are required
+ * for the backend to orchestrate RTSP/WebRTC streams via MediaMTX.
+ */
 const cameraSchema = new Schema<CameraDocument>(
   {
     name: {
@@ -91,10 +103,13 @@ const cameraSchema = new Schema<CameraDocument>(
 );
 
 // ─── Indexes ──────────────────────────────────────────────────────────────────
+// Optimized for finding cameras by ownership and online status
 
-// Compound index for fast queries based on customer and soft delete status
 cameraSchema.index({ customerId: 1, isDeleted: 1 });
-cameraSchema.index({ status: 1, isDeleted: 1 });
+cameraSchema.index({ operatorIds: 1, isDeleted: 1 });
+cameraSchema.index({ franchiseId: 1, isDeleted: 1 });
+cameraSchema.index({ status: 1 });
+cameraSchema.index({ "settings.talkbackEnabled": 1 });
 cameraSchema.index({ serialNumber: 1, isDeleted: 1 });
 
 // ─── Model ───────────────────────────────────────────────────────────────────

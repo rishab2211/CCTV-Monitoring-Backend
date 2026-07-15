@@ -1,3 +1,8 @@
+/**
+ * @file role.service.ts
+ * @description Manages dynamic RBAC roles and permissions.
+ * Includes methods for creating, updating, and querying custom roles.
+ */
 import mongoose from "mongoose";
 import { Role, RoleDocument } from "../models/Role";
 import { Permission, PermissionDocument } from "../models/Permission";
@@ -33,6 +38,12 @@ const validatePermissionsExist = async (permissions: string[]): Promise<void> =>
   }
 };
 
+/**
+ * Get role by ID.
+ * Retrieves the specific details and permissions array for a role.
+ * 
+ * @param id - Role ID
+ */
 const getRoleById = async (id: string): Promise<RoleDocument> => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw ApiError.badRequest("Invalid role ID format");
@@ -45,7 +56,8 @@ const getRoleById = async (id: string): Promise<RoleDocument> => {
 // ─── Role Service ─────────────────────────────────────────────────────────────
 
 /**
- * List all roles (system + custom), with permission count.
+ * Get all roles.
+ * Returns a list of all roles (built-in and custom) configured in the system.
  */
 export const listRoles = async () => {
   const roles = await Role.find({}).sort({ isSystem: -1, name: 1 }).lean();
@@ -56,7 +68,11 @@ export const listRoles = async () => {
 };
 
 /**
- * Get a single role with its full permission documents populated.
+ * Get permissions for a role by ID.
+ * Specifically returns just the `permissions` array for a given role.
+ * Used internally by the RBAC middleware or for frontend evaluation.
+ * 
+ * @param id - Role ID
  */
 export const getRolePermissions = async (id: string) => {
   const role = await getRoleById(id);
@@ -89,7 +105,9 @@ export const getRolePermissions = async (id: string) => {
 
 /**
  * Create a new custom role.
- * Validates all provided permissions exist.
+ * Validates that a role with the same name doesn't already exist.
+ * 
+ * @param input - Role details (name, description, permissions)
  */
 export const createRole = async (input: CreateRoleInput): Promise<RoleDocument> => {
   // Check name uniqueness
@@ -109,8 +127,11 @@ export const createRole = async (input: CreateRoleInput): Promise<RoleDocument> 
 };
 
 /**
- * Update a role's display name and/or description.
- * The role's name and isSystem flag cannot be changed.
+ * Update an existing role.
+ * Partially updates the permissions array or description of a custom role.
+ * 
+ * @param id - Role ID
+ * @param input - Updates to apply
  */
 export const updateRole = async (
   id: string,
@@ -128,8 +149,10 @@ export const updateRole = async (
 };
 
 /**
- * Delete a custom role.
- * System roles cannot be deleted.
+ * Delete a role.
+ * Permanently removes a custom role from the database.
+ * 
+ * @param id - Role ID
  */
 export const deleteRole = async (id: string): Promise<void> => {
   const role = await getRoleById(id);

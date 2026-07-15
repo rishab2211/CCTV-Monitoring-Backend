@@ -1,3 +1,8 @@
+/**
+ * @file user.controller.ts
+ * @description Express request handlers for user management.
+ * Responsible for parsing HTTP requests, triggering business logic, and formatting responses.
+ */
 import { Request, Response } from "express";
 import { catchAsync } from "../utils/catchAsync";
 import { ApiResponse } from "../utils/ApiResponse";
@@ -9,8 +14,9 @@ import { ListUsersQuery } from "../validators/user.validator";
 // ─── Generic User CRUD ────────────────────────────────────────────────────────
 
 /**
+ * List Users Endpoint
  * GET /api/v1/users
- * List all users with filters and pagination.
+ * Retrieves a paginated list of active users.
  */
 export const listUsers = catchAsync(async (req: Request, res: Response) => {
   const result = await userService.listUsers(req.query as unknown as ListUsersQuery);
@@ -18,8 +24,8 @@ export const listUsers = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
+ * Get User Details Endpoint
  * GET /api/v1/users/:id
- * Get a single user by ID.
  */
 export const getUserById = catchAsync(async (req: Request, res: Response) => {
   const user = await userService.getUserById(req.params.id);
@@ -27,8 +33,9 @@ export const getUserById = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
+ * Create User Endpoint
  * POST /api/v1/users
- * Create a new user (admin-initiated).
+ * Used by admins to manually provision users.
  */
 export const createUser = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -39,8 +46,9 @@ export const createUser = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
+ * Update User Endpoint
  * PUT /api/v1/users/:id
- * Update a user's details.
+ * Applies partial updates to a user profile.
  */
 export const updateUser = catchAsync(async (req: Request, res: Response) => {
   const user = await userService.updateUser(req.params.id, req.body);
@@ -48,8 +56,9 @@ export const updateUser = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
+ * Delete User Endpoint
  * DELETE /api/v1/users/:id
- * Soft-delete a user (super_admin only).
+ * Soft deletes a user account.
  */
 export const deleteUser = catchAsync(async (req: Request, res: Response) => {
   await userService.softDeleteUser(req.params.id);
