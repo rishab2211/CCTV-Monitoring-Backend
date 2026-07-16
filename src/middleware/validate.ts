@@ -19,7 +19,17 @@ export const validate = (
   target: ValidationTarget = "body"
 ): RequestHandler => {
   return (req: Request, _res: Response, next: NextFunction): void => {
-    const result = schema.safeParse(req[target]);
+    // Try unwrapped parsing first (e.g., auth schemas)
+    let result = schema.safeParse(req[target]);
+
+    if (!result.success) {
+      // Fallback: try wrapped parsing (e.g., body: z.object(...))
+      const wrappedResult = schema.safeParse({ [target]: req[target] });
+      if (wrappedResult.success) {
+        req[target] = (wrappedResult.data as any)[target];
+        return next();
+      }
+    }
 
     if (!result.success) {
       const errors = formatZodErrors(result.error);
