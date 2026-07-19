@@ -29,6 +29,7 @@ const buildUserFilter = (
   query: ListUsersQuery,
   roleOverride?: UserRole
 ): Record<string, unknown> => {
+  query ??= {} as ListUsersQuery; // guard: ensure query is never undefined
   const filter: Record<string, unknown> = {
     isDeleted: false,
   };
@@ -77,10 +78,10 @@ const revokeUserSessions = async (userId: string): Promise<void> => {
  * @returns Paginated results containing the users list
  */
 export const listUsers = async (
-  query: ListUsersQuery,
+  query: ListUsersQuery = {} as ListUsersQuery,
   roleOverride?: UserRole
 ) => {
-  const filter = buildUserFilter(query, roleOverride);
+  const filter = buildUserFilter(query ?? ({} as ListUsersQuery), roleOverride);
   const { page, limit, sortBy, sortOrder } = parsePaginationParams(query as Record<string, unknown>);
   const skip = (page - 1) * limit;
   const sortDir = sortOrder === "asc" ? 1 : -1;

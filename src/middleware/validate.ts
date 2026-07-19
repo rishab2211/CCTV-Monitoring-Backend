@@ -19,24 +19,14 @@ export const validate = (
   target: ValidationTarget = "body"
 ): RequestHandler => {
   return (req: Request, _res: Response, next: NextFunction): void => {
-    // Try unwrapped parsing first (e.g., auth schemas)
-    let result = schema.safeParse(req[target]);
-
-    if (!result.success) {
-      // Fallback: try wrapped parsing (e.g., body: z.object(...))
-      const wrappedResult = schema.safeParse({ [target]: req[target] });
-      if (wrappedResult.success) {
-        req[target] = (wrappedResult.data as any)[target];
-        return next();
-      }
-    }
+    const result = schema.safeParse(req[target]);
 
     if (!result.success) {
       const errors = formatZodErrors(result.error);
       return next(ApiError.badRequest("Validation failed", errors));
     }
 
-    // Replace with parsed data (handles coercion, defaults, stripping unknowns)
+    // Replace req[target] with parsed data (coercions, defaults, stripped unknowns applied)
     req[target] = result.data;
     next();
   };

@@ -96,7 +96,7 @@ export const errorHandler = (
     statusCode,
     message,
     ...(errors.length > 0 && { errors }),
-    ...(env.NODE_ENV === "development" && { stack: err.stack }),
+    // ...(env.NODE_ENV === "development" && { stack: err.stack }),
   };
 
   res.status(statusCode).json(response);

@@ -86,14 +86,12 @@ export const listUsersQuerySchema = z.object({
     .enum(["super_admin", "admin", "franchise", "operator", "technician", "customer"])
     .optional(),
   isActive: z
-    .string()
-    .optional()
-    .transform((v) => {
-      if (v === "true") return true;
-      if (v === "false") return false;
+    .preprocess((v) => {
+      if (v === "true" || v === true) return true;
+      if (v === "false" || v === false) return false;
       return undefined;
-    }),
-  search: z.string().max(100).optional(), // searches name, email, phone
+    }, z.boolean().optional()),
+  search: z.string().max(100).trim().optional(), // searches name, email, phone
   sortBy: z
     .enum(["createdAt", "name", "email", "role"])
     .default("createdAt"),
