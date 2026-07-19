@@ -10,7 +10,7 @@
   <img alt="Express" src="https://img.shields.io/badge/Framework-Express.js%204-000000?logo=express&logoColor=white"/>
   <img alt="MongoDB" src="https://img.shields.io/badge/Database-MongoDB%208-47A248?logo=mongodb&logoColor=white"/>
   <img alt="Socket.IO" src="https://img.shields.io/badge/Realtime-Socket.IO%204-010101?logo=socket.io&logoColor=white"/>
-  <img alt="License" src="https://img.shields.io/badge/License-MIT-green"/>
+  <img alt="License" src="https://img.shields.io/badge/License-Proprietary-red"/>
 </p>
 
 </div>
@@ -419,8 +419,7 @@ WebSocket connections require a valid JWT passed in the handshake `auth` object.
 ### Installation
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/your-org/cctv-monitoring-backend.git
+# 1. Obtain the source code from the project maintainer
 cd cctv-monitoring-backend
 
 # 2. Install dependencies
@@ -547,6 +546,10 @@ location /api/ {
 
 ---
 
-## 📄 License
+## ⚖️ License
 
-This project is licensed under the [MIT License](LICENSE).
+**This is proprietary software. All rights reserved.**
+
+This codebase and all associated files are the exclusive intellectual property of the project owner. Unauthorized copying, distribution, modification, sublicensing, or use of this software — in whole or in part — without prior written permission from the owner is strictly prohibited.
+
+© 2025 CCTV Monitoring Platform. All rights reserved.
