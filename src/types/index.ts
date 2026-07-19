@@ -66,6 +66,7 @@ export interface IOperatorDetails {
   shiftEnd?: string; // "21:00"
   isOnShift?: boolean;
   assignedCameras?: Types.ObjectId[];
+  assignedFranchise?: Types.ObjectId;
 }
 
 export interface ITechnicianDetails {

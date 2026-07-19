@@ -62,6 +62,7 @@ const operatorDetailsSchema = new Schema<IOperatorDetails>(
     shiftEnd: { type: String, default: "21:00" },
     isOnShift: { type: Boolean, default: false },
     assignedCameras: [{ type: Schema.Types.ObjectId, ref: "Camera" }],
+    assignedFranchise: { type: Schema.Types.ObjectId, ref: "Franchise" },
   },
   { _id: false }
 );
