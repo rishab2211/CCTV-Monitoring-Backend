@@ -5,7 +5,8 @@ import { Types } from "mongoose";
 export type UserRole =
   | "super_admin"
   | "admin"
-  | "franchise"
+  | "franchise"       // franchise owner — top of the franchise hierarchy
+  | "franchise_admin" // manager appointed by the franchise owner
   | "operator"
   | "technician"
   | "customer";
@@ -38,7 +39,7 @@ export interface IUser {
 
   // Instance methods
   comparePassword(candidatePassword: string): Promise<boolean>;
-  generateAccessToken(sessionId: string): string;
+  generateAccessToken(sessionId: string, franchiseId?: string): string;
   generateRefreshToken(): string;
 }
 
@@ -51,6 +52,7 @@ export interface IAddress {
 }
 
 export interface IFranchiseDetails {
+  franchiseRef?: Types.ObjectId; // direct ref to the Franchise document (for owners & admins)
   territory?: {
     city: string;
     state: string;
@@ -92,6 +94,7 @@ export interface JwtAccessPayload {
   role: UserRole;
   sessionId: string;
   email: string;
+  franchiseId?: string; // null for super_admin; set for franchise-scoped roles
   iat?: number;
   exp?: number;
 }

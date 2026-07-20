@@ -34,7 +34,9 @@ export const authorize = (...roles: UserRole[]): RequestHandler => {
  */
 export const isSuperAdmin = authorize("super_admin");
 export const isAdmin = authorize("super_admin", "admin");
-export const isFranchise = authorize("super_admin", "admin", "franchise");
-export const isOperator = authorize("super_admin", "admin", "operator");
+export const isFranchiseOwner = authorize("super_admin", "franchise");
+export const isFranchiseAdmin = authorize("super_admin", "admin", "franchise", "franchise_admin");
+export const isFranchise = authorize("super_admin", "admin", "franchise", "franchise_admin"); // backward-compat alias
+export const isOperator = authorize("super_admin", "admin", "franchise_admin", "operator");
 export const isTechnician = authorize("super_admin", "admin", "technician");
 export const isCustomer = authorize("customer");

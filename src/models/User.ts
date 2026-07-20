@@ -40,6 +40,7 @@ const addressSchema = new Schema<IAddress>(
  */
 const franchiseDetailsSchema = new Schema<IFranchiseDetails>(
   {
+    franchiseRef: { type: Schema.Types.ObjectId, ref: "Franchise" }, // direct link to Franchise doc
     territory: {
       city: String,
       state: String,
@@ -144,6 +145,7 @@ const userSchema = new Schema<UserDocument>(
           "super_admin",
           "admin",
           "franchise",
+          "franchise_admin",
           "operator",
           "technician",
           "customer",
@@ -248,19 +250,18 @@ userSchema.methods.comparePassword = async function (candidatePassword: string):
 
 /**
  * Generates a short-lived JWT Access Token.
- * Includes the current session ID to allow remote logout/invalidation.
+ * Includes the current session ID and franchiseId for tenant scoping.
  */
-userSchema.methods.generateAccessToken = function (sessionId: string): string {
+userSchema.methods.generateAccessToken = function (sessionId: string, franchiseId?: string): string {
   return jwt.sign(
     {
       userId: this._id.toString(),
       role: this.role,
       sessionId,
       email: this.email,
+      ...(franchiseId ? { franchiseId } : {}),
     },
     env.ACCESS_TOKEN_SECRET,
-    // @types/jsonwebtoken v9 requires StringValue (branded ms type), not plain string.
-    // Cast via unknown to satisfy the type — runtime values like "15m" work correctly.
     { expiresIn: env.ACCESS_TOKEN_EXPIRY as unknown as number }
   );
 };

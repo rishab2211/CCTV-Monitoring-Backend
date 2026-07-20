@@ -48,6 +48,7 @@ export const authenticate = (
       role: decoded.role,
       sessionId: decoded.sessionId,
       email: decoded.email,
+      franchiseId: decoded.franchiseId,
     };
 
     next();
@@ -87,6 +88,7 @@ export const optionalAuthenticate = (
       role: decoded.role,
       sessionId: decoded.sessionId,
       email: decoded.email,
+      franchiseId: decoded.franchiseId,
     };
   } catch {
     // Silently ignore — optional auth doesn't fail on bad tokens

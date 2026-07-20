@@ -64,15 +64,17 @@ const parseDeviceInfo = (userAgent: string = "", ipAddress: string = ""): IDevic
 
 /**
  * Issues both access and refresh tokens and creates a device session.
+ * @param franchiseId - resolved franchise scope for this user (undefined for super_admin/admin)
  */
 const issueTokens = async (
   user: UserDocument,
-  deviceInfo: IDeviceInfo
+  deviceInfo: IDeviceInfo,
+  franchiseId?: string
 ): Promise<AuthTokens> => {
   const sessionId = uuidv4();
 
-  // Generate tokens
-  const accessToken = user.generateAccessToken(sessionId);
+  // Generate tokens — pass franchiseId so it's embedded in the JWT
+  const accessToken = user.generateAccessToken(sessionId, franchiseId);
   const rawRefreshToken = user.generateRefreshToken();
 
   // Hash refresh token before storing
@@ -176,9 +178,6 @@ export const login = async (
 
   const user = await User.findOne(query).select("+password");
 
-  console.log("USER DETAILS",user);
-  
-
   if (!user) {
     throw ApiError.unauthorized("Invalid credentials");
   }
@@ -187,20 +186,39 @@ export const login = async (
     throw ApiError.forbidden("Your account has been deactivated. Please contact support.");
   }
 
-  // Check Franchise Suspension
-  let franchiseIdToCheck = null;
-  if (user.role === "customer" && user.customerDetails?.assignedFranchise) {
-    franchiseIdToCheck = user.customerDetails.assignedFranchise;
+  // ── Resolve franchiseId & check franchise suspension ─────────────────────────
+  let resolvedFranchiseId: string | undefined;
+  let franchiseIdToCheck: unknown = null;
+
+  if (user.role === "franchise") {
+    // Franchise owner — find the Franchise document they own
+    const ownedFranchise = await Franchise.findOne({ ownerId: user._id });
+    if (ownedFranchise) {
+      if (ownedFranchise.status === "suspended") {
+        throw ApiError.forbidden("Your franchise account is suspended. Please contact the administrator.");
+      }
+      resolvedFranchiseId = ownedFranchise._id.toString();
+    }
+  } else if (user.role === "franchise_admin") {
+    // Franchise admin — franchiseRef stored on their franchiseDetails sub-doc
+    const franchiseRef = user.franchiseDetails?.franchiseRef;
+    if (franchiseRef) {
+      franchiseIdToCheck = franchiseRef;
+      resolvedFranchiseId = franchiseRef.toString();
+    }
   } else if (user.role === "operator" && user.operatorDetails?.assignedFranchise) {
     franchiseIdToCheck = user.operatorDetails.assignedFranchise;
-  } else if (user.role === "franchise") {
-    // For franchise owner, find the franchise they own
-    const ownedFranchise = await Franchise.findOne({ ownerId: user._id });
-    if (ownedFranchise && ownedFranchise.status === "suspended") {
-      throw ApiError.forbidden("Your franchise account is suspended. Please contact the administrator.");
-    }
+    resolvedFranchiseId = user.operatorDetails.assignedFranchise.toString();
+  } else if (user.role === "technician" && user.technicianDetails?.assignedFranchise) {
+    franchiseIdToCheck = user.technicianDetails.assignedFranchise;
+    resolvedFranchiseId = user.technicianDetails.assignedFranchise.toString();
+  } else if (user.role === "customer" && user.customerDetails?.assignedFranchise) {
+    franchiseIdToCheck = user.customerDetails.assignedFranchise;
+    resolvedFranchiseId = user.customerDetails.assignedFranchise.toString();
   }
+  // super_admin and admin have no franchise scope — resolvedFranchiseId stays undefined
 
+  // Check if the assigned/owning franchise is suspended
   if (franchiseIdToCheck) {
     const franchise = await Franchise.findById(franchiseIdToCheck);
     if (franchise && franchise.status === "suspended") {
@@ -214,8 +232,12 @@ export const login = async (
     throw ApiError.unauthorized("Invalid credentials");
   }
 
-  // Issue tokens and create session
-  const tokens = await issueTokens(user, parseDeviceInfo(deviceInfo.userAgent, deviceInfo.ipAddress));
+  // Issue tokens (with franchiseId embedded in the JWT)
+  const tokens = await issueTokens(
+    user,
+    parseDeviceInfo(deviceInfo.userAgent, deviceInfo.ipAddress),
+    resolvedFranchiseId
+  );
 
   logActivity({
     userId: user._id,
@@ -225,7 +247,7 @@ export const login = async (
     userAgent: deviceInfo.userAgent,
   });
 
-  logger.info(`🔓 User logged in: ${user.email}`);
+  logger.info(`🔓 User logged in: ${user.email} (${user.role})`);
 
   return { user, tokens };
 };

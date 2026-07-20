@@ -12,7 +12,15 @@ declare global {
         role: IUser["role"];
         sessionId: string;
         email: string;
+        franchiseId?: string; // present for all franchise-scoped roles
       };
+
+      /**
+       * Attached by the `tenantScope` middleware.
+       * - `string` → filter all DB queries to this franchiseId
+       * - `null`   → super_admin — no filtering (global access)
+       */
+      franchiseScope?: string | null;
     }
   }
 }

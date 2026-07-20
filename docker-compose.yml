@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: cctv_mediamtx
+    network_mode: host
+    environment:
+      # These environment variables override the default mediamtx.yml settings inside the container
+      - MTX_API=yes
+      - MTX_APIADDRESS=:9997
+    restart: unless-stopped

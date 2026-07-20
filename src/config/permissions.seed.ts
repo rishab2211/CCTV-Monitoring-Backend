@@ -110,8 +110,8 @@ const SYSTEM_ROLES = [
   },
   {
     name: "franchise",
-    displayName: "Franchise Partner",
-    description: "Manages customers and technicians in their territory",
+    displayName: "Franchise Partner (Owner)",
+    description: "Owns a franchise. Can appoint franchise admins and view overall franchise performance",
     permissions: [
       "users:read", "users:write",
       "cameras:read",
@@ -123,6 +123,25 @@ const SYSTEM_ROLES = [
       "analytics:read",
       "payments:read",
       "notifications:read",
+    ],
+  },
+  {
+    name: "franchise_admin",
+    displayName: "Franchise Administrator",
+    description: "Manages all day-to-day operations within their franchise: users, cameras, alerts, jobs",
+    permissions: [
+      "users:read", "users:write", "users:delete",
+      "cameras:read", "cameras:write", "cameras:assign", "cameras:configure", "cameras:restart",
+      "streams:view",
+      "recordings:read", "recordings:download", "recordings:delete",
+      "alerts:read", "alerts:write", "alerts:resolve",
+      "sos:read",
+      "incidents:read", "incidents:write",
+      "installations:read", "installations:write",
+      "analytics:read",
+      "payments:read",
+      "notifications:read",
+      "talkback:use",
     ],
   },
   {
