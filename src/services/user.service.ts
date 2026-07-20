@@ -27,7 +27,8 @@ import { logger } from "../utils/logger";
  */
 const buildUserFilter = (
   query: ListUsersQuery,
-  roleOverride?: UserRole
+  roleOverride?: UserRole,
+  franchiseScope?: string | null
 ): Record<string, unknown> => {
   query ??= {} as ListUsersQuery; // guard: ensure query is never undefined
   const filter: Record<string, unknown> = {
@@ -44,13 +45,33 @@ const buildUserFilter = (
     filter.isActive = query.isActive;
   }
 
+  const andConditions: Record<string, unknown>[] = [];
+
   if (query.search) {
     const searchRegex = new RegExp(query.search, "i");
-    filter.$or = [
-      { name: searchRegex },
-      { email: searchRegex },
-      { phone: searchRegex },
-    ];
+    andConditions.push({
+      $or: [
+        { name: searchRegex },
+        { email: searchRegex },
+        { phone: searchRegex },
+      ]
+    });
+  }
+
+  if (franchiseScope) {
+    const fId = new mongoose.Types.ObjectId(franchiseScope);
+    andConditions.push({
+      $or: [
+        { "operatorDetails.assignedFranchise": fId },
+        { "technicianDetails.assignedFranchise": fId },
+        { "customerDetails.assignedFranchise": fId },
+        { "franchiseDetails.franchiseRef": fId },
+      ]
+    });
+  }
+
+  if (andConditions.length > 0) {
+    filter.$and = andConditions;
   }
 
   return filter;
@@ -79,9 +100,10 @@ const revokeUserSessions = async (userId: string): Promise<void> => {
  */
 export const listUsers = async (
   query: ListUsersQuery = {} as ListUsersQuery,
-  roleOverride?: UserRole
+  roleOverride?: UserRole,
+  franchiseScope?: string | null
 ) => {
-  const filter = buildUserFilter(query ?? ({} as ListUsersQuery), roleOverride);
+  const filter = buildUserFilter(query ?? ({} as ListUsersQuery), roleOverride, franchiseScope);
   const { page, limit, sortBy, sortOrder } = parsePaginationParams(query as Record<string, unknown>);
   const skip = (page - 1) * limit;
   const sortDir = sortOrder === "asc" ? 1 : -1;

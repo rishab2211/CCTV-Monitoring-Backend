@@ -14,6 +14,11 @@ const billingInvoiceSchema = new Schema<BillingInvoiceDocument>(
       ref: "User",
       required: true,
     },
+    franchiseId: {
+      type: Schema.Types.ObjectId,
+      ref: "Franchise",
+      index: true,
+    },
     subscriptionId: {
       type: Schema.Types.ObjectId,
       ref: "Subscription",

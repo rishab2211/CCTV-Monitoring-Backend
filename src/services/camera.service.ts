@@ -39,9 +39,9 @@ export const validateCameraAccess = async (
   const userObjectId = new mongoose.Types.ObjectId(userId);
 
   // Franchise access check
-  if (role === "franchise") {
-    // 1. Directly assigned franchise
-    if (camera.franchiseId && camera.franchiseId.equals(userObjectId)) {
+  if (role === "franchise" || role === "franchise_admin") {
+    // 1. Directly assigned franchise (using franchiseId from token)
+    if (user.franchiseId && camera.franchiseId && camera.franchiseId.toString() === user.franchiseId) {
       return;
     }
     // 2. Camera owned by a customer registered under this franchise
@@ -49,7 +49,7 @@ export const validateCameraAccess = async (
       const customer = await User.findOne({
         _id: camera.customerId,
         role: "customer",
-        "customerDetails.assignedFranchise": userObjectId,
+        "customerDetails.assignedFranchise": new mongoose.Types.ObjectId(user.franchiseId!),
         isDeleted: false,
       }).select("_id");
       
@@ -155,19 +155,32 @@ export const listCameras = async (
   const { role, userId } = user;
   const userObjectId = new mongoose.Types.ObjectId(userId);
 
-  if (role === "franchise") {
+  if (role === "franchise" || role === "franchise_admin") {
     // Find all customers managed by this franchise
+    if (!user.franchiseId) {
+      throw ApiError.forbidden("No franchise associated with your account");
+    }
+    const fId = new mongoose.Types.ObjectId(user.franchiseId);
+    
     const customers = await User.find({
-      "customerDetails.assignedFranchise": userObjectId,
+      "customerDetails.assignedFranchise": fId,
       role: "customer",
       isDeleted: false,
     }).select("_id");
     const customerIds = customers.map((c) => c._id);
 
-    filter.$or = [
+    // If query has a search, we must use $and
+    const franchiseOr = [
       { customerId: { $in: customerIds } },
-      { franchiseId: userObjectId },
+      { franchiseId: fId },
     ];
+    
+    if (filter.$or) {
+      filter.$and = [{ $or: filter.$or }, { $or: franchiseOr }];
+      delete filter.$or;
+    } else {
+      filter.$or = franchiseOr;
+    }
   } else if (role === "operator") {
     filter.operatorIds = userObjectId;
   } else if (role === "customer") {

@@ -12,6 +12,7 @@ export type PaymentProvider = "razorpay" | "stripe" | "manual";
 export interface IPayment {
   _id: mongoose.Types.ObjectId;
   customerId: mongoose.Types.ObjectId;
+  franchiseId?: mongoose.Types.ObjectId;
   subscriptionId: mongoose.Types.ObjectId;
   amount: number;                   // in smallest currency unit (paise for INR)
   currency: string;                 // e.g. "INR"
@@ -35,6 +36,11 @@ const paymentSchema = new Schema<PaymentDocument>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
+    },
+    franchiseId: {
+      type: Schema.Types.ObjectId,
+      ref: "Franchise",
       index: true,
     },
     subscriptionId: {

@@ -1,7 +1,8 @@
 import { Router } from "express";
 import * as userController from "../../controllers/user.controller";
 import { authenticate } from "../../middleware/auth";
-import { authorize } from "../../middleware/authorize";
+import { authorize, isFranchiseAdmin, isFranchiseOwner } from "../../middleware/authorize";
+import { tenantScope } from "../../middleware/tenantScope";
 import { validate } from "../../middleware/validate";
 import {
   createUserSchema,
@@ -17,7 +18,8 @@ const router = Router();
 router.get(
   "/operators",
   authenticate,
-  authorize("super_admin", "admin"),
+  isFranchiseAdmin, // Changed from super_admin/admin to include franchise admins
+  tenantScope,
   validate(listUsersQuerySchema, "query"),
   userController.listOperators
 );
@@ -26,7 +28,7 @@ router.get(
 router.post(
   "/operators",
   authenticate,
-  authorize("super_admin", "admin"),
+  isFranchiseAdmin, // Admins & franchise admins can create operators
   validate(createUserSchema),
   userController.createOperator
 );
@@ -38,7 +40,8 @@ router.post(
 router.get(
   "/technicians",
   authenticate,
-  authorize("super_admin", "admin", "franchise"),
+  isFranchiseAdmin,
+  tenantScope,
   validate(listUsersQuerySchema, "query"),
   userController.listTechnicians
 );
@@ -47,7 +50,7 @@ router.get(
 router.post(
   "/technicians",
   authenticate,
-  authorize("super_admin", "admin", "franchise"),
+  isFranchiseAdmin,
   validate(createUserSchema),
   userController.createTechnician
 );
@@ -58,7 +61,8 @@ router.post(
 router.get(
   "/customers",
   authenticate,
-  authorize("super_admin", "admin", "franchise"),
+  isFranchiseAdmin,
+  tenantScope,
   validate(listUsersQuerySchema, "query"),
   userController.listCustomers
 );
@@ -67,7 +71,7 @@ router.get(
 router.post(
   "/customers",
   authenticate,
-  authorize("super_admin", "admin", "franchise"),
+  isFranchiseAdmin,
   validate(createUserSchema),
   userController.createCustomer
 );
@@ -76,7 +80,7 @@ router.post(
 router.get(
   "/customers/:id",
   authenticate,
-  authorize("super_admin", "admin", "franchise", "operator"),
+  authorize("super_admin", "admin", "franchise", "franchise_admin", "operator"),
   validate(userIdParamSchema, "params"),
   userController.getCustomerById
 );

@@ -14,6 +14,11 @@ const subscriptionSchema = new Schema<SubscriptionDocument>(
       ref: "User",
       required: true,
     },
+    franchiseId: {
+      type: Schema.Types.ObjectId,
+      ref: "Franchise",
+      index: true,
+    },
     planId: {
       type: Schema.Types.ObjectId,
       ref: "Plan",

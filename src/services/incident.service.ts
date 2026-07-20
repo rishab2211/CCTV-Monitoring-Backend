@@ -26,9 +26,11 @@ import { logger } from "../utils/logger";
 export const reportIncident = async (input: any, user: JwtAccessPayload) => {
   const { title, description, type, severity, cameraId, attachments = [] } = input;
 
+  let franchiseId;
   if (cameraId) {
     const camera = await Camera.findOne({ _id: cameraId, isDeleted: false });
     if (!camera) throw ApiError.notFound("Camera not found");
+    franchiseId = camera.franchiseId;
 
     // Ensure customer/operator has access to this camera to report an incident on it
     if (user.role === "customer" || user.role === "operator") {
@@ -45,6 +47,7 @@ export const reportIncident = async (input: any, user: JwtAccessPayload) => {
     type,
     severity,
     cameraId,
+    franchiseId,
     reportedBy: user.userId,
     attachments,
     status: "open",
@@ -117,6 +120,9 @@ export const listIncidents = async (query: any, user: JwtAccessPayload) => {
       { reportedBy: user.userId },
       { cameraId: { $in: accessibleCameras.map((c) => c._id) } }
     ];
+  } else if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No franchise associated with your account");
+    filter.franchiseId = user.franchiseId;
   }
 
   const skip = (page - 1) * limit;

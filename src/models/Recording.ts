@@ -16,6 +16,11 @@ const recordingSchema = new Schema<RecordingDocument>(
       required: true,
       index: true,
     },
+    franchiseId: {
+      type: Schema.Types.ObjectId,
+      ref: "Franchise",
+      index: true,
+    },
     startTime: {
       type: Date,
       required: true,

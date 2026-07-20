@@ -35,10 +35,9 @@ export const createJob = async (input: any, user: JwtAccessPayload) => {
 
   // If Franchise Manager is creating the job, automatically lock to their franchise
   let actualFranchiseId = franchiseId;
-  if (user.role === "franchise") {
-    const ownedFranchise = await Franchise.findOne({ ownerId: user.userId });
-    if (!ownedFranchise) throw ApiError.forbidden("No active franchise found for this user");
-    actualFranchiseId = ownedFranchise._id.toString();
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No active franchise found for this user");
+    actualFranchiseId = user.franchiseId;
   }
 
   // Validate Camera if provided
@@ -94,10 +93,9 @@ export const listJobs = async (query: any, user: JwtAccessPayload) => {
   // RBAC Filtering
   if (user.role === "technician") {
     filter.assignedTechnician = user.userId;
-  } else if (user.role === "franchise") {
-    const ownedFranchise = await Franchise.findOne({ ownerId: user.userId });
-    if (!ownedFranchise) throw ApiError.forbidden("No active franchise found for this user");
-    filter.franchiseId = ownedFranchise._id;
+  } else if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No active franchise found for this user");
+    filter.franchiseId = user.franchiseId;
   } else {
     // Admins can filter by whatever they want
     if (assignedTechnician) filter.assignedTechnician = assignedTechnician;
@@ -137,9 +135,8 @@ export const getJobDetails = async (id: string, user: JwtAccessPayload) => {
     throw ApiError.forbidden("You do not have access to this job");
   }
 
-  if (user.role === "franchise") {
-    const ownedFranchise = await Franchise.findOne({ ownerId: user.userId });
-    if (!ownedFranchise || job.franchiseId?._id.toString() !== ownedFranchise._id.toString()) {
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId || job.franchiseId?._id.toString() !== user.franchiseId) {
       throw ApiError.forbidden("You do not have access to this job");
     }
   }

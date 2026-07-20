@@ -11,6 +11,11 @@ const alertSchema = new Schema<AlertDocument>(
       required: true,
       index: true,
     },
+    franchiseId: {
+      type: Schema.Types.ObjectId,
+      ref: "Franchise",
+      index: true,
+    },
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",

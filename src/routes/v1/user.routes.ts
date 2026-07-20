@@ -1,7 +1,8 @@
 import { Router } from "express";
 import * as userController from "../../controllers/user.controller";
 import { authenticate } from "../../middleware/auth";
-import { authorize } from "../../middleware/authorize";
+import { authorize, isFranchiseAdmin } from "../../middleware/authorize";
+import { tenantScope } from "../../middleware/tenantScope";
 import { validate } from "../../middleware/validate";
 import {
   createUserSchema,
@@ -43,7 +44,8 @@ router.put(
 router.get(
   "/",
   authenticate,
-  authorize("super_admin", "admin"),
+  authorize("super_admin", "admin"), // Kept admin-only as this is the generic user list endpoint
+  tenantScope,
   validate(listUsersQuerySchema, "query"),
   userController.listUsers
 );

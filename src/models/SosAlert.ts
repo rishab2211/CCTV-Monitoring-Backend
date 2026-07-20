@@ -14,6 +14,11 @@ const sosAlertSchema = new Schema<SosAlertDocument>(
       type: Schema.Types.ObjectId,
       ref: "Camera",
     },
+    franchiseId: {
+      type: Schema.Types.ObjectId,
+      ref: "Franchise",
+      index: true,
+    },
     location: {
       type: String, // E.g., 'Main Gate', 'Zone B', or coordinates depending on client capabilities
     },

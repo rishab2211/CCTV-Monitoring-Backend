@@ -11,6 +11,11 @@ const talkbackSessionSchema = new Schema<TalkbackSessionDocument>(
       required: true,
       index: true,
     },
+    franchiseId: {
+      type: Schema.Types.ObjectId,
+      ref: "Franchise",
+      index: true,
+    },
     operatorId: {
       type: Schema.Types.ObjectId,
       ref: "User",

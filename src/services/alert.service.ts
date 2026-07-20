@@ -23,6 +23,7 @@ export const createAlert = async (data: any, user: JwtAccessPayload) => {
 
   const alert = await Alert.create({
     ...data,
+    franchiseId: camera.franchiseId,
     createdBy: user.userId,
     status: "new",
   });
@@ -67,8 +68,11 @@ export const listAlerts = async (query: any, user: JwtAccessPayload) => {
     if (!camera) throw ApiError.notFound("Camera");
     await validateCameraAccess(camera, user);
     filter.cameraId = cameraId;
+  } else if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No franchise associated with your account");
+    filter.franchiseId = user.franchiseId;
   } else if (user.role !== "super_admin" && user.role !== "admin") {
-    // If no cameraId provided, non-admins can only see alerts for their assigned cameras
+    // Non-admins (operators, customers) only see alerts for their assigned cameras
     const accessibleCameras = await Camera.find({
       $or: [{ operatorIds: user.userId }, { customerId: user.userId }],
       isDeleted: false,

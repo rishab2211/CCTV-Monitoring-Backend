@@ -306,6 +306,7 @@ export type RecordingStatus = "recording" | "completed" | "failed" | "deleted";
 export interface IRecording {
   _id: Types.ObjectId;
   cameraId: Types.ObjectId;
+  franchiseId?: Types.ObjectId;
   startTime: Date;
   endTime?: Date;
   type: RecordingType;
@@ -358,6 +359,7 @@ export type AlertStatus = "new" | "acknowledged" | "resolved" | "escalated";
 export interface IAlert {
   _id: Types.ObjectId;
   cameraId: Types.ObjectId;
+  franchiseId?: Types.ObjectId;
   createdBy: Types.ObjectId;
   type: AlertType;
   priority: AlertPriority;
@@ -379,6 +381,7 @@ export type TalkbackStatus = "active" | "completed" | "failed";
 export interface ITalkbackSession {
   _id: Types.ObjectId;
   cameraId: Types.ObjectId;
+  franchiseId?: Types.ObjectId;
   operatorId: Types.ObjectId;
   startedAt: Date;
   endedAt?: Date;
@@ -422,6 +425,7 @@ export type SosStatus = "active" | "acknowledged" | "resolved";
 export interface ISosAlert {
   _id: Types.ObjectId;
   triggeredBy: Types.ObjectId;
+  franchiseId?: Types.ObjectId;
   cameraId?: Types.ObjectId;
   location?: string;
   status: SosStatus;
@@ -452,6 +456,7 @@ export interface IIncident {
   type: IncidentType;
   severity: IncidentSeverity;
   status: IncidentStatus;
+  franchiseId?: Types.ObjectId;
   cameraId?: Types.ObjectId;
   reportedBy: Types.ObjectId;
   assignedTo?: Types.ObjectId;
@@ -547,6 +552,7 @@ export type SubscriptionStatus = "active" | "past_due" | "canceled";
 export interface ISubscription {
   _id: Types.ObjectId;
   customerId: Types.ObjectId;
+  franchiseId?: Types.ObjectId;
   planId: Types.ObjectId;
   planName: string;
   status: SubscriptionStatus;
@@ -562,6 +568,7 @@ export type InvoiceStatus = "paid" | "pending" | "failed";
 export interface IBillingInvoice {
   _id: Types.ObjectId;
   customerId: Types.ObjectId;
+  franchiseId?: Types.ObjectId;
   subscriptionId: Types.ObjectId;
   amount: number;
   status: InvoiceStatus;

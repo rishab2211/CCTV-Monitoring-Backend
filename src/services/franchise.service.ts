@@ -124,8 +124,8 @@ export const getFranchiseDetails = async (id: string, user: JwtAccessPayload) =>
   const franchise = await Franchise.findById(id).populate("ownerId", "name email phone");
   if (!franchise) throw ApiError.notFound("Franchise not found");
 
-  // Admins can see any. Franchise owners can see their own.
-  if (user.role === "franchise" && franchise.ownerId._id.toString() !== user.userId) {
+  // Admins can see any. Franchise scopes can see their own.
+  if ((user.role === "franchise" || user.role === "franchise_admin") && franchise._id.toString() !== user.franchiseId) {
     throw ApiError.forbidden("You do not have access to this franchise");
   }
 

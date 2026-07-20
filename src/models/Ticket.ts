@@ -17,6 +17,7 @@ export interface ITicket {
   status: TicketStatus;
   priority: TicketPriority;
   category: TicketCategory;
+  franchiseId?: mongoose.Types.ObjectId;
   createdBy: mongoose.Types.ObjectId;
   assignedTo?: mongoose.Types.ObjectId;
   comments: ITicketComment[];
@@ -65,6 +66,11 @@ const ticketSchema = new Schema<TicketDocument>(
       enum: ["billing", "technical", "account", "general"],
       default: "general",
       required: true,
+    },
+    franchiseId: {
+      type: Schema.Types.ObjectId,
+      ref: "Franchise",
+      index: true,
     },
     createdBy: {
       type: Schema.Types.ObjectId,

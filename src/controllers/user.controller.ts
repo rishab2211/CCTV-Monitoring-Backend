@@ -19,7 +19,7 @@ import { ListUsersQuery } from "../validators/user.validator";
  * Retrieves a paginated list of active users.
  */
 export const listUsers = catchAsync(async (req: Request, res: Response) => {
-  const result = await userService.listUsers(req.query as unknown as ListUsersQuery);
+  const result = await userService.listUsers(req.query as unknown as ListUsersQuery, undefined, req.franchiseScope);
   res.status(200).json(new ApiResponse(200, result));
 });
 
@@ -122,7 +122,8 @@ const listByRole = (role: UserRole) =>
   catchAsync(async (req: Request, res: Response) => {
     const result = await userService.listUsers(
       req.query as unknown as ListUsersQuery,
-      role
+      role,
+      req.franchiseScope
     );
     res.status(200).json(new ApiResponse(200, result));
   });

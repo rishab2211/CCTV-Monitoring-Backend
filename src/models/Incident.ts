@@ -34,6 +34,11 @@ const incidentSchema = new Schema<IncidentDocument>(
       type: Schema.Types.ObjectId,
       ref: "Camera",
     },
+    franchiseId: {
+      type: Schema.Types.ObjectId,
+      ref: "Franchise",
+      index: true,
+    },
     reportedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",

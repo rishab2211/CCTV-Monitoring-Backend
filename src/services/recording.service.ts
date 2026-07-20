@@ -27,7 +27,10 @@ export const createRecordingChunk = async (data: any) => {
   const camera = await Camera.findOne({ _id: data.cameraId, isDeleted: false });
   if (!camera) throw ApiError.notFound("Camera");
 
-  const recording = await Recording.create(data);
+  const recording = await Recording.create({
+    ...data,
+    franchiseId: camera.franchiseId,
+  });
   return recording;
 };
 
@@ -48,6 +51,9 @@ export const listRecordings = async (query: any, user: JwtAccessPayload) => {
     if (!camera) throw ApiError.notFound("Camera");
     await validateCameraAccess(camera, user);
     filter.cameraId = cameraId;
+  } else if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No franchise associated with your account");
+    filter.franchiseId = user.franchiseId;
   } else if (user.role !== "super_admin" && user.role !== "admin") {
     // If no cameraId provided, non-admins can only see their assigned cameras
     const accessibleCameras = await Camera.find({

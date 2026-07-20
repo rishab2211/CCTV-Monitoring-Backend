@@ -48,6 +48,13 @@ class SocketService {
       const user = socket.data.user as JwtAccessPayload;
       logger.debug(`[Socket.IO] Client connected: ${user.userId} (${user.role})`);
 
+      // Automatically join franchise room if user belongs to one
+      if (user.franchiseId) {
+        const franchiseRoom = `franchise_${user.franchiseId}`;
+        socket.join(franchiseRoom);
+        logger.debug(`[Socket.IO] User ${user.userId} joined room ${franchiseRoom}`);
+      }
+
       // Client can request to join specific camera rooms to receive alerts for them
       socket.on("join_camera", (cameraId: string) => {
         const roomName = `camera_${cameraId}`;
@@ -84,6 +91,17 @@ class SocketService {
       return;
     }
     const roomName = `camera_${cameraId}`;
+    this.io.to(roomName).emit(event, data);
+    logger.debug(`[Socket.IO] Emitted '${event}' to ${roomName}`);
+  }
+
+  /**
+   * Emit Event to Franchise Room
+   * Broadcasts to all users (admins, operators, etc.) within a specific franchise.
+   */
+  public emitToFranchise(franchiseId: string, event: string, data: any) {
+    if (!this.io) return;
+    const roomName = `franchise_${franchiseId}`;
     this.io.to(roomName).emit(event, data);
     logger.debug(`[Socket.IO] Emitted '${event}' to ${roomName}`);
   }
