@@ -12,6 +12,27 @@ import {
 
 const router = Router();
 
+// ─── /api/v1/franchise-admins ────────────────────────────────────────────────
+
+/** GET /api/v1/franchise-admins */
+router.get(
+  "/franchise-admins",
+  authenticate,
+  authorize("super_admin", "admin", "franchise"), // Franchise owners & admins can list managers
+  tenantScope,
+  validate(listUsersQuerySchema, "query"),
+  userController.listFranchiseAdmins
+);
+
+/** POST /api/v1/franchise-admins */
+router.post(
+  "/franchise-admins",
+  authenticate,
+  authorize("super_admin", "admin", "franchise"), // Franchise owners can create their managers
+  validate(createUserSchema),
+  userController.createFranchiseAdmin
+);
+
 // ─── /api/v1/operators ───────────────────────────────────────────────────────
 
 /** GET /api/v1/operators */

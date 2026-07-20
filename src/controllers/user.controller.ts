@@ -41,6 +41,9 @@ export const createUser = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
   const user = await userService.createUser(req.body, {
     userId: req.user.userId,
+    franchiseId: req.user.role === "franchise" || req.user.role === "franchise_admin" 
+      ? req.franchiseScope 
+      : undefined
   });
   res.status(201).json(new ApiResponse(201, { user }, "User created successfully"));
 });
@@ -138,7 +141,12 @@ const createByRole = (role: UserRole) =>
     if (!req.user) throw ApiError.unauthorized();
     const user = await userService.createUser(
       { ...req.body, role }, // override role to enforce correct type
-      { userId: req.user.userId }
+      { 
+        userId: req.user.userId,
+        franchiseId: req.user.role === "franchise" || req.user.role === "franchise_admin" 
+          ? req.franchiseScope 
+          : undefined
+      }
     );
     res.status(201).json(
       new ApiResponse(201, { user }, `${role.charAt(0).toUpperCase() + role.slice(1)} created successfully`)
@@ -155,6 +163,8 @@ export const listTechnicians = listByRole("technician");
 export const createTechnician = createByRole("technician");
 export const listCustomers = listByRole("customer");
 export const createCustomer = createByRole("customer");
+export const listFranchiseAdmins = listByRole("franchise_admin");
+export const createFranchiseAdmin = createByRole("franchise_admin");
 
 /**
  * GET /api/v1/customers/:id

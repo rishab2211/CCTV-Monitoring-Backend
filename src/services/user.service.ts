@@ -155,7 +155,7 @@ export const getUserById = async (id: string): Promise<UserDocument> => {
  */
 export const createUser = async (
   input: CreateUserInput,
-  createdBy: { userId: string; name?: string }
+  createdBy: { userId: string; name?: string; franchiseId?: string | null }
 ): Promise<UserDocument> => {
   // Check uniqueness
   const [emailExists, phoneExists] = await Promise.all([
@@ -165,6 +165,20 @@ export const createUser = async (
 
   if (emailExists) throw ApiError.conflict("An account with this email already exists");
   if (phoneExists) throw ApiError.conflict("An account with this phone number already exists");
+
+  // If created by a franchise or franchise_admin, force binding to their franchise
+  if (createdBy.franchiseId) {
+    const fId = new mongoose.Types.ObjectId(createdBy.franchiseId);
+    if (input.role === "franchise_admin") {
+      input.franchiseDetails = { ...input.franchiseDetails, franchiseRef: fId as any };
+    } else if (input.role === "operator") {
+      input.operatorDetails = { ...input.operatorDetails, assignedFranchise: fId as any };
+    } else if (input.role === "technician") {
+      input.technicianDetails = { ...input.technicianDetails, assignedFranchise: fId as any };
+    } else if (input.role === "customer") {
+      input.customerDetails = { ...input.customerDetails, assignedFranchise: fId as any };
+    }
+  }
 
   const user = await User.create(input);
 
