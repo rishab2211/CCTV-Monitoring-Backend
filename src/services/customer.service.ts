@@ -55,6 +55,7 @@ export const subscribeToPlan = async (planName: string, durationMonths: number, 
     startDate,
     endDate,
     price: totalAmount,
+    franchiseId: customer.customerDetails?.assignedFranchise || undefined,
   });
 
   const invoice = await BillingInvoice.create({
@@ -63,6 +64,7 @@ export const subscribeToPlan = async (planName: string, durationMonths: number, 
     amount: totalAmount,
     status: "paid", // Assuming payment is instantly successful in this simulation
     billingDate: startDate,
+    franchiseId: customer.customerDetails?.assignedFranchise || undefined,
     invoiceUrl: `https://billing.example.com/inv/${new mongoose.Types.ObjectId().toString()}` // Mock URL
   });
 

@@ -28,15 +28,20 @@ export const createJob = async (input: any, user: JwtAccessPayload) => {
   const { title, description, type, assignedTechnician, franchiseId, cameraId, scheduledAt } = input;
 
   // Validate Technician
-  const tech = await User.findOne({ _id: assignedTechnician, role: "technician", isDeleted: false });
+  const techFilter: any = { _id: assignedTechnician, role: "technician", isDeleted: false };
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No active franchise found for this user");
+    techFilter["technicianDetails.assignedFranchise"] = new mongoose.Types.ObjectId(user.franchiseId);
+  }
+
+  const tech = await User.findOne(techFilter);
   if (!tech) {
-    throw ApiError.badRequest("Invalid technician assigned. User must have the 'technician' role.");
+    throw ApiError.badRequest("Invalid technician assigned, or technician does not belong to your franchise.");
   }
 
   // If Franchise Manager is creating the job, automatically lock to their franchise
   let actualFranchiseId = franchiseId;
   if (user.role === "franchise" || user.role === "franchise_admin") {
-    if (!user.franchiseId) throw ApiError.forbidden("No active franchise found for this user");
     actualFranchiseId = user.franchiseId;
   }
 

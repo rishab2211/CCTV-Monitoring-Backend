@@ -126,15 +126,26 @@ export const clockOut = async (handoverNotes: string | undefined, user: JwtAcces
  * Updates both the Operator's profile and the Cameras.
  */
 export const assignCameras = async (operatorId: string, cameraIds: string[], user: JwtAccessPayload) => {
-  if (user.role !== "super_admin" && user.role !== "admin" && user.role !== "franchise") {
+  if (user.role !== "super_admin" && user.role !== "admin" && user.role !== "franchise" && user.role !== "franchise_admin") {
     throw ApiError.forbidden("You do not have permission to assign cameras");
   }
 
-  const operator = await User.findOne({ _id: operatorId, role: "operator", isDeleted: false });
-  if (!operator) throw ApiError.notFound("Operator not found");
+  const operatorFilter: any = { _id: operatorId, role: "operator", isDeleted: false };
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No active franchise found");
+    operatorFilter["operatorDetails.assignedFranchise"] = new mongoose.Types.ObjectId(user.franchiseId);
+  }
+
+  const operator = await User.findOne(operatorFilter);
+  if (!operator) throw ApiError.notFound("Operator not found or belongs to another franchise");
 
   // Validate cameras
-  const cameras = await Camera.find({ _id: { $in: cameraIds }, isDeleted: false });
+  const cameraFilter: any = { _id: { $in: cameraIds }, isDeleted: false };
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    cameraFilter.franchiseId = new mongoose.Types.ObjectId(user.franchiseId);
+  }
+  
+  const cameras = await Camera.find(cameraFilter);
   if (cameras.length !== cameraIds.length) {
     throw ApiError.badRequest("One or more provided Camera IDs are invalid or deleted");
   }
