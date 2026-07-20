@@ -93,7 +93,8 @@ export const validateCameraAccess = async (
  */
 export const createCamera = async (
   input: CreateCameraInput,
-  createdBy: string
+  createdBy: string,
+  franchiseScope?: string | null
 ): Promise<CameraDocument> => {
   // Check unique serial number
   const exists = await Camera.findOne({ serialNumber: input.serialNumber, isDeleted: false });
@@ -103,6 +104,7 @@ export const createCamera = async (
 
   const camera = await Camera.create({
     ...input,
+    franchiseId: franchiseScope || undefined, // Inject franchise binding
     status: "offline",
     health: {
       cpuUsage: 0,

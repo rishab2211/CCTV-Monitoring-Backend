@@ -16,7 +16,7 @@ import { ListCamerasQuery } from "../validators/camera.validator";
  */
 export const createCamera = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
-  const camera = await cameraService.createCamera(req.body, req.user.userId);
+  const camera = await cameraService.createCamera(req.body, req.user.userId, req.franchiseScope);
   res.status(201).json(new ApiResponse(201, { camera }, "Camera registered successfully"));
 });
 

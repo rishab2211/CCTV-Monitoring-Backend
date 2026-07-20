@@ -63,7 +63,8 @@ router.post(
 router.get(
   "/:id",
   authenticate,
-  authorize("super_admin", "admin"),
+  authorize("super_admin", "admin", "franchise", "franchise_admin"),
+  tenantScope,
   validate(userIdParamSchema, "params"),
   userController.getUserById
 );
@@ -72,7 +73,8 @@ router.get(
 router.put(
   "/:id",
   authenticate,
-  authorize("super_admin", "admin"),
+  authorize("super_admin", "admin", "franchise", "franchise_admin"),
+  tenantScope,
   validate(userIdParamSchema, "params"),
   validate(updateUserSchema),
   userController.updateUser
@@ -91,7 +93,8 @@ router.delete(
 router.patch(
   "/:id/status",
   authenticate,
-  authorize("super_admin", "admin"),
+  authorize("super_admin", "admin", "franchise", "franchise_admin"),
+  tenantScope,
   validate(userIdParamSchema, "params"),
   validate(updateStatusSchema),
   userController.updateUserStatus

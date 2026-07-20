@@ -102,6 +102,7 @@ router.get(
   "/customers/:id",
   authenticate,
   authorize("super_admin", "admin", "franchise", "franchise_admin", "operator"),
+  tenantScope,
   validate(userIdParamSchema, "params"),
   userController.getCustomerById
 );

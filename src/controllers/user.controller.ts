@@ -28,7 +28,7 @@ export const listUsers = catchAsync(async (req: Request, res: Response) => {
  * GET /api/v1/users/:id
  */
 export const getUserById = catchAsync(async (req: Request, res: Response) => {
-  const user = await userService.getUserById(req.params.id);
+  const user = await userService.getUserById(req.params.id, req.franchiseScope);
   res.status(200).json(new ApiResponse(200, { user }));
 });
 
@@ -54,7 +54,7 @@ export const createUser = catchAsync(async (req: Request, res: Response) => {
  * Applies partial updates to a user profile.
  */
 export const updateUser = catchAsync(async (req: Request, res: Response) => {
-  const user = await userService.updateUser(req.params.id, req.body);
+  const user = await userService.updateUser(req.params.id, req.body, req.franchiseScope);
   res.status(200).json(new ApiResponse(200, { user }, "User updated successfully"));
 });
 
@@ -77,7 +77,8 @@ export const updateUserStatus = catchAsync(async (req: Request, res: Response) =
   const user = await userService.toggleUserStatus(
     req.params.id,
     req.body,
-    req.user.userId
+    req.user.userId,
+    req.franchiseScope
   );
   const action = user.isActive ? "activated" : "deactivated";
   res.status(200).json(new ApiResponse(200, { user }, `User ${action} successfully`));
@@ -171,6 +172,6 @@ export const createFranchiseAdmin = createByRole("franchise_admin");
  * Get a specific customer's details.
  */
 export const getCustomerById = catchAsync(async (req: Request, res: Response) => {
-  const customer = await userService.getCustomerById(req.params.id);
+  const customer = await userService.getCustomerById(req.params.id, req.franchiseScope);
   res.status(200).json(new ApiResponse(200, { customer }));
 });

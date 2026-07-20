@@ -136,12 +136,23 @@ export const listUsers = async (
  * 
  * @param id - The target user ID
  */
-export const getUserById = async (id: string): Promise<UserDocument> => {
+export const getUserById = async (id: string, franchiseScope?: string | null): Promise<UserDocument> => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw ApiError.badRequest("Invalid user ID format");
   }
 
-  const user = await User.findOne({ _id: id, isDeleted: false });
+  const query: any = { _id: id, isDeleted: false };
+  if (franchiseScope) {
+    const fId = new mongoose.Types.ObjectId(franchiseScope);
+    query["$or"] = [
+      { "operatorDetails.assignedFranchise": fId },
+      { "technicianDetails.assignedFranchise": fId },
+      { "customerDetails.assignedFranchise": fId },
+      { "franchiseDetails.franchiseRef": fId },
+    ];
+  }
+
+  const user = await User.findOne(query);
   if (!user) throw ApiError.notFound("User");
   return user;
 };
@@ -202,9 +213,10 @@ export const createUser = async (
  */
 export const updateUser = async (
   id: string,
-  input: UpdateUserInput
+  input: UpdateUserInput,
+  franchiseScope?: string | null
 ): Promise<UserDocument> => {
-  const user = await getUserById(id);
+  const user = await getUserById(id, franchiseScope);
 
   // Build a flat update object to handle nested sub-documents correctly
   const updateData: Record<string, unknown> = {};
@@ -289,9 +301,10 @@ export const softDeleteUser = async (id: string): Promise<void> => {
 export const toggleUserStatus = async (
   id: string,
   input: UpdateStatusInput,
-  changedBy: string
+  updatedByUserId: string,
+  franchiseScope?: string | null
 ): Promise<UserDocument> => {
-  const user = await getUserById(id);
+  const user = await getUserById(id, franchiseScope);
 
   if (user.role === "super_admin" && !input.isActive) {
     throw ApiError.forbidden("Super admin accounts cannot be deactivated");
@@ -408,16 +421,22 @@ export const updateAvatar = async (_userId: string): Promise<never> => {
 /**
  * Get customer by ID — accessible by admin, franchise, and operator.
  */
-export const getCustomerById = async (id: string): Promise<UserDocument> => {
+export const getCustomerById = async (id: string, franchiseScope?: string | null): Promise<UserDocument> => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw ApiError.badRequest("Invalid customer ID format");
   }
 
-  const customer = await User.findOne({
+  const query: any = {
     _id: id,
     role: "customer",
     isDeleted: false,
-  });
+  };
+
+  if (franchiseScope) {
+    query["customerDetails.assignedFranchise"] = new mongoose.Types.ObjectId(franchiseScope);
+  }
+
+  const customer = await User.findOne(query);
 
   if (!customer) throw ApiError.notFound("Customer");
   return customer;
