@@ -66,6 +66,7 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload) => 
   // Create new session
   const session = await TalkbackSession.create({
     cameraId,
+    franchiseId: camera.franchiseId,
     operatorId: user.userId,
     status: "active",
   });
@@ -177,6 +178,9 @@ export const getLogs = async (query: any, user: JwtAccessPayload) => {
     if (!camera) throw ApiError.notFound("Camera");
     await validateCameraAccess(camera, user);
     filter.cameraId = cameraId;
+  } else if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No franchise associated with your account");
+    filter.franchiseId = user.franchiseId;
   } else if (user.role !== "super_admin" && user.role !== "admin") {
     // Non-admins can only see logs for cameras they are assigned to
     const accessibleCameras = await Camera.find({
@@ -218,11 +222,16 @@ export const getLogs = async (query: any, user: JwtAccessPayload) => {
  * @param user - The admin user requesting the active sessions list
  */
 export const getActiveSessions = async (user: JwtAccessPayload) => {
-  if (user.role !== "super_admin" && user.role !== "admin") {
+  const matchStage: any = { status: "active" };
+
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No franchise associated with your account");
+    matchStage.franchiseId = user.franchiseId;
+  } else if (user.role !== "super_admin" && user.role !== "admin") {
     throw ApiError.forbidden("Requires admin privileges");
   }
 
-  const activeSessions = await TalkbackSession.find({ status: "active" })
+  const activeSessions = await TalkbackSession.find(matchStage)
     .populate("cameraId", "name")
     .populate("operatorId", "name role")
     .sort({ startedAt: -1 })

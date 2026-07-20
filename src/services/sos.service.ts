@@ -30,16 +30,18 @@ export const triggerSos = async (
 ) => {
   const { cameraId, location } = input;
 
-  // Validate camera if provided
+  let franchiseId;
   if (cameraId) {
     const camera = await Camera.findOne({ _id: cameraId, isDeleted: false });
     if (!camera) throw ApiError.notFound("Camera associated with SOS not found");
+    franchiseId = camera.franchiseId;
   }
 
   // Create the SOS alert
   const sosAlert = await SosAlert.create({
     triggeredBy: user.userId,
     cameraId,
+    franchiseId,
     location,
     status: "active",
   });
@@ -101,7 +103,10 @@ export const listSosAlerts = async (query: any, user: JwtAccessPayload) => {
   if (cameraId) filter.cameraId = cameraId;
 
   // Non-admins can only see their own SOS alerts or SOS alerts from cameras they are assigned to
-  if (user.role !== "super_admin" && user.role !== "admin") {
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No franchise associated with your account");
+    filter.franchiseId = user.franchiseId;
+  } else if (user.role !== "super_admin" && user.role !== "admin") {
     // If operator, they see SOS for their cameras
     if (user.role === "operator") {
       const accessibleCameras = await Camera.find({

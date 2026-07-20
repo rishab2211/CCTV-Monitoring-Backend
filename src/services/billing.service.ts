@@ -87,8 +87,11 @@ export const createSubscription = async (data: { planId: string, customerId?: st
   const endDate = new Date();
   endDate.setMonth(endDate.getMonth() + plan.durationMonths);
 
+  const franchiseId = customer.customerDetails?.assignedFranchise;
+
   const subscription = await Subscription.create({
     customerId,
+    franchiseId,
     planId: plan._id,
     planName: plan.name,
     status: "active",
@@ -100,6 +103,7 @@ export const createSubscription = async (data: { planId: string, customerId?: st
   // Create an initial invoice
   await BillingInvoice.create({
     customerId,
+    franchiseId,
     subscriptionId: subscription._id,
     amount: plan.price,
     status: "pending",
@@ -120,7 +124,11 @@ export const getSubscription = async (id: string, user: JwtAccessPayload) => {
   const subscription = await Subscription.findById(id).populate("planId").lean();
   if (!subscription) throw ApiError.notFound("Subscription not found");
 
-  if (user.role === "customer" && subscription.customerId.toString() !== user.userId) {
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId || subscription.franchiseId?.toString() !== user.franchiseId) {
+      throw ApiError.forbidden();
+    }
+  } else if (user.role === "customer" && subscription.customerId.toString() !== user.userId) {
     throw ApiError.forbidden();
   }
 
@@ -152,6 +160,7 @@ export const renewSubscription = async (id: string, user: JwtAccessPayload) => {
   // Generate new invoice
   await BillingInvoice.create({
     customerId: subscription.customerId,
+    franchiseId: subscription.franchiseId,
     subscriptionId: subscription._id,
     amount: plan.price,
     status: "pending",
@@ -202,6 +211,7 @@ export const createPaymentOrder = async (subscriptionId: string, user: JwtAccess
   
   const payment = await Payment.create({
     customerId: subscription.customerId,
+    franchiseId: subscription.franchiseId,
     subscriptionId: subscription._id,
     amount: subscription.price * 100, // stored in paise
     currency: "INR",
@@ -245,7 +255,10 @@ export const listPayments = async (query: any, user: JwtAccessPayload) => {
   if (status) filter.status = status;
   if (customerId) filter.customerId = customerId;
 
-  if (user.role === "customer") {
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No franchise associated with your account");
+    filter.franchiseId = user.franchiseId;
+  } else if (user.role === "customer") {
     filter.customerId = user.userId;
   }
 
@@ -262,7 +275,11 @@ export const getPayment = async (id: string, user: JwtAccessPayload) => {
   const payment = await Payment.findById(id).populate("subscriptionId").lean();
   if (!payment) throw ApiError.notFound("Payment not found");
 
-  if (user.role === "customer" && payment.customerId.toString() !== user.userId) {
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId || payment.franchiseId?.toString() !== user.franchiseId) {
+      throw ApiError.forbidden();
+    }
+  } else if (user.role === "customer" && payment.customerId.toString() !== user.userId) {
     throw ApiError.forbidden();
   }
 
@@ -297,7 +314,10 @@ export const listInvoices = async (query: any, user: JwtAccessPayload) => {
   if (status) filter.status = status;
   if (customerId) filter.customerId = customerId;
 
-  if (user.role === "customer") {
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No franchise associated with your account");
+    filter.franchiseId = user.franchiseId;
+  } else if (user.role === "customer") {
     filter.customerId = user.userId;
   }
 
@@ -314,7 +334,11 @@ export const getInvoice = async (id: string, user: JwtAccessPayload) => {
   const invoice = await BillingInvoice.findById(id).populate("subscriptionId", "planName").lean();
   if (!invoice) throw ApiError.notFound("Invoice not found");
 
-  if (user.role === "customer" && invoice.customerId.toString() !== user.userId) {
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId || invoice.franchiseId?.toString() !== user.franchiseId) {
+      throw ApiError.forbidden();
+    }
+  } else if (user.role === "customer" && invoice.customerId.toString() !== user.userId) {
     throw ApiError.forbidden();
   }
 

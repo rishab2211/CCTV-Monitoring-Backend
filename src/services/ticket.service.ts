@@ -16,6 +16,7 @@ import * as notificationService from "./notification.service";
 export const createTicket = async (data: any, user: JwtAccessPayload) => {
   const ticket = await Ticket.create({
     ...data,
+    franchiseId: user.franchiseId,
     createdBy: user.userId,
     status: "open"
   });
@@ -50,8 +51,12 @@ export const listTickets = async (query: any, user: JwtAccessPayload) => {
 
   const filter: any = {};
   
-  // Customers/Operators only see their own tickets
-  if (user.role !== "admin" && user.role !== "super_admin") {
+  // Franchise admins see tickets for their franchise
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No franchise associated with your account");
+    filter.franchiseId = user.franchiseId;
+  } else if (user.role !== "admin" && user.role !== "super_admin") {
+    // Customers/Operators only see their own tickets
     filter.createdBy = user.userId;
   }
 
@@ -85,7 +90,11 @@ export const getTicket = async (id: string, user: JwtAccessPayload) => {
 
   if (!ticket) throw ApiError.notFound("Ticket not found");
 
-  if (user.role !== "admin" && user.role !== "super_admin" && ticket.createdBy._id.toString() !== user.userId) {
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId || ticket.franchiseId?.toString() !== user.franchiseId) {
+      throw ApiError.forbidden();
+    }
+  } else if (user.role !== "admin" && user.role !== "super_admin" && ticket.createdBy._id.toString() !== user.userId) {
     throw ApiError.forbidden();
   }
 
@@ -96,8 +105,16 @@ export const getTicket = async (id: string, user: JwtAccessPayload) => {
  * 4. Update Ticket
  */
 export const updateTicket = async (id: string, data: any, user: JwtAccessPayload) => {
-  if (user.role !== "admin" && user.role !== "super_admin") {
-    throw ApiError.forbidden("Only admins can update ticket details directly");
+  if (user.role !== "admin" && user.role !== "super_admin" && user.role !== "franchise" && user.role !== "franchise_admin") {
+    throw ApiError.forbidden("Only admins or franchise managers can update ticket details directly");
+  }
+
+  // If franchise admin, ensure they own the ticket
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    const existingTicket = await Ticket.findById(id);
+    if (!existingTicket || existingTicket.franchiseId?.toString() !== user.franchiseId) {
+      throw ApiError.forbidden("You do not have access to this ticket");
+    }
   }
 
   const ticket = await Ticket.findByIdAndUpdate(id, data, { new: true });
@@ -117,8 +134,16 @@ export const updateTicket = async (id: string, data: any, user: JwtAccessPayload
  * 5. Update Ticket Status
  */
 export const updateTicketStatus = async (id: string, status: string, user: JwtAccessPayload) => {
-  if (user.role !== "admin" && user.role !== "super_admin") {
-    throw ApiError.forbidden("Only admins can change ticket status");
+  if (user.role !== "admin" && user.role !== "super_admin" && user.role !== "franchise" && user.role !== "franchise_admin") {
+    throw ApiError.forbidden("Only admins or franchise managers can change ticket status");
+  }
+
+  // If franchise admin, ensure they own the ticket
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    const existingTicket = await Ticket.findById(id);
+    if (!existingTicket || existingTicket.franchiseId?.toString() !== user.franchiseId) {
+      throw ApiError.forbidden("You do not have access to this ticket");
+    }
   }
 
   const ticket = await Ticket.findByIdAndUpdate(id, { status }, { new: true });

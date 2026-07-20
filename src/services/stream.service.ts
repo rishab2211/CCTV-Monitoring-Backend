@@ -140,10 +140,11 @@ export const stopStream = async (input: StopStreamInput, user: JwtAccessPayload)
     throw ApiError.notFound("Active stream session");
   }
 
-  // Only the owner or an admin can stop a session
+  // Only the owner, admin, or franchise manager can stop a session
   const isOwner = session.userId.toString() === user.userId;
   const isAdmin = user.role === "super_admin" || user.role === "admin";
-  if (!isOwner && !isAdmin) {
+  const isFranchise = user.role === "franchise" || user.role === "franchise_admin";
+  if (!isOwner && !isAdmin && !isFranchise) {
     throw ApiError.forbidden("You can only stop your own stream sessions");
   }
 

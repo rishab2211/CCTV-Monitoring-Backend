@@ -14,18 +14,35 @@ import { JwtAccessPayload } from "../types";
 import { ApiError } from "../utils/ApiError";
 import mongoose from "mongoose";
 
-// Helper to check admin access
-const ensureAdmin = (user: JwtAccessPayload) => {
-  if (user.role !== "admin" && user.role !== "super_admin") {
-    throw ApiError.forbidden("Analytics are restricted to administrators");
+const ensureAdminOrFranchise = (user: JwtAccessPayload) => {
+  if (user.role !== "admin" && user.role !== "super_admin" && user.role !== "franchise" && user.role !== "franchise_admin") {
+    throw ApiError.forbidden("Analytics are restricted to administrators and franchise managers");
   }
+  return (user.role === "franchise" || user.role === "franchise_admin") ? user.franchiseId : null;
 };
 
 /**
  * 1. Main Dashboard Analytics
  */
 export const getDashboardAnalytics = async (user: JwtAccessPayload) => {
-  ensureAdmin(user);
+  const franchiseId = ensureAdminOrFranchise(user);
+  
+  const userMatch: any = { isDeleted: false };
+  const cameraMatch: any = { isDeleted: false };
+  const incidentMatch: any = { status: { $in: ["open", "investigating"] } };
+  const paymentMatch: any = { status: "paid" };
+
+  if (franchiseId) {
+    const fId = new mongoose.Types.ObjectId(franchiseId);
+    userMatch["$or"] = [
+      { "customerDetails.assignedFranchise": fId },
+      { "operatorDetails.assignedFranchise": fId },
+      { "technicianDetails.assignedFranchise": fId }
+    ];
+    cameraMatch.franchiseId = fId;
+    incidentMatch.franchiseId = fId;
+    paymentMatch.franchiseId = fId;
+  }
 
   const [
     totalUsers,
@@ -33,11 +50,11 @@ export const getDashboardAnalytics = async (user: JwtAccessPayload) => {
     activeIncidents,
     recentPayments,
   ] = await Promise.all([
-    User.countDocuments({ isDeleted: false }),
-    Camera.countDocuments({ isDeleted: false }),
-    Incident.countDocuments({ status: { $in: ["open", "investigating"] } }),
+    User.countDocuments(userMatch),
+    Camera.countDocuments(cameraMatch),
+    Incident.countDocuments(incidentMatch),
     Payment.aggregate([
-      { $match: { status: "paid" } },
+      { $match: paymentMatch },
       { $group: { _id: null, totalRevenue: { $sum: "$amount" } } }
     ])
   ]);
@@ -55,9 +72,11 @@ export const getDashboardAnalytics = async (user: JwtAccessPayload) => {
  * 2. Alert Analytics
  */
 export const getAlertAnalytics = async (user: JwtAccessPayload) => {
-  ensureAdmin(user);
+  const franchiseId = ensureAdminOrFranchise(user);
+  const matchStage = franchiseId ? { $match: { franchiseId: new mongoose.Types.ObjectId(franchiseId) } } : { $match: {} };
 
   const stats = await Alert.aggregate([
+    matchStage,
     {
       $group: {
         _id: "$status",
@@ -67,6 +86,7 @@ export const getAlertAnalytics = async (user: JwtAccessPayload) => {
   ]);
 
   const severityStats = await Alert.aggregate([
+    matchStage,
     {
       $group: {
         _id: "$severity",
@@ -86,10 +106,12 @@ export const getAlertAnalytics = async (user: JwtAccessPayload) => {
  * 3. Camera Analytics
  */
 export const getCameraAnalytics = async (user: JwtAccessPayload) => {
-  ensureAdmin(user);
+  const franchiseId = ensureAdminOrFranchise(user);
+  const matchStage: any = { isDeleted: false };
+  if (franchiseId) matchStage.franchiseId = new mongoose.Types.ObjectId(franchiseId);
 
   const statusStats = await Camera.aggregate([
-    { $match: { isDeleted: false } },
+    { $match: matchStage },
     {
       $group: {
         _id: "$status",
@@ -108,7 +130,8 @@ export const getCameraAnalytics = async (user: JwtAccessPayload) => {
  * 4. Operator Performance
  */
 export const getOperatorAnalytics = async (user: JwtAccessPayload) => {
-  ensureAdmin(user);
+  const franchiseId = ensureAdminOrFranchise(user);
+  const matchStage = franchiseId ? { $match: { "operator.operatorDetails.assignedFranchise": new mongoose.Types.ObjectId(franchiseId) } } : { $match: {} };
 
   const performance = await OperatorShift.aggregate([
     {
@@ -128,6 +151,7 @@ export const getOperatorAnalytics = async (user: JwtAccessPayload) => {
       }
     },
     { $unwind: "$operator" },
+    matchStage,
     {
       $project: {
         operatorName: "$operator.name",
@@ -150,11 +174,13 @@ export const getOperatorAnalytics = async (user: JwtAccessPayload) => {
  * 5. Revenue Analytics
  */
 export const getRevenueAnalytics = async (user: JwtAccessPayload) => {
-  ensureAdmin(user);
+  const franchiseId = ensureAdminOrFranchise(user);
+  const matchStage: any = { status: "paid" };
+  if (franchiseId) matchStage.franchiseId = new mongoose.Types.ObjectId(franchiseId);
 
   // Group by month
   const revenueByMonth = await Payment.aggregate([
-    { $match: { status: "paid" } },
+    { $match: matchStage },
     {
       $group: {
         _id: { 
@@ -178,9 +204,11 @@ export const getRevenueAnalytics = async (user: JwtAccessPayload) => {
  * 6. Subscription Growth
  */
 export const getSubscriptionAnalytics = async (user: JwtAccessPayload) => {
-  ensureAdmin(user);
+  const franchiseId = ensureAdminOrFranchise(user);
+  const matchStage = franchiseId ? { $match: { franchiseId: new mongoose.Types.ObjectId(franchiseId) } } : { $match: {} };
 
   const stats = await Subscription.aggregate([
+    matchStage,
     {
       $group: {
         _id: "$status",
@@ -189,8 +217,11 @@ export const getSubscriptionAnalytics = async (user: JwtAccessPayload) => {
     }
   ]);
 
+  const matchStage2: any = { status: "active" };
+  if (franchiseId) matchStage2.franchiseId = new mongoose.Types.ObjectId(franchiseId);
+
   const byPlan = await Subscription.aggregate([
-    { $match: { status: "active" } },
+    { $match: matchStage2 },
     {
       $group: {
         _id: "$planName",
@@ -210,9 +241,11 @@ export const getSubscriptionAnalytics = async (user: JwtAccessPayload) => {
  * 7. Incident Resolution Stats
  */
 export const getIncidentAnalytics = async (user: JwtAccessPayload) => {
-  ensureAdmin(user);
+  const franchiseId = ensureAdminOrFranchise(user);
+  const matchStage = franchiseId ? { $match: { franchiseId: new mongoose.Types.ObjectId(franchiseId) } } : { $match: {} };
 
   const stats = await Incident.aggregate([
+    matchStage,
     {
       $group: {
         _id: "$status",
@@ -222,6 +255,7 @@ export const getIncidentAnalytics = async (user: JwtAccessPayload) => {
   ]);
 
   const typeStats = await Incident.aggregate([
+    matchStage,
     {
       $group: {
         _id: "$type",
@@ -241,9 +275,11 @@ export const getIncidentAnalytics = async (user: JwtAccessPayload) => {
  * 8. Franchise Performance
  */
 export const getFranchiseAnalytics = async (user: JwtAccessPayload) => {
-  ensureAdmin(user);
+  const franchiseId = ensureAdminOrFranchise(user);
+  const matchStage = franchiseId ? { $match: { _id: new mongoose.Types.ObjectId(franchiseId) } } : { $match: {} };
 
   const stats = await Franchise.aggregate([
+    matchStage,
     {
       $lookup: {
         from: "users",
