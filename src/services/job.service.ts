@@ -21,7 +21,7 @@ import { logger } from "../utils/logger";
  * @returns The created Job document
  */
 export const createJob = async (input: any, user: JwtAccessPayload) => {
-  if (user.role !== "super_admin" && user.role !== "admin" && user.role !== "franchise") {
+  if (user.role !== "super_admin" && user.role !== "admin" && user.role !== "franchise" && user.role !== "franchise_admin") {
     throw ApiError.forbidden("You do not have permission to create jobs");
   }
 
@@ -47,8 +47,12 @@ export const createJob = async (input: any, user: JwtAccessPayload) => {
 
   // Validate Camera if provided
   if (cameraId) {
-    const camera = await Camera.findOne({ _id: cameraId, isDeleted: false });
-    if (!camera) throw ApiError.notFound("Camera not found");
+    const cameraFilter: any = { _id: cameraId, isDeleted: false };
+    if (actualFranchiseId) {
+      cameraFilter.franchiseId = new mongoose.Types.ObjectId(actualFranchiseId);
+    }
+    const camera = await Camera.findOne(cameraFilter);
+    if (!camera) throw ApiError.notFound("Camera not found or does not belong to your franchise");
   }
 
   const job = await InstallationJob.create({
@@ -164,9 +168,8 @@ export const updateJobStatus = async (id: string, updateData: any, user: JwtAcce
     throw ApiError.forbidden("You do not have access to this job");
   }
 
-  if (user.role === "franchise") {
-    const ownedFranchise = await Franchise.findOne({ ownerId: user.userId });
-    if (!ownedFranchise || job.franchiseId?.toString() !== ownedFranchise._id.toString()) {
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId || job.franchiseId?.toString() !== user.franchiseId.toString()) {
       throw ApiError.forbidden("You do not have access to this job");
     }
   }
