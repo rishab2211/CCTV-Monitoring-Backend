@@ -21,12 +21,14 @@ router.use(authenticate);
 // Any authenticated user can trigger an SOS (e.g. from mobile app)
 router.post(
   "/",
+  permit("sos:trigger"),
   validate(triggerSosSchema, "body"),
   sosController.triggerSos
 );
 
 router.get(
   "/",
+  permit("sos:read"),
   validate(listSosSchema, "query"),
   sosController.listSosAlerts
 );
@@ -53,13 +55,13 @@ router.post(
 
 router.get(
   "/active",
-  permit("alerts:view"),
+  permit("sos:read"),
   sosController.getActiveSos
 );
 
 router.get(
   "/:id",
-  permit("alerts:view"),
+  permit("sos:read"),
   validate(sosIdParamSchema, "params"),
   sosController.getSosDetail
 );
@@ -74,7 +76,7 @@ router.post(
 
 router.get(
   "/:id/timeline",
-  permit("alerts:view"),
+  permit("sos:read"),
   validate(sosIdParamSchema, "params"),
   sosController.getSosTimeline
 );

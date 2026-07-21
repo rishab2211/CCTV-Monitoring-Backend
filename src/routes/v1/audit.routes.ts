@@ -18,10 +18,10 @@ export const activityRouter = Router();
 
 // Both routers require authentication and admin access
 auditRouter.use(authenticate);
-auditRouter.use(permit("audit:view")); // Assuming there's an audit view permission
+auditRouter.use(permit("audit:read"));
 
 activityRouter.use(authenticate);
-activityRouter.use(permit("audit:view"));
+activityRouter.use(permit("audit:read"));
 
 // ─── Audit Logs ──────────────────────────────────────────────────────────────
 

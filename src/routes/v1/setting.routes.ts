@@ -15,17 +15,17 @@ router.use(authenticate);
 // ─── Global Settings ─────────────────────────────────────────────────────────
 
 // GET available to admin, PUT available to super_admin
-router.get("/", permit("settings:view"), settingController.getSystemSettings);
-router.put("/", permit("settings:manage"), settingController.updateSystemSettings);
+router.get("/", permit("settings:read"), settingController.getSystemSettings);
+router.put("/", permit("settings:write"), settingController.updateSystemSettings);
 
 // ─── Notification Settings ───────────────────────────────────────────────────
 
-router.get("/notifications", permit("settings:view"), settingController.getNotificationSettings);
-router.put("/notifications", permit("settings:manage"), settingController.updateNotificationSettings);
+router.get("/notifications", permit("settings:read"), settingController.getNotificationSettings);
+router.put("/notifications", permit("settings:write"), settingController.updateNotificationSettings);
 
 // ─── Recording Settings ──────────────────────────────────────────────────────
 
-router.get("/recording", permit("settings:view"), settingController.getRecordingSettings);
-router.put("/recording", permit("settings:manage"), settingController.updateRecordingSettings);
+router.get("/recording", permit("settings:read"), settingController.getRecordingSettings);
+router.put("/recording", permit("settings:write"), settingController.updateRecordingSettings);
 
 export default router;

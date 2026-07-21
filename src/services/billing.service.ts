@@ -128,7 +128,9 @@ export const getSubscription = async (id: string, user: JwtAccessPayload) => {
     if (!user.franchiseId || subscription.franchiseId?.toString() !== user.franchiseId) {
       throw ApiError.forbidden();
     }
-  } else if (user.role === "customer" && subscription.customerId.toString() !== user.userId) {
+  } else if (user.role === "customer") {
+    if (subscription.customerId.toString() !== user.userId) throw ApiError.forbidden();
+  } else if (user.role !== "super_admin" && user.role !== "admin") {
     throw ApiError.forbidden();
   }
 
@@ -139,7 +141,9 @@ export const renewSubscription = async (id: string, user: JwtAccessPayload) => {
   const subscription = await Subscription.findById(id);
   if (!subscription) throw ApiError.notFound("Subscription not found");
 
-  if (user.role === "customer" && subscription.customerId.toString() !== user.userId) {
+  if (user.role === "customer") {
+    if (subscription.customerId.toString() !== user.userId) throw ApiError.forbidden();
+  } else if (user.role !== "super_admin" && user.role !== "admin" && user.role !== "franchise" && user.role !== "franchise_admin") {
     throw ApiError.forbidden();
   }
 
@@ -180,7 +184,9 @@ export const cancelSubscription = async (id: string, user: JwtAccessPayload) => 
   const subscription = await Subscription.findById(id);
   if (!subscription) throw ApiError.notFound("Subscription not found");
 
-  if (user.role === "customer" && subscription.customerId.toString() !== user.userId) {
+  if (user.role === "customer") {
+    if (subscription.customerId.toString() !== user.userId) throw ApiError.forbidden();
+  } else if (user.role !== "super_admin" && user.role !== "admin" && user.role !== "franchise" && user.role !== "franchise_admin") {
     throw ApiError.forbidden();
   }
 
@@ -202,7 +208,9 @@ export const createPaymentOrder = async (subscriptionId: string, user: JwtAccess
   const subscription = await Subscription.findById(subscriptionId);
   if (!subscription) throw ApiError.notFound("Subscription not found");
 
-  if (user.role === "customer" && subscription.customerId.toString() !== user.userId) {
+  if (user.role === "customer") {
+    if (subscription.customerId.toString() !== user.userId) throw ApiError.forbidden();
+  } else if (user.role !== "super_admin" && user.role !== "admin" && user.role !== "franchise" && user.role !== "franchise_admin") {
     throw ApiError.forbidden();
   }
 
@@ -260,6 +268,8 @@ export const listPayments = async (query: any, user: JwtAccessPayload) => {
     filter.franchiseId = user.franchiseId;
   } else if (user.role === "customer") {
     filter.customerId = user.userId;
+  } else if (user.role !== "super_admin" && user.role !== "admin") {
+    throw ApiError.forbidden();
   }
 
   const skip = (Number(page) - 1) * Number(limit);
@@ -279,7 +289,9 @@ export const getPayment = async (id: string, user: JwtAccessPayload) => {
     if (!user.franchiseId || payment.franchiseId?.toString() !== user.franchiseId) {
       throw ApiError.forbidden();
     }
-  } else if (user.role === "customer" && payment.customerId.toString() !== user.userId) {
+  } else if (user.role === "customer") {
+    if (payment.customerId.toString() !== user.userId) throw ApiError.forbidden();
+  } else if (user.role !== "super_admin" && user.role !== "admin") {
     throw ApiError.forbidden();
   }
 
@@ -319,6 +331,8 @@ export const listInvoices = async (query: any, user: JwtAccessPayload) => {
     filter.franchiseId = user.franchiseId;
   } else if (user.role === "customer") {
     filter.customerId = user.userId;
+  } else if (user.role !== "super_admin" && user.role !== "admin") {
+    throw ApiError.forbidden();
   }
 
   const skip = (Number(page) - 1) * Number(limit);
@@ -338,7 +352,9 @@ export const getInvoice = async (id: string, user: JwtAccessPayload) => {
     if (!user.franchiseId || invoice.franchiseId?.toString() !== user.franchiseId) {
       throw ApiError.forbidden();
     }
-  } else if (user.role === "customer" && invoice.customerId.toString() !== user.userId) {
+  } else if (user.role === "customer") {
+    if (invoice.customerId.toString() !== user.userId) throw ApiError.forbidden();
+  } else if (user.role !== "super_admin" && user.role !== "admin") {
     throw ApiError.forbidden();
   }
 

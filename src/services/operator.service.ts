@@ -207,8 +207,12 @@ export const listShifts = async (query: any, user: JwtAccessPayload) => {
     } else {
       filter.operatorId = { $in: operatorIds };
     }
-  } else if (operatorId) {
-    filter.operatorId = operatorId;
+  } else if (user.role === "super_admin" || user.role === "admin") {
+    if (operatorId) {
+      filter.operatorId = operatorId;
+    }
+  } else {
+    throw ApiError.forbidden("You do not have permission to view shifts");
   }
 
   const skip = (Number(page) - 1) * Number(limit);
@@ -233,6 +237,9 @@ export const getOperatorPerformance = async (operatorId: string, user: JwtAccess
   // Access control
   if (user.role === "operator" && user.userId !== operatorId) {
     throw ApiError.forbidden("You can only view your own performance");
+  }
+  if (user.role !== "super_admin" && user.role !== "admin" && user.role !== "franchise" && user.role !== "franchise_admin" && user.role !== "operator") {
+    throw ApiError.forbidden("You do not have permission to view performance");
   }
 
   const query: any = { _id: operatorId, role: "operator", isDeleted: false };

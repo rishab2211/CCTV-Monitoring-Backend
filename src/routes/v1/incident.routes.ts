@@ -34,6 +34,7 @@ router.use(authenticate);
  */
 router.post(
   "/",
+  permit("incidents:write"),
   upload.array("attachments", 5),
   validate(createIncidentSchema, "body"),
   incidentController.reportIncident
@@ -45,6 +46,7 @@ router.post(
  */
 router.get(
   "/",
+  permit("incidents:read"),
   validate(listIncidentsSchema, "query"),
   incidentController.listIncidents
 );
@@ -55,6 +57,7 @@ router.get(
  */
 router.get(
   "/:id",
+  permit("incidents:read"),
   validate(incidentIdParamSchema, "params"),
   incidentController.getIncidentDetails
 );
@@ -68,6 +71,7 @@ router.get(
  */
 router.patch(
   "/:id/status",
+  permit("incidents:write"),
   validate(incidentIdParamSchema, "params"),
   validate(updateIncidentStatusSchema, "body"),
   incidentController.updateIncidentStatus
@@ -79,7 +83,7 @@ router.patch(
  */
 router.patch(
   "/:id/assign",
-  permit("incidents:assign"),
+  permit("incidents:write"),
   validate(incidentIdParamSchema, "params"),
   validate(assignIncidentSchema, "body"),
   incidentController.assignIncident
@@ -91,7 +95,7 @@ router.patch(
  */
 router.patch(
   "/:id/close",
-  permit("incidents:manage"),
+  permit("incidents:write"),
   validate(incidentIdParamSchema, "params"),
   validate(closeIncidentSchema, "body"),
   incidentController.closeIncident
@@ -105,7 +109,7 @@ router.patch(
  */
 router.post(
   "/:id/notes",
-  permit("incidents:manage"),
+  permit("incidents:write"),
   validate(incidentIdParamSchema, "params"),
   validate(addIncidentNoteSchema, "body"),
   incidentController.addIncidentNote
@@ -118,7 +122,7 @@ router.post(
  */
 router.post(
   "/:id/media",
-  permit("incidents:manage"),
+  permit("incidents:write"),
   upload.array("media", 10),
   validate(incidentIdParamSchema, "params"),
   incidentController.uploadIncidentMedia
@@ -130,7 +134,7 @@ router.post(
  */
 router.post(
   "/:id/verify",
-  permit("incidents:manage"),
+  permit("incidents:write"),
   validate(incidentIdParamSchema, "params"),
   validate(verifyIncidentSchema, "body"),
   incidentController.verifyIncident
@@ -144,6 +148,7 @@ router.post(
  */
 router.get(
   "/:id/timeline",
+  permit("incidents:read"),
   validate(incidentIdParamSchema, "params"),
   incidentController.getIncidentTimeline
 );
@@ -155,7 +160,7 @@ router.get(
  */
 router.get(
   "/:id/report",
-  permit("incidents:manage"),
+  permit("incidents:read"),
   validate(incidentIdParamSchema, "params"),
   incidentController.getIncidentReport
 );

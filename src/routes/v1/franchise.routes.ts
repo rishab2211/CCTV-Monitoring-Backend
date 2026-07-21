@@ -32,7 +32,7 @@ router.use(authenticate);
  */
 router.post(
   "/",
-  permit("franchises:manage"),
+  permit("franchises:write"),
   validate(createFranchiseSchema, "body"),
   franchiseController.createFranchise
 );
@@ -43,7 +43,7 @@ router.post(
  */
 router.get(
   "/",
-  permit("franchises:manage"),
+  permit("franchises:read"),
   franchiseController.listFranchises
 );
 
@@ -53,6 +53,7 @@ router.get(
  */
 router.get(
   "/:id",
+  permit("franchises:read"),
   validate(franchiseIdParamSchema, "params"),
   franchiseController.getFranchiseDetails
 );
@@ -63,7 +64,7 @@ router.get(
  */
 router.put(
   "/:id",
-  permit("franchises:manage"),
+  permit("franchises:write"),
   validate(franchiseIdParamSchema, "params"),
   validate(updateFranchiseSchema, "body"),
   franchiseController.updateFranchise
@@ -77,7 +78,7 @@ router.put(
  */
 router.post(
   "/:id/users/:userId",
-  permit("franchises:manage"),
+  permit("franchises:write"),
   validate(assignUserToFranchiseSchema, "params"),
   franchiseController.assignUserToFranchise
 );
@@ -90,6 +91,7 @@ router.post(
  */
 router.get(
   "/:id/customers",
+  permit("franchises:read"),
   validate(franchiseIdParamSchema, "params"),
   franchiseController.getFranchiseCustomers
 );
@@ -102,6 +104,7 @@ router.get(
  */
 router.get(
   "/:id/leads",
+  permit("franchises:read"),
   validate(franchiseIdParamSchema, "params"),
   franchiseController.getFranchiseLeads
 );
@@ -112,6 +115,7 @@ router.get(
  */
 router.post(
   "/:id/leads",
+  permit("franchises:write"),
   validate(franchiseIdParamSchema, "params"),
   validate(createLeadSchema, "body"),
   franchiseController.createFranchiseLead
@@ -123,6 +127,7 @@ router.post(
  */
 router.put(
   "/:id/leads/:leadId",
+  permit("franchises:write"),
   validate(leadParamSchema, "params"),
   validate(updateLeadSchema, "body"),
   franchiseController.updateFranchiseLead
@@ -136,6 +141,7 @@ router.put(
  */
 router.get(
   "/:id/commission",
+  permit("franchises:read"),
   validate(franchiseIdParamSchema, "params"),
   franchiseController.getCommissionReport
 );
@@ -146,6 +152,7 @@ router.get(
  */
 router.get(
   "/:id/royalty",
+  permit("franchises:read"),
   validate(franchiseIdParamSchema, "params"),
   franchiseController.getRoyaltyReport
 );
@@ -156,6 +163,7 @@ router.get(
  */
 router.get(
   "/:id/sales",
+  permit("franchises:read"),
   validate(franchiseIdParamSchema, "params"),
   franchiseController.getSalesReport
 );
@@ -168,7 +176,7 @@ router.get(
  */
 router.put(
   "/:id/territory",
-  permit("franchises:manage"),
+  permit("franchises:write"),
   validate(franchiseIdParamSchema, "params"),
   validate(updateTerritorySchema, "body"),
   franchiseController.updateTerritory
@@ -180,6 +188,7 @@ router.put(
  */
 router.get(
   "/:id/territory",
+  permit("franchises:read"),
   validate(franchiseIdParamSchema, "params"),
   franchiseController.getTerritory
 );

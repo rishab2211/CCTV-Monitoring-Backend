@@ -30,9 +30,9 @@ planRouter.get("/", billingController.listPlans);
 
 // Admin-only management
 planRouter.use(authenticate);
-planRouter.post("/", permit("billing:manage"), validate(createPlanSchema, "body"), billingController.createPlan);
-planRouter.put("/:id", permit("billing:manage"), validate(idParamSchema, "params"), validate(updatePlanSchema, "body"), billingController.updatePlan);
-planRouter.delete("/:id", permit("billing:manage"), validate(idParamSchema, "params"), billingController.deletePlan);
+planRouter.post("/", permit("payments:write"), validate(createPlanSchema, "body"), billingController.createPlan);
+planRouter.put("/:id", permit("payments:write"), validate(idParamSchema, "params"), validate(updatePlanSchema, "body"), billingController.updatePlan);
+planRouter.delete("/:id", permit("payments:write"), validate(idParamSchema, "params"), billingController.deletePlan);
 
 
 // ============================================================================
@@ -60,7 +60,7 @@ paymentRouter.use(authenticate);
 paymentRouter.post("/create-order", validate(createOrderSchema, "body"), billingController.createPaymentOrder);
 paymentRouter.get("/", billingController.listPayments);
 paymentRouter.get("/:id", validate(idParamSchema, "params"), billingController.getPayment);
-paymentRouter.post("/:id/refund", permit("billing:manage"), validate(idParamSchema, "params"), validate(refundPaymentSchema, "body"), billingController.refundPayment);
+paymentRouter.post("/:id/refund", permit("payments:write"), validate(idParamSchema, "params"), validate(refundPaymentSchema, "body"), billingController.refundPayment);
 
 
 // ============================================================================

@@ -123,6 +123,8 @@ export const listIncidents = async (query: any, user: JwtAccessPayload) => {
   } else if (user.role === "franchise" || user.role === "franchise_admin") {
     if (!user.franchiseId) throw ApiError.forbidden("No franchise associated with your account");
     filter.franchiseId = user.franchiseId;
+  } else if (user.role !== "super_admin" && user.role !== "admin") {
+    throw ApiError.forbidden("You do not have access to view these incidents");
   }
 
   const skip = (page - 1) * limit;

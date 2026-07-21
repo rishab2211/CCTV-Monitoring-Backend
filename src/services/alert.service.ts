@@ -249,7 +249,10 @@ export const getPendingAlerts = async (user: JwtAccessPayload) => {
   // Get all 'new' and 'acknowledged' alerts for cameras accessible by this user
   let filter: any = { status: { $in: ["new", "acknowledged"] } };
 
-  if (user.role !== "super_admin" && user.role !== "admin") {
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No franchise associated with your account");
+    filter.franchiseId = user.franchiseId;
+  } else if (user.role !== "super_admin" && user.role !== "admin") {
     const accessibleCameras = await Camera.find({
       $or: [{ operatorIds: user.userId }, { customerId: user.userId }],
       isDeleted: false,

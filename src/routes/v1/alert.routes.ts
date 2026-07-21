@@ -23,7 +23,7 @@ router.use(authenticate);
 // Create an alert manually
 router.post(
   "/",
-  permit("alerts:manage"),
+  permit("alerts:write"),
   validate(createAlertSchema),
   alertController.createAlert
 );
@@ -31,7 +31,7 @@ router.post(
 // Acknowledge an alert
 router.patch(
   "/:id/acknowledge",
-  permit("alerts:manage"),
+  permit("alerts:write"),
   validate(alertIdParamSchema, "params"),
   alertController.acknowledgeAlert
 );
@@ -39,7 +39,7 @@ router.patch(
 // Resolve an alert
 router.patch(
   "/:id/resolve",
-  permit("alerts:manage"),
+  permit("alerts:resolve"),
   validate(alertIdParamSchema, "params"),
   validate(resolveAlertSchema),
   alertController.resolveAlert
@@ -48,7 +48,7 @@ router.patch(
 // Escalate an alert
 router.patch(
   "/:id/escalate",
-  permit("alerts:manage"),
+  permit("alerts:write"),
   validate(alertIdParamSchema, "params"),
   alertController.escalateAlert
 );
@@ -56,7 +56,7 @@ router.patch(
 // Verify an alert
 router.post(
   "/:id/verify",
-  permit("alerts:manage"),
+  permit("alerts:write"),
   validate(alertIdParamSchema, "params"),
   validate(verifyAlertSchema),
   alertController.verifyAlert
@@ -67,7 +67,7 @@ router.post(
 // Configure alert rules
 router.put(
   "/rules",
-  permit("alerts:manage", "cameras:manage"), // Need admin/manage privileges
+  permit("cameras:configure"), // Need admin/franchise privileges
   validate(updateAlertRulesSchema),
   alertController.updateAlertRules
 );
@@ -75,7 +75,7 @@ router.put(
 // Get alert rules for camera
 router.get(
   "/rules/:cameraId",
-  permit("alerts:view", "cameras:view"),
+  permit("alerts:read", "cameras:read"),
   validate(cameraIdParamSchema, "params"),
   alertController.getAlertRules
 );
@@ -85,14 +85,14 @@ router.get(
 // Get pending alerts (new/acknowledged)
 router.get(
   "/pending",
-  permit("alerts:view"),
+  permit("alerts:read"),
   alertController.getPendingAlerts
 );
 
 // Get global alert stats (Admin only)
 router.get(
   "/stats",
-  permit("alerts:manage"),
+  permit("alerts:read"),
   alertController.getAlertStats
 );
 
@@ -100,7 +100,7 @@ router.get(
 // We route this to listAlerts controller but inject the cameraId into req.query
 router.get(
   "/:cameraId/history",
-  permit("alerts:view"),
+  permit("alerts:read"),
   validate(cameraIdParamSchema, "params"),
   (req, res, next) => {
     req.query.cameraId = req.params.cameraId;
@@ -113,7 +113,7 @@ router.get(
 // List all alerts (filtered)
 router.get(
   "/",
-  permit("alerts:view"),
+  permit("alerts:read"),
   validate(listAlertsQuerySchema, "query"),
   alertController.listAlerts
 );
@@ -121,7 +121,7 @@ router.get(
 // Get alert details
 router.get(
   "/:id",
-  permit("alerts:view"),
+  permit("alerts:read"),
   validate(alertIdParamSchema, "params"),
   alertController.getAlertDetails
 );

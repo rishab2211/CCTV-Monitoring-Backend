@@ -12,7 +12,7 @@ const router = Router();
 // All analytics routes require authentication and admin access
 // The controller/service already enforces admin access, but we can also use permit middleware here.
 router.use(authenticate);
-router.use(permit("analytics:view"));
+router.use(permit("analytics:read"));
 
 /**
  * GET /api/v1/analytics/dashboard

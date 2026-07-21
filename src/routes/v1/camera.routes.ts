@@ -23,6 +23,8 @@ router.use(authenticate);
 
 // ─── Scoped List Endpoints (Registered before :id to prevent clash) ──────────
 
+import { tenantScope } from "../../middleware/tenantScope";
+
 /** GET /api/v1/cameras/customer/:customerId */
 router.get(
   "/customer/:customerId",
@@ -45,6 +47,7 @@ router.get(
 router.get(
   "/",
   permit("cameras:read"),
+  tenantScope,
   validate(listCamerasQuerySchema, "query"),
   cameraController.listCameras
 );
@@ -53,6 +56,7 @@ router.get(
 router.post(
   "/",
   permit("cameras:write"),
+  tenantScope,
   validate(createCameraSchema),
   cameraController.createCamera
 );
@@ -61,6 +65,7 @@ router.post(
 router.get(
   "/:id",
   permit("cameras:read"),
+  tenantScope,
   validate(cameraIdParamSchema, "params"),
   cameraController.getCameraById
 );
@@ -69,6 +74,7 @@ router.get(
 router.put(
   "/:id",
   permit("cameras:write"),
+  tenantScope,
   validate(cameraIdParamSchema, "params"),
   validate(updateCameraSchema),
   cameraController.updateCamera
@@ -78,6 +84,7 @@ router.put(
 router.delete(
   "/:id",
   permit("cameras:delete"),
+  tenantScope,
   validate(cameraIdParamSchema, "params"),
   cameraController.deleteCamera
 );
@@ -88,6 +95,7 @@ router.delete(
 router.post(
   "/:id/assign",
   permit("cameras:assign"),
+  tenantScope,
   validate(cameraIdParamSchema, "params"),
   validate(assignCameraSchema),
   cameraController.assignCamera
@@ -97,6 +105,7 @@ router.post(
 router.post(
   "/:id/transfer",
   permit("cameras:assign"),
+  tenantScope,
   validate(cameraIdParamSchema, "params"),
   validate(transferCameraSchema),
   cameraController.transferCamera
@@ -106,6 +115,7 @@ router.post(
 router.patch(
   "/:id/status",
   permit("cameras:configure", "cameras:write"),
+  tenantScope,
   validate(cameraIdParamSchema, "params"),
   validate(updateStatusSchema),
   cameraController.updateCameraStatus
@@ -124,6 +134,7 @@ router.post(
 router.get(
   "/:id/health",
   permit("cameras:read"),
+  tenantScope,
   validate(cameraIdParamSchema, "params"),
   cameraController.getCameraById // details endpoint already contains health stats
 );
@@ -132,6 +143,7 @@ router.get(
 router.post(
   "/:id/restart",
   permit("cameras:restart"),
+  tenantScope,
   validate(cameraIdParamSchema, "params"),
   cameraController.restartCamera
 );
@@ -142,6 +154,7 @@ router.post(
 router.patch(
   "/:id/recording",
   permit("cameras:configure"),
+  tenantScope,
   validate(cameraIdParamSchema, "params"),
   cameraController.updateRecording
 );
@@ -150,6 +163,7 @@ router.patch(
 router.patch(
   "/:id/motion",
   permit("cameras:configure"),
+  tenantScope,
   validate(cameraIdParamSchema, "params"),
   cameraController.updateMotion
 );
@@ -158,6 +172,7 @@ router.patch(
 router.patch(
   "/:id/ai",
   permit("cameras:configure"),
+  tenantScope,
   validate(cameraIdParamSchema, "params"),
   cameraController.updateAI
 );

@@ -33,7 +33,7 @@ router.use(authenticate);
  */
 router.post(
   "/",
-  permit("jobs:manage"),
+  permit("installations:write"),
   validate(createJobSchema, "body"),
   jobController.createJob
 );
@@ -44,6 +44,7 @@ router.post(
  */
 router.get(
   "/",
+  permit("installations:read"),
   validate(listJobsSchema, "query"),
   jobController.listJobs
 );
@@ -55,6 +56,7 @@ router.get(
  */
 router.get(
   "/assigned",
+  permit("installations:read"),
   jobController.getAssignedJobs
 );
 
@@ -64,6 +66,7 @@ router.get(
  */
 router.get(
   "/:id",
+  permit("installations:read"),
   validate(jobIdParamSchema, "params"),
   jobController.getJobDetails
 );
@@ -74,6 +77,7 @@ router.get(
  */
 router.put(
   "/:id",
+  permit("installations:write"),
   upload.array("attachments", 5),
   validate(jobIdParamSchema, "params"),
   validate(updateJobStatusSchema, "body"),
@@ -86,7 +90,7 @@ router.put(
  */
 router.put(
   "/:id/reassign",
-  permit("jobs:manage"),
+  permit("installations:write"),
   validate(jobIdParamSchema, "params"),
   validate(reassignJobSchema, "body"),
   jobController.reassignJob
@@ -98,6 +102,7 @@ router.put(
  */
 router.post(
   "/:id/checklist",
+  permit("installations:write"),
   validate(jobIdParamSchema, "params"),
   validate(submitChecklistSchema, "body"),
   jobController.submitChecklist
@@ -110,6 +115,7 @@ router.post(
  */
 router.post(
   "/:id/photos",
+  permit("installations:write"),
   upload.array("photos", 10),
   validate(jobIdParamSchema, "params"),
   jobController.uploadJobPhotos
@@ -122,6 +128,7 @@ router.post(
  */
 router.post(
   "/:id/signature",
+  permit("installations:write"),
   upload.array("signature", 1),
   validate(jobIdParamSchema, "params"),
   jobController.uploadCustomerSignature
@@ -133,6 +140,7 @@ router.post(
  */
 router.patch(
   "/:id/complete",
+  permit("installations:write"),
   validate(jobIdParamSchema, "params"),
   jobController.completeJob
 );
@@ -143,6 +151,7 @@ router.patch(
  */
 router.get(
   "/:id/report",
+  permit("installations:read"),
   validate(jobIdParamSchema, "params"),
   jobController.getJobReport
 );
@@ -155,6 +164,7 @@ router.get(
  */
 router.get(
   "/technicians/:id/schedule",
+  permit("installations:read"),
   validate(technicianIdParamSchema, "params"),
   jobController.getTechnicianSchedule
 );
@@ -165,6 +175,7 @@ router.get(
  */
 router.post(
   "/technicians/:id/gps",
+  permit("installations:write"),
   validate(technicianIdParamSchema, "params"),
   validate(updateGpsSchema, "body"),
   jobController.updateGpsLocation

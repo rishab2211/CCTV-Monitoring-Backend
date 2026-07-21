@@ -17,7 +17,6 @@ router.use(authenticate);
 // Clock In (Operators Only)
 router.post(
   "/clock-in",
-  permit("operators:manage"), // Or some specific permission, assuming basic role covers it in controller
   operatorController.clockIn
 );
 
@@ -31,6 +30,7 @@ router.post(
 // List Historical Shifts
 router.get(
   "/shifts",
+  permit("users:read"),
   validate(listShiftsSchema, "query"),
   operatorController.listShifts
 );
@@ -38,7 +38,7 @@ router.get(
 // Assign Cameras (Admins / Franchise)
 router.post(
   "/:id/cameras",
-  permit("operators:manage"), // Require management permission
+  permit("cameras:assign"),
   validate(operatorIdParamSchema, "params"),
   validate(assignCamerasSchema, "body"),
   operatorController.assignCameras
@@ -47,6 +47,7 @@ router.post(
 // Get Operator Performance
 router.get(
   "/:id/performance",
+  permit("users:read"),
   validate(operatorIdParamSchema, "params"),
   operatorController.getPerformance
 );

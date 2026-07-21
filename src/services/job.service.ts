@@ -105,10 +105,12 @@ export const listJobs = async (query: any, user: JwtAccessPayload) => {
   } else if (user.role === "franchise" || user.role === "franchise_admin") {
     if (!user.franchiseId) throw ApiError.forbidden("No active franchise found for this user");
     filter.franchiseId = user.franchiseId;
-  } else {
+  } else if (user.role === "super_admin" || user.role === "admin") {
     // Admins can filter by whatever they want
     if (assignedTechnician) filter.assignedTechnician = assignedTechnician;
     if (franchiseId) filter.franchiseId = franchiseId;
+  } else {
+    throw ApiError.forbidden("You do not have access to view these jobs");
   }
 
   const skip = (Number(page) - 1) * Number(limit);

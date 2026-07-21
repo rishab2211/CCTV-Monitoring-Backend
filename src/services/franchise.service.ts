@@ -231,8 +231,7 @@ export const getFranchiseCustomers = async (franchiseId: string, user: JwtAccess
   const franchise = await Franchise.findById(franchiseId);
   if (!franchise) throw ApiError.notFound("Franchise not found");
 
-  // Franchise owners can only view their own customers
-  if (user.role === "franchise" && franchise.ownerId.toString() !== user.userId) {
+  if ((user.role === "franchise" || user.role === "franchise_admin") && franchise._id.toString() !== user.franchiseId) {
     throw ApiError.forbidden("Access denied");
   }
 
@@ -256,7 +255,7 @@ export const getFranchiseLeads = async (franchiseId: string, user: JwtAccessPayl
   const franchise = await Franchise.findById(franchiseId);
   if (!franchise) throw ApiError.notFound("Franchise not found");
 
-  if (user.role === "franchise" && franchise.ownerId.toString() !== user.userId) {
+  if ((user.role === "franchise" || user.role === "franchise_admin") && franchise._id.toString() !== user.franchiseId) {
     throw ApiError.forbidden("Access denied");
   }
 
@@ -275,7 +274,7 @@ export const createFranchiseLead = async (franchiseId: string, leadData: any, us
   const franchise = await Franchise.findById(franchiseId);
   if (!franchise) throw ApiError.notFound("Franchise not found");
 
-  if (user.role === "franchise" && franchise.ownerId.toString() !== user.userId) {
+  if ((user.role === "franchise" || user.role === "franchise_admin") && franchise._id.toString() !== user.franchiseId) {
     throw ApiError.forbidden("Access denied");
   }
 
@@ -303,7 +302,7 @@ export const updateFranchiseLead = async (franchiseId: string, leadId: string, u
   const franchise = await Franchise.findById(franchiseId);
   if (!franchise) throw ApiError.notFound("Franchise not found");
 
-  if (user.role === "franchise" && franchise.ownerId.toString() !== user.userId) {
+  if ((user.role === "franchise" || user.role === "franchise_admin") && franchise._id.toString() !== user.franchiseId) {
     throw ApiError.forbidden("Access denied");
   }
 
@@ -327,7 +326,7 @@ export const getCommissionReport = async (franchiseId: string, user: JwtAccessPa
   const franchise = await Franchise.findById(franchiseId).populate("ownerId", "name franchiseDetails");
   if (!franchise) throw ApiError.notFound("Franchise not found");
 
-  if (user.role === "franchise" && franchise.ownerId._id.toString() !== user.userId) {
+  if ((user.role === "franchise" || user.role === "franchise_admin") && franchise._id.toString() !== user.franchiseId) {
     throw ApiError.forbidden("Access denied");
   }
 
@@ -370,7 +369,7 @@ export const getRoyaltyReport = async (franchiseId: string, user: JwtAccessPaylo
   const franchise = await Franchise.findById(franchiseId);
   if (!franchise) throw ApiError.notFound("Franchise not found");
 
-  if (user.role === "franchise" && franchise.ownerId.toString() !== user.userId) {
+  if ((user.role === "franchise" || user.role === "franchise_admin") && franchise._id.toString() !== user.franchiseId) {
     throw ApiError.forbidden("Access denied");
   }
 
@@ -408,7 +407,7 @@ export const getSalesReport = async (franchiseId: string, user: JwtAccessPayload
   const franchise = await Franchise.findById(franchiseId);
   if (!franchise) throw ApiError.notFound("Franchise not found");
 
-  if (user.role === "franchise" && franchise.ownerId.toString() !== user.userId) {
+  if ((user.role === "franchise" || user.role === "franchise_admin") && franchise._id.toString() !== user.franchiseId) {
     throw ApiError.forbidden("Access denied");
   }
 
@@ -470,7 +469,7 @@ export const getTerritory = async (franchiseId: string, user: JwtAccessPayload) 
   const franchise = await Franchise.findById(franchiseId);
   if (!franchise) throw ApiError.notFound("Franchise not found");
 
-  if (user.role === "franchise" && franchise.ownerId.toString() !== user.userId) {
+  if ((user.role === "franchise" || user.role === "franchise_admin") && franchise._id.toString() !== user.franchiseId) {
     throw ApiError.forbidden("Access denied");
   }
 

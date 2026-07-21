@@ -258,7 +258,24 @@ export const getSosDetail = async (id: string, user: JwtAccessPayload) => {
  * @returns An array of active SOS alerts
  */
 export const getActiveSos = async (user: JwtAccessPayload) => {
-  const sosAlerts = await SosAlert.find({ status: "active" })
+  const filter: any = { status: "active" };
+
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No franchise associated with your account");
+    filter.franchiseId = user.franchiseId;
+  } else if (user.role !== "super_admin" && user.role !== "admin") {
+    if (user.role === "operator") {
+      const accessibleCameras = await Camera.find({
+        operatorIds: user.userId,
+        isDeleted: false,
+      }).select("_id");
+      filter.cameraId = { $in: accessibleCameras.map((c) => c._id) };
+    } else {
+      filter.triggeredBy = user.userId;
+    }
+  }
+
+  const sosAlerts = await SosAlert.find(filter)
     .populate("triggeredBy", "name role email")
     .populate("cameraId", "name location")
     .sort({ createdAt: -1 })

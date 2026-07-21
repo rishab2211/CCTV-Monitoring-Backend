@@ -52,7 +52,7 @@ router.put(
 router.post(
   "/schedule",
   authenticate,
-  permit("recordings:manage"), // Admins/franchise, or customers managing their own (handled in service)
+  permit("cameras:configure"), // Admin/franchise_admin, or owners managing their own
   validate(setScheduleSchema),
   recordingController.updateSchedule
 );
@@ -60,7 +60,7 @@ router.post(
 router.get(
   "/:cameraId/schedule",
   authenticate,
-  permit("recordings:view"),
+  permit("recordings:read"),
   validate(cameraIdParamSchema, "params"),
   recordingController.getSchedule
 );
@@ -70,7 +70,7 @@ router.get(
 router.get(
   "/:cameraId/playback",
   authenticate,
-  permit("recordings:view"),
+  permit("recordings:read"),
   validate(cameraIdParamSchema, "params"),
   validate(timeRangeQuerySchema, "query"),
   recordingController.getPlaybackChunks
@@ -79,7 +79,7 @@ router.get(
 router.get(
   "/:cameraId/timeline",
   authenticate,
-  permit("recordings:view"),
+  permit("recordings:read"),
   validate(cameraIdParamSchema, "params"),
   validate(dateQuerySchema, "query"),
   recordingController.getTimeline
@@ -90,7 +90,7 @@ router.get(
 router.get(
   "/",
   authenticate,
-  permit("recordings:view"),
+  permit("recordings:read"),
   validate(listRecordingsQuerySchema, "query"),
   recordingController.listRecordings
 );
@@ -98,7 +98,7 @@ router.get(
 router.get(
   "/:id",
   authenticate,
-  permit("recordings:view"),
+  permit("recordings:read"),
   validate(recordingIdParamSchema, "params"),
   recordingController.getRecordingDetails
 );
@@ -106,7 +106,7 @@ router.get(
 router.post(
   "/:id/download",
   authenticate,
-  permit("recordings:view"),
+  permit("recordings:download"),
   validate(recordingIdParamSchema, "params"),
   recordingController.generateDownloadLink
 );
@@ -114,7 +114,7 @@ router.post(
 router.delete(
   "/:id",
   authenticate,
-  permit("recordings:manage"),
+  permit("recordings:delete"),
   validate(recordingIdParamSchema, "params"),
   recordingController.deleteRecording
 );

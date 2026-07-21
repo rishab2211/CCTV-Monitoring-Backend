@@ -173,7 +173,11 @@ export const addComment = async (id: string, text: string, user: JwtAccessPayloa
   const ticket = await Ticket.findById(id);
   if (!ticket) throw ApiError.notFound("Ticket not found");
 
-  if (user.role !== "admin" && user.role !== "super_admin" && ticket.createdBy.toString() !== user.userId) {
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId || ticket.franchiseId?.toString() !== user.franchiseId) {
+      throw ApiError.forbidden();
+    }
+  } else if (user.role !== "admin" && user.role !== "super_admin" && ticket.createdBy.toString() !== user.userId) {
     throw ApiError.forbidden();
   }
 
