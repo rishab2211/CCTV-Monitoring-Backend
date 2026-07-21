@@ -68,7 +68,10 @@ export const createFranchise = async (input: any, user: JwtAccessPayload) => {
  * @returns An object containing the populated franchises and pagination metadata
  * @throws ApiError if the user lacks permissions
  */
-export const listFranchises = async (query: any, user: JwtAccessPayload) => {
+export const listFranchises = async (
+  query: any, 
+  user: JwtAccessPayload
+): Promise<{ franchises: any[]; total: number; page: number; limit: number; totalPages: number }> => {
   if (user.role !== "super_admin" && user.role !== "admin") {
     throw ApiError.forbidden("Only admins can list all franchises");
   }
@@ -304,7 +307,7 @@ export const updateFranchiseLead = async (franchiseId: string, leadId: string, u
     throw ApiError.forbidden("Access denied");
   }
 
-  const lead = franchise.leads?.id(leadId);
+  const lead = franchise.leads?.find((l: any) => l._id?.toString() === leadId);
   if (!lead) throw ApiError.notFound("Lead not found");
 
   Object.assign(lead, { ...updateData, updatedAt: new Date() });

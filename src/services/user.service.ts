@@ -326,9 +326,9 @@ export const toggleUserStatus = async (
     userId: user._id,
     action: input.isActive ? "USER_ACTIVATED" : "USER_DEACTIVATED",
     description: input.isActive
-      ? `Account activated by ${changedBy}`
-      : `Account deactivated by ${changedBy}${input.reason ? `: ${input.reason}` : ""}`,
-    metadata: { changedBy, reason: input.reason },
+      ? `Account activated by ${updatedByUserId}`
+      : `Account deactivated by ${updatedByUserId}${input.reason ? `: ${input.reason}` : ""}`,
+    metadata: { updatedByUserId, reason: input.reason },
   });
 
   logger.info(

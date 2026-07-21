@@ -39,6 +39,7 @@ const franchiseDetailsSchema = z
     commissionRate: z.number().min(0).max(100).optional(),
     royaltyRate: z.number().min(0).max(100).optional(),
     franchiseCode: z.string().max(50).optional(),
+    franchiseRef: objectIdSchema.optional(),
   })
   .optional();
 
@@ -52,6 +53,7 @@ const operatorDetailsSchema = z
       .string()
       .regex(/^\d{2}:\d{2}$/, "shiftEnd must be HH:MM format")
       .optional(),
+    assignedFranchise: objectIdSchema.optional(),
   })
   .optional();
 
