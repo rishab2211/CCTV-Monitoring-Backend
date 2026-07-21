@@ -83,7 +83,7 @@ export const listUsersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   role: z
-    .enum(["super_admin", "admin", "franchise", "operator", "technician", "customer"])
+    .enum(["super_admin", "admin", "franchise", "franchise_admin", "operator", "technician", "customer"])
     .optional(),
   isActive: z
     .preprocess((v) => {
@@ -107,7 +107,7 @@ export const createUserSchema = z.object({
   email: z.string().email().toLowerCase().trim(),
   phone: phoneSchema,
   password: passwordSchema,
-  role: z.enum(["admin", "franchise", "operator", "technician", "customer"]),
+  role: z.enum(["admin", "franchise", "franchise_admin", "operator", "technician", "customer"]),
   address: addressSchema,
   // Role-specific optional sub-documents
   franchiseDetails: franchiseDetailsSchema,

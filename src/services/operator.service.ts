@@ -194,6 +194,19 @@ export const listShifts = async (query: any, user: JwtAccessPayload) => {
 
   if (user.role === "operator") {
     filter.operatorId = user.userId; // Operators only see their own shifts
+  } else if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No active franchise found");
+    const operators = await User.find({ "operatorDetails.assignedFranchise": user.franchiseId, role: "operator" }).select("_id");
+    const operatorIds = operators.map(op => op._id);
+    
+    if (operatorId) {
+      if (!operatorIds.some(id => id.toString() === operatorId.toString())) {
+        throw ApiError.forbidden("Operator does not belong to your franchise");
+      }
+      filter.operatorId = operatorId;
+    } else {
+      filter.operatorId = { $in: operatorIds };
+    }
   } else if (operatorId) {
     filter.operatorId = operatorId;
   }
@@ -222,8 +235,14 @@ export const getOperatorPerformance = async (operatorId: string, user: JwtAccess
     throw ApiError.forbidden("You can only view your own performance");
   }
 
-  const operator = await User.findOne({ _id: operatorId, role: "operator", isDeleted: false });
-  if (!operator) throw ApiError.notFound("Operator not found");
+  const query: any = { _id: operatorId, role: "operator", isDeleted: false };
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No active franchise found");
+    query["operatorDetails.assignedFranchise"] = new mongoose.Types.ObjectId(user.franchiseId);
+  }
+
+  const operator = await User.findOne(query);
+  if (!operator) throw ApiError.notFound("Operator not found or belongs to another franchise");
 
   // Aggregate all historical shifts for this operator
   const aggregation = await OperatorShift.aggregate([
