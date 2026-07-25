@@ -5,11 +5,12 @@
 <p>An enterprise-grade, real-time B2B2C CCTV-as-a-Service backend built with <strong>Express.js</strong>, <strong>TypeScript</strong>, <strong>MongoDB</strong>, and <strong>Socket.IO</strong>.</p>
 
 <p>
-  <img alt="Node.js" src="https://img.shields.io/badge/Runtime-Bun%20v1.3.14-black?logo=bun&logoColor=white"/>
+  <img alt="Bun" src="https://img.shields.io/badge/Runtime-Bun%20v1.3.14-black?logo=bun&logoColor=white"/>
   <img alt="TypeScript" src="https://img.shields.io/badge/Language-TypeScript%205.5-3178C6?logo=typescript&logoColor=white"/>
   <img alt="Express" src="https://img.shields.io/badge/Framework-Express.js%204-000000?logo=express&logoColor=white"/>
   <img alt="MongoDB" src="https://img.shields.io/badge/Database-MongoDB%208-47A248?logo=mongodb&logoColor=white"/>
   <img alt="Socket.IO" src="https://img.shields.io/badge/Realtime-Socket.IO%204-010101?logo=socket.io&logoColor=white"/>
+  <img alt="Version" src="https://img.shields.io/badge/API%20Version-v2.0%20Multi--Tenant-blue"/>
   <img alt="License" src="https://img.shields.io/badge/License-Proprietary-red"/>
 </p>
 
@@ -20,16 +21,20 @@
 ## 📋 Table of Contents
 
 - [Overview](#-overview)
+- [v2.0 Multi-Tenant Architecture](#-v20-multi-tenant-architecture-shift)
 - [Business Architecture](#-business-architecture)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
 - [API Modules](#-api-modules)
 - [Authentication & Security](#-authentication--security)
+- [Multi-Tenant Middleware Stack](#-multi-tenant-middleware-stack)
+- [RBAC Matrix](#-rbac-matrix)
 - [Real-time Events (Socket.IO)](#-real-time-events-socketio)
 - [Background Jobs (Cron)](#-background-jobs-cron)
 - [Getting Started](#-getting-started)
 - [Environment Variables](#-environment-variables)
 - [Running the Server](#-running-the-server)
+- [Testing with Postman](#-testing-with-postman)
 - [Deployment](#-deployment)
 
 ---
@@ -39,20 +44,80 @@
 The CCTV Monitoring Platform is a **B2B2C CaaS (CCTV-as-a-Service)** system. A parent security company sells monitoring subscriptions through regional Franchise partners. Franchises register Customers, Technicians install cameras at customer premises, and Operators watch live feeds 24/7 from a centralised control room.
 
 ```
-Company (Super Admin / Admin)
-  └── Franchise Partners
-        └── Customers
+Company (Super Admin / Admin)  ← Global platform access, no tenant boundary
+  └── Franchise Partners (Tenants)  ← Completely isolated islands of data
+        ├── Franchise Admins  ← Manage the Franchise, its staff, and customers
+        ├── Operators  ← Watch cameras and respond to alerts (tenant-scoped)
+        ├── Technicians  ← Install and maintain cameras (tenant-scoped)
+        └── Customers  ← End-users paying subscriptions (walled garden)
               └── Cameras (RTSP → MediaMTX → WebRTC → Operator / Customer)
                     └── Alerts → Operators → Incidents → Resolved
 ```
 
 This backend serves **five distinct client applications**: Customer Mobile App, Operator Web Panel, Franchise Portal, Technician Mobile App, and the React Admin Dashboard — all from a single versioned REST API at `/api/v1`.
 
+> **Total Coverage:** ~204 endpoints across 20 modules.
+
+---
+
+## 🏢 v2.0 Multi-Tenant Architecture Shift
+
+> **This is the most significant architectural change in the platform's history.**
+
+### What Changed
+
+The API migrated from a **flat, role-based hierarchy** (v1.0) to a strict **Multi-Tenant, Franchise-Scoped** architecture (v2.0).
+
+| Concern | v1.0 (Old) | v2.0 (Current) |
+|---|---|---|
+| Data Isolation | Per-user role checks | Strict `franchiseId` scoping |
+| Franchise Data | Shared tables | Completely isolated tenant island |
+| Middleware | `Auth → Role Check` | `Auth → TenantScope → Role → Permission` |
+| JWT Payload | `userId`, `role` | `userId`, `role`, **`franchiseId`** |
+| DB Queries | Unscoped or manual | Auto-filtered via `tenantScope` middleware |
+| Franchise Admin Role | Did not exist | `franchise_admin` role added |
+
+### The Core Tenant Isolation Pattern
+
+Every resource query for Franchise-scoped users is now automatically filtered by `franchiseId`. Services spread `req.franchiseScope` into their MongoDB filter:
+
+```typescript
+// tenantScope middleware injects this into req object
+// req.franchiseScope === null       → Super Admin / Admin (global, no filter)
+// req.franchiseScope === "abc123"   → Franchise-scoped (filtered by franchiseId)
+
+const filter = {
+  isDeleted: false,
+  ...(req.franchiseScope ? { franchiseId: req.franchiseScope } : {})
+};
+const cameras = await Camera.find(filter);
+```
+
+This means a Franchise Admin **physically cannot** access another franchise's data — not via ID guessing or any other method — because the database query itself has the tenant filter baked in.
+
+### JWT Payload (v2.0)
+
+When any user (Franchise Admin, Operator, etc.) logs in, their JWT now embeds their `franchiseId` directly:
+
+```json
+{
+  "userId": "668abc123def456789012345",
+  "role": "franchise_admin",
+  "franchiseId": "669xyz456abc789012345678",
+  "iat": 1752345600,
+  "exp": 1752346500
+}
+```
+
+You do **not** need to pass `franchiseId` manually in API requests. The middleware reads it from the token automatically.
+
+### Customer Walled Garden
+
+Customer routes (`/customer/*`) are treated as a special "walled garden" scoped strictly to the authenticated `userId`. Customers can **only** access their own cameras, notifications, payments, and profile — never another customer's data.
+
 ---
 
 ## 🏗 Business Architecture
-
-![Architecture Overview](https://mermaid.ink/svg/pako:eNptUt1u2jAUfhXLFxOVAKUkISEXkyDQqVMhiESjW7MLh5wFr42NbKeCIm73AHvEPclOYC3NWl_5fPp-zjn2nq5kDjSghWKbNUlGqSB4dJWdgJSO2OoeRE5iUI98BTqlJ0p9hvPru5ROthsFWnd_arKYxEmNpvT7mbWMkRRLtDHd6-hoBKrBCBfRDDkzbIWESgryWWb6hYHpqXjT12RrQAn28G5j0-QW_aaQc4bXf5GktUjiOfnz6zdZQrZIwotGE1fhFDVXXEHGNNQlac0rvSYzafgPvmKGS6GbmvBmjJrwQVY5F0ztSGuoNRjygXzhOUgMLkoQhsRGKlZAUzwffkXxgj1JtWEojasMhZGAjuElkEjloF7lvb-GMTOM3LBdvdFX80ezT9FdaypFIccjUpPqoS7eWuFjYegyJp3Ox5PsjB-h5LYJ4F6aAO6gCeBcJ6B-1v99XzD0oW38djyngVEVtGkJqmR1Sfc1N6VmDSWkNMBrztR9PeABNRsmvklZPsuUrIr1c1FtcmZgzBnu58zAeUGFshKGBu7RgAZ7uqXBpWV3Hd_3erZl9W3f7_fadEcD23K7vuPantNzB5bjeYc2fTpGWl3fcpyB1fddp98buJfe4S9O1PPZ)
 
 | Layer | Technology |
 |---|---|
@@ -99,12 +164,7 @@ cctv-monitoring-backend/
 ├── .gitignore
 │
 ├── scripts/
-│   ├── generate-postman.js            # Auto-compiles Postman collection from MD guides
-│   └── CCTV_API_Collection.json       # Generated Postman collection (do not edit manually)
-│
-├── docs/
-│   ├── architecture_overview.png      # Architecture diagram
-│   └── alert_sequence_flow.png        # Real-time alert pipeline sequence diagram
+│   └── merge_collections.js           # Merges modular Postman JSONs into one file
 │
 └── src/
     ├── app.ts                         # Express app setup (middleware, routes, error handler)
@@ -140,7 +200,8 @@ cctv-monitoring-backend/
     │   └── user.controller.ts
     │
     ├── middleware/
-    │   ├── auth.ts                    # Verifies JWT, attaches req.user
+    │   ├── auth.ts                    # Verifies JWT → attaches req.user; also accepts X-System-Key
+    │   ├── tenantScope.ts             # [NEW v2.0] Extracts franchiseId → attaches req.franchiseScope
     │   ├── authorize.ts               # Role guard: authorize('admin', 'super_admin')
     │   ├── permit.ts                  # Permission guard: permit('cameras:write')
     │   ├── validate.ts                # Zod schema validation (body / params / query)
@@ -149,18 +210,18 @@ cctv-monitoring-backend/
     │   └── errorHandler.ts            # Global error handler: ApiError → JSON response
     │
     ├── models/                        # 26 Mongoose schemas
-    │   ├── User.ts                    # Core user document (shared by all roles)
+    │   ├── User.ts                    # Core user document (shared by all roles, has franchiseId)
     │   ├── Role.ts
     │   ├── Permission.ts              # Granular permission keys (e.g. cameras:write)
     │   ├── RefreshToken.ts            # Rotatable refresh token store
     │   ├── OTPVerification.ts         # Time-limited OTP codes
     │   ├── DeviceSession.ts           # Active login sessions per device
     │   ├── DeviceToken.ts             # FCM push notification tokens
-    │   ├── Camera.ts
+    │   ├── Camera.ts                  # franchiseId field added for tenant isolation
     │   ├── StreamSession.ts           # Active WebRTC/RTSP stream sessions
     │   ├── Recording.ts               # Video recording metadata + Cloudinary refs
     │   ├── RecordingSchedule.ts       # Scheduled recording rules per camera
-    │   ├── Alert.ts                   # Motion/sensor alert events
+    │   ├── Alert.ts                   # Motion/sensor alert events (franchiseId scoped)
     │   ├── SosAlert.ts                # Panic/SOS events
     │   ├── TalkbackSession.ts         # Two-way audio call records
     │   ├── Incident.ts                # Incident reports with media attachments
@@ -208,20 +269,20 @@ cctv-monitoring-backend/
     │   ├── auth.service.ts            # Register, login, OTP, token rotation, device sessions
     │   ├── user.service.ts
     │   ├── role.service.ts
-    │   ├── camera.service.ts          # CRUD, assignment, health, AI toggles
+    │   ├── camera.service.ts          # CRUD, assignment, health, AI toggles (tenant-scoped)
     │   ├── stream.service.ts          # MediaMTX path management, WebRTC tokens
     │   ├── recording.service.ts       # Segment tracking, Cloudinary upload, retention
-    │   ├── alert.service.ts           # Alert lifecycle, triage rules, escalation
+    │   ├── alert.service.ts           # Alert lifecycle, triage rules, escalation (tenant-scoped)
     │   ├── sos.service.ts             # Panic dispatch, operator broadcast
     │   ├── talkback.service.ts        # WHIP session management
-    │   ├── incident.service.ts        # Report creation, media, PDF export
+    │   ├── incident.service.ts        # Report creation, media, PDF export (tenant-scoped)
     │   ├── notification.service.ts    # FCM push, in-app inbox, preferences
     │   ├── billing.service.ts         # Plans, subscriptions, Razorpay, invoices
     │   ├── franchise.service.ts       # Franchise CRUD, leads CRM, commission reports
-    │   ├── job.service.ts             # Installation dispatch, checklist, GPS
+    │   ├── job.service.ts             # Installation dispatch, checklist, GPS (tenant-scoped)
     │   ├── operator.service.ts        # Shift management, camera assignment, performance
     │   ├── customer.service.ts        # Self-service panel, family sharing, subscription
-    │   ├── analytics.service.ts       # Dashboard KPIs, revenue aggregations
+    │   ├── analytics.service.ts       # Dashboard KPIs, revenue aggregations (tenant-aware)
     │   ├── audit.service.ts           # Write-op log queries
     │   ├── ticket.service.ts          # Support thread management
     │   ├── setting.service.ts         # System config read/write
@@ -230,7 +291,7 @@ cctv-monitoring-backend/
     │
     ├── types/
     │   ├── index.ts                   # Shared interfaces, enums, JWT payload types
-    │   └── express.d.ts               # Augments Express Request with req.user
+    │   └── express.d.ts               # Augments Express Request with req.user, req.franchiseScope
     │
     ├── utils/
     │   ├── ApiError.ts                # Custom error class with HTTP status factory methods
@@ -310,39 +371,92 @@ POST /auth/refresh-token
   → Old refreshToken rotated (reuse detected → full session invalidated)
 ```
 
-### Middleware Stack (Applied per request)
+### System / Hardware Authentication
+
+Camera hardware and internal system services can bypass JWT by sending:
 
 ```
-Rate Limiter → Helmet → CORS → JWT Verify → Role Check → Permission Check → Zod Validate → Controller
+X-System-Key: <SYSTEM_API_KEY from .env>
 ```
 
-| Middleware | Purpose |
-|---|---|
-| `helmet()` | XSS protection, HSTS, Content-Security-Policy headers |
-| `express-rate-limit` | 100 req/15 min general; 10 req/15 min on auth routes |
-| `authenticate` | Verifies JWT (`Authorization: Bearer`), attaches `req.user`; also accepts `X-System-Key` for internal hardware requests |
-| `authorize(...roles)` | Blocks if `req.user.role` is not in the allowed list |
-| `permit(...permissions)` | Checks granular permission keys against the user's role (e.g. `cameras:write`) |
-| `validate(schema)` | Zod schema — strips unknown fields, rejects malformed input |
-| `errorHandler` | Global Express error handler — converts `ApiError` instances to structured JSON |
+This is used for camera heartbeat pings and automated webhook callbacks.
 
-### RBAC Matrix
+---
 
-| Capability | Super Admin | Admin | Franchise | Operator | Technician | Customer |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| Manage Admins | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Manage Franchises | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Manage Cameras | ✅ | ✅ | ❌ | ❌ | ✅* | ❌ |
-| View Live Stream | ✅ | ✅ | ❌ | ✅** | ❌ | ✅*** |
-| Manage Alerts | ✅ | ✅ | ❌ | ✅** | ❌ | ❌ |
-| Audio Talkback | ❌ | ❌ | ❌ | ✅** | ❌ | ❌ |
-| View Analytics | ✅ | ✅ | ✅**** | ❌ | ❌ | ❌ |
-| System Settings | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+## 🛡 Multi-Tenant Middleware Stack
 
-> `*` Technicians: only during active installation job  
-> `**` Operators: only cameras assigned to them  
-> `***` Customers: only their own cameras  
-> `****` Franchise: only their territory data  
+> **v2.0 Critical Change:** The middleware stack order has changed. `tenantScope` was inserted after `authenticate` and before `authorize`/`permit`.
+
+### Full Stack Per Request
+
+```
+Rate Limiter → Helmet → CORS → authenticate → tenantScope → authorize/permit → validate → Controller
+```
+
+### Middleware Reference
+
+| Middleware | File | Purpose |
+|---|---|---|
+| `helmet()` | built-in | XSS protection, HSTS, Content-Security-Policy headers |
+| `express-rate-limit` | `rateLimiter.ts` | 100 req/15 min general; 10 req/15 min on auth routes |
+| `authenticate` | `auth.ts` | Verifies JWT (`Authorization: Bearer`), attaches `req.user`; also accepts `X-System-Key` |
+| `tenantScope` | `tenantScope.ts` | **[NEW v2.0]** Reads `franchiseId` from `req.user` → attaches `req.franchiseScope` (`null` for global, `string` for tenant) |
+| `authorize(...roles)` | `authorize.ts` | Blocks if `req.user.role` is not in the allowed list |
+| `permit(...permissions)` | `permit.ts` | Checks granular permission keys against the user's role (e.g. `cameras:write`) |
+| `validate(schema)` | `validate.ts` | Zod schema — strips unknown fields, rejects malformed input |
+| `errorHandler` | `errorHandler.ts` | Global Express error handler — converts `ApiError` instances to structured JSON |
+
+### Role Aliases (authorize.ts convenience exports)
+
+```typescript
+isSuperAdmin      → authorize('super_admin')
+isAdmin           → authorize('super_admin', 'admin')
+isFranchiseOwner  → authorize('super_admin', 'franchise')
+isFranchiseAdmin  → authorize('super_admin', 'admin', 'franchise', 'franchise_admin')
+isOperator        → authorize('super_admin', 'admin', 'franchise_admin', 'operator')
+isTechnician      → authorize('super_admin', 'admin', 'technician')
+isCustomer        → authorize('customer')
+```
+
+---
+
+## 🔑 RBAC Matrix
+
+> **v2.0 Note:** `franchise_admin` is a new role added in this version. Franchise Admins manage their own Franchise's operators, technicians, customers, and cameras — but cannot access another franchise's data.
+
+| Capability | Super Admin | Admin | Franchise | Franchise Admin | Operator | Technician | Customer |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Global Platform Settings | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Manage All Franchises | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Manage Own Franchise | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Manage Franchise Staff | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Manage Cameras | ✅ | ✅ | ✅ | ✅ | ❌ | ✅† | ❌ |
+| View Live Stream | ✅ | ✅ | ❌ | ❌ | ✅‡ | ❌ | ✅§ |
+| Manage Alerts | ✅ | ✅ | ❌ | ✅ | ✅‡ | ❌ | ❌ |
+| Audio Talkback | ❌ | ❌ | ❌ | ❌ | ✅‡ | ❌ | ❌ |
+| View Analytics | ✅ | ✅ | ✅¶ | ✅¶ | ❌ | ❌ | ❌ |
+| Billing & Plans | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅§ |
+| Audit Logs | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+> `†` Technicians: camera access only during an active installation job
+> `‡` Operators: only cameras/alerts explicitly assigned to them within their franchise
+> `§` Customers: strictly their own cameras, subscriptions, and invoices (walled garden)
+> `¶` Franchise / Franchise Admin: only their own franchise's territory data
+
+### Granular Permissions (permit middleware)
+
+Permission strings are seeded from `src/config/permissions.seed.ts`. Examples:
+
+```
+cameras:read        cameras:write       cameras:delete
+alerts:read         alerts:write
+incidents:read      incidents:write
+recordings:read     recordings:delete
+users:read          users:write         users:delete
+franchises:read     franchises:write
+analytics:read
+settings:write
+```
 
 ---
 
@@ -355,7 +469,7 @@ WebSocket connections require a valid JWT passed in the handshake `auth` object.
 | Room | Subscribers | Events Received |
 |---|---|---|
 | `admin` | Super Admins, Admins | All global events |
-| `operator` | All Operators | SOS triggers, shift changes |
+| `operator` | All Operators (within a franchise) | SOS triggers, shift changes |
 | `camera_<id>` | Assigned Operators, Owner Customer | `new_alert`, stream start/stop |
 | `customer_<id>` | Individual Customer | `alert_resolved`, `notification` |
 
@@ -383,8 +497,6 @@ WebSocket connections require a valid JWT passed in the handshake `auth` object.
 | `join_room` | `{ room }` | Join `admin`, `operator`, or `camera_<id>` |
 | `leave_room` | `{ room }` | Cleanly depart a room |
 | `subscribe_camera` | `{ cameraId }` | Join a specific camera's event room |
-
-![Alert Sequence Flow](docs/alert_sequence_flow.png)
 
 ---
 
@@ -415,6 +527,7 @@ WebSocket connections require a valid JWT passed in the handshake `auth` object.
 | [MediaMTX](https://github.com/bluenviron/mediamtx) | Latest (for live streaming) |
 | Firebase project | For FCM push notifications |
 | Cloudinary account | For media/recording storage |
+| Razorpay account | For payment processing |
 
 ### Installation
 
@@ -511,6 +624,60 @@ bun run start
 bun run build
 ```
 
+**Health check:**
+```bash
+curl http://localhost:5000/api/health
+```
+
+---
+
+## 🧪 Testing with Postman
+
+A comprehensive **automated Postman collection** covering all 204 endpoints is available.
+
+### Files
+
+The Postman files are generated by scripts in the project. To generate:
+
+```bash
+# Generate the automated + merged Postman collection
+node scripts/automate_tests.js
+```
+
+This produces `Complete_Postman_Collection_Automated.json`.
+
+### Importing
+
+1. Open **Postman** → Click **Import**.
+2. Select `Complete_Postman_Collection_Automated.json`.
+3. Also import `CCTV_Monitoring_Environment.json`.
+4. From the top-right environment dropdown, select **"CCTV Monitoring Environment"**.
+
+### How Automation Works
+
+The Postman collection includes **auto-capture test scripts** on all `POST` creation endpoints. When you create a resource (e.g. `POST /cameras`), the test script automatically saves the returned `_id` to the environment (e.g. `{{cameraId}}`). All subsequent requests use these auto-populated variables — **no manual copy-pasting required**.
+
+**Pre-configured auto-captures:**
+
+| Endpoint | Variable Saved |
+|---|---|
+| `POST /auth/login` | `accessToken`, `refreshToken` |
+| `POST /cameras` | `cameraId` |
+| `POST /franchises` | `franchiseId` |
+| `POST /users` | `userId` |
+| `POST /incidents` | `incidentId` |
+| `POST /alerts` | `alertId` |
+| `POST /sos` | `sosId` |
+| `POST /tickets` | `ticketId` |
+| `POST /plans` | `planId` |
+| `POST /subscriptions` | `subscriptionId` |
+
+### Running the Full Suite
+
+1. Click the **"CCTV Monitoring Backend - AUTOMATED"** collection.
+2. Click **Run Collection**.
+3. Postman will run all ~200+ requests sequentially, automatically using the tokens and IDs generated in earlier steps.
+
 ---
 
 ## 🚢 Deployment
@@ -542,6 +709,15 @@ location /api/ {
     proxy_set_header Host $host;
     proxy_cache_bypass $http_upgrade;
 }
+
+# Socket.IO WebSocket upgrade
+location /socket.io/ {
+    proxy_pass http://localhost:5000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "Upgrade";
+    proxy_set_header Host $host;
+}
 ```
 
 ---
@@ -552,4 +728,4 @@ location /api/ {
 
 This codebase and all associated files are the exclusive intellectual property of the project owner. Unauthorized copying, distribution, modification, sublicensing, or use of this software — in whole or in part — without prior written permission from the owner is strictly prohibited.
 
-© 2025 CCTV Monitoring Platform. All rights reserved.
+© 2025–2026 CCTV Monitoring Platform. All rights reserved.
