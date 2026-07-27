@@ -35,6 +35,12 @@ export const deletePlan = catchAsync(async (req: Request, res: Response) => {
 
 // ─── Subscriptions ───────────────────────────────────────────────────────────
 
+export const listSubscriptions = catchAsync(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const result = await billingService.listSubscriptions(req.query, req.user);
+  res.status(200).json(new ApiResponse(200, result));
+});
+
 export const createSubscription = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
   const subscription = await billingService.createSubscription(req.body, req.user);

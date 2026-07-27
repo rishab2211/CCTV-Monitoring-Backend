@@ -41,6 +41,7 @@ planRouter.delete("/:id", permit("payments:write"), validate(idParamSchema, "par
 export const subscriptionRouter = Router();
 subscriptionRouter.use(authenticate);
 
+subscriptionRouter.get("/", billingController.listSubscriptions);
 subscriptionRouter.post("/", validate(createSubscriptionSchema, "body"), billingController.createSubscription);
 subscriptionRouter.get("/:id", validate(idParamSchema, "params"), billingController.getSubscription);
 subscriptionRouter.patch("/:id/renew", validate(idParamSchema, "params"), billingController.renewSubscription);

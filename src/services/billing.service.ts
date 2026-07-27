@@ -120,6 +120,30 @@ export const createSubscription = async (data: { planId: string, customerId?: st
   return subscription;
 };
 
+export const listSubscriptions = async (query: any, user: JwtAccessPayload) => {
+  const { page = 1, limit = 20, status, customerId } = query;
+  const filter: any = {};
+  if (status) filter.status = status;
+  if (customerId) filter.customerId = customerId;
+
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) throw ApiError.forbidden("No franchise associated with your account");
+    filter.franchiseId = user.franchiseId;
+  } else if (user.role === "customer") {
+    filter.customerId = user.userId;
+  } else if (user.role !== "super_admin" && user.role !== "admin") {
+    throw ApiError.forbidden();
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+  const [subscriptions, total] = await Promise.all([
+    Subscription.find(filter).skip(skip).limit(Number(limit)).sort({ createdAt: -1 }).populate("planId").lean(),
+    Subscription.countDocuments(filter)
+  ]);
+
+  return { subscriptions, total, page: Number(page), limit: Number(limit) };
+};
+
 export const getSubscription = async (id: string, user: JwtAccessPayload) => {
   const subscription = await Subscription.findById(id).populate("planId").lean();
   if (!subscription) throw ApiError.notFound("Subscription not found");
