@@ -73,12 +73,12 @@ export const addMediaMTXPath = async (
   };
 
   const result = await mediamtxFetch("POST", `/config/paths/add/${pathName}`, config);
-  if (result !== null || result === null) {
-    // POST /config/paths/add returns 200 with empty body on success
-    logger.debug(`[MediaMTX] Path registered: ${pathName}`);
-    return true;
+  if (result === null) {
+    // If path already exists, patch it to ensure the source RTSP URL is updated
+    await mediamtxFetch("POST", `/config/paths/patch/${pathName}`, config);
   }
-  return false;
+  logger.debug(`[MediaMTX] Path registered/updated: ${pathName}`);
+  return true;
 };
 
 /**

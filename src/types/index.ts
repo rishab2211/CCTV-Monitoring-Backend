@@ -278,7 +278,7 @@ export interface IStreamSession {
 
 export interface IMediaMTXPathConfig {
   source: string; // RTSP URL of the camera
-  sourceProtocol?: "udp" | "tcp" | "tls";
+  sourceProtocol?: "automatic" | "udp" | "tcp" | "multicast" | "tls";
   sourceOnDemand?: boolean; // Only pull RTSP when a client actually connects
   maxReaders?: number;
 }

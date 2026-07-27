@@ -347,11 +347,21 @@ export const relayWebRTCOffer = async (
       method: "POST",
       headers: { "Content-Type": "application/sdp" },
       body: sdp,
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(30000) // Give MediaMTX up to 15 seconds to pull the RTSP stream
     });
 
+    if (res.status === 404) {
+      throw ApiError.notFound("The camera stream path is offline. Ensure your RTSP source (VLC) is actively running and streaming to " + camera.rtspUrl);
+    }
     if (!res.ok) {
-      throw ApiError.serviceUnavailable("MediaMTX WebRTC session could not be created");
+      const errText = await res.text().catch(() => "Unknown error");
+      logger.error(`MediaMTX WHEP Error: ${res.status} ${res.statusText} - ${errText}`);
+      if (errText.includes("timed out") || errText.includes("source of path")) {
+        throw ApiError.serviceUnavailable(
+          `Camera RTSP stream is offline or unreachable (${camera.rtspUrl}). Ensure your camera/FFmpeg is actively broadcasting.`
+        );
+      }
+      throw ApiError.serviceUnavailable(`MediaMTX WebRTC error (${res.status}): ${errText || res.statusText}`);
     }
 
     const answerSdp = await res.text();
@@ -362,8 +372,12 @@ export const relayWebRTCOffer = async (
       sdp: answerSdp,
       sessionUrl: location, // Client uses this to send ICE candidates
     };
-  } catch (err) {
+  } catch (err: any) {
     if (err instanceof ApiError) throw err;
+    logger.error(`MediaMTX Fetch failed: ${err?.message || err}`);
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+      throw ApiError.serviceUnavailable("MediaMTX took too long to respond. Your VLC stream might be hanging or not sending video frames.");
+    }
     throw ApiError.serviceUnavailable(
       "MediaMTX is not reachable. Ensure MediaMTX is running and configured."
     );

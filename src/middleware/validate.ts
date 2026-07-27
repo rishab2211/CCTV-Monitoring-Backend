@@ -17,24 +17,32 @@ export const validate = (
   target: ValidationTarget = "body"
 ): RequestHandler => {
   return (req: Request, _res: Response, next: NextFunction): void => {
-    // 1. Try direct parsing (for flat Zod schemas)
-    const directResult = schema.safeParse(req[target]);
-    if (directResult.success) {
-      req[target] = directResult.data;
-      return next();
+    // Determine if the schema expects a nested object (e.g. { body: { ... } })
+    let isWrapped = false;
+    if ("shape" in schema && typeof schema.shape === "object" && schema.shape !== null) {
+      if (target in schema.shape) {
+        isWrapped = true;
+      }
     }
 
-    // 2. Try parsing wrapped object { [target]: req[target] } (for schemas expecting { body/query/params: z.object(...) })
-    const wrappedResult = schema.safeParse({ [target]: req[target] });
-    if (wrappedResult.success) {
-      const parsed = wrappedResult.data as Record<string, any>;
-      req[target] = parsed[target] ?? parsed;
-      return next();
+    if (isWrapped) {
+      const wrappedResult = schema.safeParse({ [target]: req[target] });
+      if (wrappedResult.success) {
+        const parsed = wrappedResult.data as Record<string, any>;
+        req[target] = parsed[target] ?? parsed;
+        return next();
+      }
+      const errors = formatZodErrors(wrappedResult.error, target);
+      return next(ApiError.badRequest("Validation failed", errors));
+    } else {
+      const directResult = schema.safeParse(req[target]);
+      if (directResult.success) {
+        req[target] = directResult.data;
+        return next();
+      }
+      const errors = formatZodErrors(directResult.error);
+      return next(ApiError.badRequest("Validation failed", errors));
     }
-
-    // If both failed, format and return Zod errors (using wrapped errors for precise field names if available)
-    const errors = formatZodErrors(wrappedResult.error, target);
-    return next(ApiError.badRequest("Validation failed", errors));
   };
 };
 
