@@ -6,38 +6,53 @@ type ValidationTarget = "body" | "params" | "query";
 
 /**
  * Zod schema validation middleware factory.
+ * Supports both flat Zod schemas (z.object({ ... })) and wrapped schemas (z.object({ body/query/params: ... })).
  *
  * Usage:
- *   router.post('/register', validate(registerSchema), controller)
- *   router.get('/:id', validate(idSchema, 'params'), controller)
- *
- * On success: req.body / req.params / req.query is replaced with the parsed (typed) value.
- * On failure: throws 400 ApiError with field-level errors.
+ *   router.post('/tickets', validate(createTicketSchema, 'body'), controller)
+ *   router.get('/', validate(paginationSchema, 'query'), controller)
  */
 export const validate = (
   schema: ZodSchema,
   target: ValidationTarget = "body"
 ): RequestHandler => {
   return (req: Request, _res: Response, next: NextFunction): void => {
-    const result = schema.safeParse(req[target]);
-
-    if (!result.success) {
-      const errors = formatZodErrors(result.error);
-      return next(ApiError.badRequest("Validation failed", errors));
+    // 1. Try direct parsing (for flat Zod schemas)
+    const directResult = schema.safeParse(req[target]);
+    if (directResult.success) {
+      req[target] = directResult.data;
+      return next();
     }
 
-    // Replace req[target] with parsed data (coercions, defaults, stripped unknowns applied)
-    req[target] = result.data;
-    next();
+    // 2. Try parsing wrapped object { [target]: req[target] } (for schemas expecting { body/query/params: z.object(...) })
+    const wrappedResult = schema.safeParse({ [target]: req[target] });
+    if (wrappedResult.success) {
+      const parsed = wrappedResult.data as Record<string, any>;
+      req[target] = parsed[target] ?? parsed;
+      return next();
+    }
+
+    // If both failed, format and return Zod errors (using wrapped errors for precise field names if available)
+    const errors = formatZodErrors(wrappedResult.error, target);
+    return next(ApiError.badRequest("Validation failed", errors));
   };
 };
 
 /**
  * Formats Zod validation errors into a clean array for the API response.
  */
-const formatZodErrors = (error: ZodError): Array<{ field: string; message: string }> => {
-  return error.errors.map((e) => ({
-    field: e.path.join(".") || "value",
-    message: e.message,
-  }));
+const formatZodErrors = (
+  error: ZodError,
+  targetPrefix?: string
+): Array<{ field: string; message: string }> => {
+  return error.errors.map((e) => {
+    let field = e.path.join(".") || "value";
+    if (targetPrefix && field.startsWith(`${targetPrefix}.`)) {
+      field = field.slice(targetPrefix.length + 1);
+    }
+    return {
+      field: field || targetPrefix || "value",
+      message: e.message,
+    };
+  });
 };
