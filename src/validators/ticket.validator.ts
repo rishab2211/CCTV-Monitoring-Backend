@@ -41,3 +41,14 @@ export const idParamSchema = z.object({
     id: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid Ticket ID"),
   }),
 });
+
+export const listTicketSchema = z.object({
+  query: z.object({
+    page: z.string().regex(/^\d+$/).optional(),
+    limit: z.string().regex(/^\d+$/).optional(),
+    status: z.string().optional(),
+    priority: z.string().optional(),
+    category: z.string().optional(),
+    franchiseId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid Franchise ID").optional(),
+  }),
+});

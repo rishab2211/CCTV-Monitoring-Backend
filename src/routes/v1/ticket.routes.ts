@@ -12,9 +12,9 @@ import {
   updateTicketStatusSchema,
   assignTicketSchema,
   addCommentSchema,
-  idParamSchema
+  idParamSchema,
+  listTicketSchema
 } from "../../validators/ticket.validator";
-import { paginationSchema } from "../../validators/audit.validator"; // Reuse generic pagination
 
 const router = Router();
 
@@ -31,7 +31,7 @@ router.post("/", validate(createTicketSchema, "body"), ticketController.createTi
  * GET /api/v1/tickets
  * List tickets
  */
-router.get("/", validate(paginationSchema, "query"), ticketController.listTickets);
+router.get("/", validate(listTicketSchema, "query"), ticketController.listTickets);
 
 /**
  * GET /api/v1/tickets/:id
