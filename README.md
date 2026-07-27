@@ -95,9 +95,9 @@ const cameras = await Camera.find(filter);
 
 This means a Franchise Admin **physically cannot** access another franchise's data — not via ID guessing or any other method — because the database query itself has the tenant filter baked in.
 
-### JWT Payload (v2.0)
+### JWT Payload & Auth Response (v2.0)
 
-When any user (Franchise Admin, Operator, etc.) logs in, their JWT now embeds their `franchiseId` directly:
+When any user logs in, their JWT embeds their `franchiseId` directly:
 
 ```json
 {
@@ -109,7 +109,9 @@ When any user (Franchise Admin, Operator, etc.) logs in, their JWT now embeds th
 }
 ```
 
-You do **not** need to pass `franchiseId` manually in API requests. The middleware reads it from the token automatically.
+You do **not** need to pass `franchiseId` manually in API query parameters. The middleware reads it from the token automatically.
+
+> **Note on `/auth/me`**: The `GET /auth/me` endpoint returns the full `User` document (including `role` and `franchiseId`), but does **not** return a `permissions[]` array. Permissions are defined at the `Role` level (seeded via `src/config/permissions.seed.ts`) and checked via the `permit` middleware.
 
 ### Customer Walled Garden
 
@@ -243,16 +245,16 @@ cctv-monitoring-backend/
     │       ├── index.ts               # Aggregates all 20+ module sub-routers
     │       ├── auth.routes.ts
     │       ├── user.routes.ts
-    │       ├── admin.routes.ts
+    │       ├── admin.routes.ts        # POST /admins (super_admin only)
     │       ├── roleUser.routes.ts     # /operators, /technicians, /customers
     │       ├── role.routes.ts
     │       ├── camera.routes.ts
-    │       ├── stream.routes.ts
+    │       ├── stream.routes.ts       # WebRTC offer relay & session management
     │       ├── recording.routes.ts
     │       ├── alert.routes.ts
     │       ├── talkback.routes.ts
-    │       ├── notification.routes.ts
-    │       ├── sos.routes.ts
+    │       ├── notification.routes.ts # Notification center & unread status
+    │       ├── sos.routes.ts          # Emergency SOS panic module
     │       ├── incident.routes.ts
     │       ├── franchise.routes.ts
     │       ├── job.routes.ts
@@ -270,7 +272,7 @@ cctv-monitoring-backend/
     │   ├── user.service.ts
     │   ├── role.service.ts
     │   ├── camera.service.ts          # CRUD, assignment, health, AI toggles (tenant-scoped)
-    │   ├── stream.service.ts          # MediaMTX path management, WebRTC tokens
+    │   ├── stream.service.ts          # MediaMTX path management, WebRTC WHEP offer relay
     │   ├── recording.service.ts       # Segment tracking, Cloudinary upload, retention
     │   ├── alert.service.ts           # Alert lifecycle, triage rules, escalation (tenant-scoped)
     │   ├── sos.service.ts             # Panic dispatch, operator broadcast
@@ -334,40 +336,41 @@ All routes are versioned under `/api/v1`. Total coverage: **~204 endpoints acros
 
 | # | Module | Base Path | Key Capabilities |
 |---|---|---|---|
-| 01 | **Authentication** | `/auth` | Register, Login, OTP, Refresh Token, Session Management |
-| 02 | **User Management** | `/users`, `/admins` | CRUD, role assignment, status toggle, activity logs |
+| 01 | **Authentication** | `/auth` | Register, Login, OTP, Refresh Token (JSON Body), Active Session Revocation |
+| 02 | **User Management** | `/users`, `/admins` | CRUD, role creation (super_admin vs admin bounds), status toggle |
 | 03 | **Roles & Permissions** | `/roles`, `/permissions` | RBAC matrix CRUD, permission seeding |
 | 04 | **Camera Management** | `/cameras` | Add, assign, transfer, restart, health check, AI/motion toggles |
-| 05 | **Live Streaming** | `/streams` | MediaMTX path management, WebRTC token generation, signalling |
-| 06 | **Recordings** | `/recordings` | List, playback, download, retention policy, schedule |
+| 05 | **Live Streaming** | `/streams` | WHEP offer relay (`POST /streams/:id/webrtc/offer`), session start/stop |
+| 06 | **Recordings** | `/recordings` | List, playback (`/playback`), download, retention policy, schedule |
 | 07 | **Alert Engine** | `/alerts` | Create, triage, acknowledge, escalate, resolve, alert rules |
 | 08 | **Audio Talkback** | `/talkback` | Session tracking, WHIP URL, active call board |
-| 09 | **Notifications** | `/notifications` | FCM push, in-app list, preferences, device token registration |
-| 10 | **SOS / Panic** | `/sos` | Trigger, broadcast, acknowledge, resolve, timeline |
-| 11 | **Incident Management** | `/incidents` | Report (multipart), assign, notes, media upload, PDF report |
-| 12 | **Franchise Management** | `/franchises` | CRUD, territory, leads CRM, commission/royalty/sales reports |
+| 09 | **Notifications** | `/notifications` | FCM push, in-app inbox (`GET`, `PATCH /read`, `PATCH /read-all`) |
+| 10 | **SOS / Panic** | `/sos` | Trigger, broadcast, acknowledge, resolve, timeline (`GET /sos?status=active`) |
+| 11 | **Incident Management** | `/incidents` | Report (multipart), assign, notes, media upload, `window.print()` PDF report JSON |
+| 12 | **Franchise Management** | `/franchises` | CRUD, territory update, leads CRM, commission/royalty/sales reports |
 | 13 | **Installations** | `/installations` | Job dispatch, checklist, photo/signature upload, GPS tracking |
 | 14 | **Operator Panel** | `/operator` | Shift clock-in/out, assigned cameras, pending alerts, timeline |
 | 15 | **Customer Panel** | `/customer` | Own cameras, live view, playback, subscription, family sharing |
 | 16 | **Billing & Payments** | `/plans`, `/subscriptions`, `/payments`, `/invoices` | Razorpay orders, subscription lifecycle, refunds, PDF invoices |
-| 17 | **Analytics** | `/analytics` | Dashboard KPIs, revenue, camera stats, operator performance |
+| 17 | **Analytics** | `/analytics` | Dashboard KPIs, revenue, camera stats, operator performance (server-side date filtering) |
 | 18 | **Audit Logs** | `/audit-logs`, `/activity-logs` | Write operation history, user activity timeline |
 | 19 | **Support Tickets** | `/tickets` | Create, assign, comment thread, status management |
-| 20 | **System Settings** | `/settings` | Platform config, recording defaults, notification thresholds |
+| 20 | **System Settings** | `/settings` | Platform config, recording defaults, notification thresholds, territory preferences |
 
 ---
 
 ## 🔐 Authentication & Security
 
-### Token Lifecycle
+### Token Lifecycle & Refresh Mechanism
 
 ```
 POST /auth/login
-  → accessToken  (15 min)   — sent in Authorization: Bearer header
-  → refreshToken (30 days)  — stored in HttpOnly cookie
+  → accessToken  (15 min)  — returned in JSON response body (Authorization: Bearer header)
+  → refreshToken (30 days) — returned in JSON response body ({ refreshToken: string })
 
 POST /auth/refresh-token
-  → New accessToken issued
+  → Requires JSON request body: { refreshToken: string }
+  → New accessToken & refreshToken pair issued
   → Old refreshToken rotated (reuse detected → full session invalidated)
 ```
 
@@ -420,9 +423,15 @@ isCustomer        → authorize('customer')
 
 ---
 
-## 🔑 RBAC Matrix
+## 🔑 RBAC Matrix & User Creation Boundaries
 
-> **v2.0 Note:** `franchise_admin` is a new role added in this version. Franchise Admins manage their own Franchise's operators, technicians, customers, and cameras — but cannot access another franchise's data.
+### Role Creation Rules
+
+- `super_admin`: Can create `admin`, `franchise_admin`, `operator`, `technician`, `customer`.
+- `admin`: Can create `franchise_admin`, `operator`, `technician`, `customer` (cannot create another `admin`).
+- `franchise_admin`: Can create `operator`, `technician`, `customer` (cannot create `franchise_admin` or `admin`).
+
+### Permissions Matrix
 
 | Capability | Super Admin | Admin | Franchise | Franchise Admin | Operator | Technician | Customer |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -443,35 +452,20 @@ isCustomer        → authorize('customer')
 > `§` Customers: strictly their own cameras, subscriptions, and invoices (walled garden)
 > `¶` Franchise / Franchise Admin: only their own franchise's territory data
 
-### Granular Permissions (permit middleware)
-
-Permission strings are seeded from `src/config/permissions.seed.ts`. Examples:
-
-```
-cameras:read        cameras:write       cameras:delete
-alerts:read         alerts:write
-incidents:read      incidents:write
-recordings:read     recordings:delete
-users:read          users:write         users:delete
-franchises:read     franchises:write
-analytics:read
-settings:write
-```
-
 ---
 
 ## 🔌 Real-time Events (Socket.IO)
 
-WebSocket connections require a valid JWT passed in the handshake `auth` object. The server validates it using `socketAuth` middleware before allowing any room joins.
+WebSocket connections require a valid JWT passed in the handshake `auth` object (`{ auth: { token: accessToken } }`). The server validates it using `socketAuth` middleware before allowing any room joins.
 
 ### Room Strategy
 
-| Room | Subscribers | Events Received |
-|---|---|---|
-| `admin` | Super Admins, Admins | All global events |
-| `operator` | All Operators (within a franchise) | SOS triggers, shift changes |
-| `camera_<id>` | Assigned Operators, Owner Customer | `new_alert`, stream start/stop |
-| `customer_<id>` | Individual Customer | `alert_resolved`, `notification` |
+| Room Pattern | Subscribers / Membership | Join Mechanism | Events Delivered |
+|---|---|---|---|
+| `admin` | Super Admins, Admins | Client emits `join_room` with `{ room: 'admin' }` | All global system & telemetry events |
+| `franchise_${franchiseId}` | Franchise Admins, Operators, Technicians | **Automatic** — server joins socket on connection via JWT `franchiseId` | Franchise-scoped alerts, SOS triggers |
+| `camera_${cameraId}` | Assigned Operators, Camera Viewers | Client emits `join_camera` with `cameraId` (string) | `camera_online`, `camera_offline`, `camera_health`, `new_alert` |
+| `notification:${userId}` | Target User | Global event name per user ID | User-targeted notifications |
 
 ### Event Reference
 
@@ -487,16 +481,17 @@ WebSocket connections require a valid JWT passed in the handshake `auth` object.
 | `alert_resolved` | `{ alertId, resolution }` | Operator action |
 | `sos_triggered` | SOS object | Customer panic button |
 | `sos_acknowledged` | `{ sosId, operatorId }` | Operator acknowledgement |
-| `recording_started` | `{ cameraId }` | Cron segment upload started |
-| `notification` | Notification object | Any system event targeting the user |
+| `sos_resolved` | `{ sosId, timestamp }` | SOS resolution |
+| `notification` | Notification object | User-targeted notification |
 
 **Client → Server**
 
 | Event | Payload | Purpose |
 |---|---|---|
-| `join_room` | `{ room }` | Join `admin`, `operator`, or `camera_<id>` |
+| `join_room` | `{ room: "admin" }` | Join admin room (Super Admin / Admin only) |
 | `leave_room` | `{ room }` | Cleanly depart a room |
-| `subscribe_camera` | `{ cameraId }` | Join a specific camera's event room |
+| `join_camera` | `cameraId` (string) | Join a specific camera's event room |
+| `leave_camera` | `cameraId` (string) | Depart a specific camera's event room |
 
 ---
 
