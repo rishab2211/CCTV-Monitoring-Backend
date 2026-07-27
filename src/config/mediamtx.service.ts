@@ -40,7 +40,11 @@ const mediamtxFetch = async <T>(
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      logger.warn(`[MediaMTX] ${method} ${path} → ${res.status}: ${text}`);
+      if (text.includes("path already exists")) {
+        logger.debug(`[MediaMTX] Path '${path}' already exists. Updating via PATCH...`);
+      } else {
+        logger.warn(`[MediaMTX] ${method} ${path} → ${res.status}: ${text}`);
+      }
       return null;
     }
 
@@ -75,7 +79,7 @@ export const addMediaMTXPath = async (
   const result = await mediamtxFetch("POST", `/config/paths/add/${pathName}`, config);
   if (result === null) {
     // If path already exists, patch it to ensure the source RTSP URL is updated
-    await mediamtxFetch("POST", `/config/paths/patch/${pathName}`, config);
+    await mediamtxFetch("PATCH", `/config/paths/patch/${pathName}`, config);
   }
   logger.debug(`[MediaMTX] Path registered/updated: ${pathName}`);
   return true;
