@@ -9,81 +9,138 @@ import { logger } from "./utils/logger";
 import { socketService } from "./services/socket.service";
 
 const startServer = async (): Promise<void> => {
+  const startTime = Date.now();
+
+  logger.info("🚀 Starting CCTV Monitoring Backend System...");
+  logger.info(`📋 Environment: ${env.NODE_ENV} | Node: ${process.version} | PID: ${process.pid}`);
+
   try {
-    // ── Connect to MongoDB ────────────────────────────────────────────────────
+    // ── Stage 1: Connect to MongoDB ─────────────────────────────────────────
+    const dbStartTime = Date.now();
+    logger.info("📦 [1/6] Connecting to MongoDB Database...");
     await connectDB();
+    logger.info(`✅ [1/6] MongoDB Connected (${Date.now() - dbStartTime}ms)`);
 
-    // ── Seed permissions and roles (idempotent) ───────────────────────────
+    // ── Stage 2: Seed Permissions and Roles ─────────────────────────────────
+    const seedStartTime = Date.now();
+    logger.info("🔐 [2/6] Seeding System Permissions & Roles...");
     await seedPermissionsAndRoles();
+    logger.info(`✅ [2/6] Permissions & Roles Synced (${Date.now() - seedStartTime}ms)`);
 
-    // ── Sync camera paths to MediaMTX (non-fatal if MediaMTX not running) ──
+    // ── Stage 3: Sync MediaMTX Paths ────────────────────────────────────────
+    const mediaStartTime = Date.now();
+    logger.info("📹 [3/6] Syncing MediaMTX Camera Stream Paths...");
     await syncMediaMTXPaths();
+    logger.info(`✅ [3/6] MediaMTX Stream Paths Synced (${Date.now() - mediaStartTime}ms)`);
 
-    // ── Configure external services ───────────────────────────────────────────
+    // ── Stage 4: Configure External Services ────────────────────────────────
+    const extStartTime = Date.now();
+    logger.info("⚙️  [4/6] Initializing External Services (Cloudinary & SMTP)...");
     configureCloudinary();
-    await verifyEmailConnection(); // Non-blocking — logs warning on failure
+    await verifyEmailConnection();
+    logger.info(`✅ [4/6] External Services Initialized (${Date.now() - extStartTime}ms)`);
 
-    // ── Start HTTP server ─────────────────────────────────────────────────────
+    // ── Stage 5: Start HTTP Server ──────────────────────────────────────────
+    const httpStartTime = Date.now();
+    logger.info(`📡 [5/6] Binding HTTP Server to Port ${env.PORT}...`);
+
     const server = app.listen(env.PORT, () => {
-      logger.info(`
-╔══════════════════════════════════════════════════════╗
-║           CCTV Monitoring Backend                    ║
-╠══════════════════════════════════════════════════════╣
-║  Status   : Running                                  ║
-║  Port     : ${String(env.PORT).padEnd(38)}║
-║  Mode     : ${env.NODE_ENV.padEnd(38)}║
-║  API Base : http://localhost:${env.PORT}/api/v1${"".padEnd(9)}║
-║  Health   : http://localhost:${env.PORT}/api/health${"".padEnd(7)}║
-╚══════════════════════════════════════════════════════╝
-      `.trim());
+      const bootDuration = Date.now() - startTime;
+
+      logger.info(`✅ [5/6] HTTP Server Ready (${Date.now() - httpStartTime}ms)`);
+
+      // ── Stage 6: Initialize WebSockets ───────────────────────────────────
+      const socketStartTime = Date.now();
+      logger.info("🔌 [6/6] Initializing Socket.IO WebSocket Engine...");
+      socketService.initialize(server);
+      logger.info(`✅ [6/6] WebSocket Engine Ready (${Date.now() - socketStartTime}ms)`);
+
+      // ── Print System Banner ──────────────────────────────────────────────
+      const banner = [
+        "════════════════════════════════════════════════════════════════",
+        "         📹 CCTV Monitoring Backend Service Online              ",
+        "════════════════════════════════════════════════════════════════",
+        `  Status      :  ACTIVE & READY`,
+        `  Environment :  ${env.NODE_ENV.toUpperCase()}`,
+        `  Server Port :  ${env.PORT}`,
+        `  Process ID  :  ${process.pid}`,
+        `  API Base    :  http://localhost:${env.PORT}/api/v1`,
+        `  Health Check:  http://localhost:${env.PORT}/api/health`,
+        `  WebSockets  :  ws://localhost:${env.PORT}`,
+        `  Boot Time   :  ${bootDuration} ms`,
+        "════════════════════════════════════════════════════════════════",
+      ].join("\n");
+
+      logger.info(`\n${banner}\n`);
     });
 
-    // ── Initialize WebSockets ─────────────────────────────────────────────────
-    socketService.initialize(server);
+    // ── Graceful Shutdown Handler ───────────────────────────────────────────
+    let isShuttingDown = false;
 
-    // ── Graceful Shutdown ─────────────────────────────────────────────────────
     const gracefulShutdown = async (signal: string): Promise<void> => {
-      logger.info(`\n⚠️  ${signal} received. Shutting down gracefully...`);
+      if (isShuttingDown) {
+        logger.warn(`⚠️  Received ${signal} again. Force shutdown in progress...`);
+        return;
+      }
+      isShuttingDown = true;
+      const shutdownStart = Date.now();
 
-      server.close(async () => {
-        logger.info("✅ HTTP server closed");
+      logger.info(`\n🛑 [Shutdown] Received signal '${signal}'. Initiating graceful shutdown...`);
 
-        try {
-          const mongoose = await import("mongoose");
-          await mongoose.default.connection.close();
-          logger.info("✅ MongoDB connection closed");
-        } catch (err) {
-          logger.error("Error closing MongoDB connection:", err);
-        }
-
-        logger.info("👋 Goodbye!");
-        process.exit(0);
-      });
-
-      // Force shutdown after 10 seconds
-      setTimeout(() => {
-        logger.error("💥 Forced shutdown after timeout");
+      // Set force exit timer (10s timeout)
+      const forceExitTimer = setTimeout(() => {
+        logger.error("💥 [Shutdown] Graceful shutdown timed out (10s). Forcing termination!");
         process.exit(1);
       }, 10000);
+
+      // Unref timer so it doesn't keep the event loop alive if everything closes cleanly
+      forceExitTimer.unref();
+
+      try {
+        // Step 1: Close HTTP server (stops accepting new incoming requests)
+        await new Promise<void>((resolve, reject) => {
+          server.close((err) => {
+            if (err) return reject(err);
+            logger.info("✅ [Shutdown] HTTP server closed (no longer accepting requests)");
+            resolve();
+          });
+        });
+
+        // Step 2: Close MongoDB Connection
+        const mongoose = await import("mongoose");
+        if (mongoose.default.connection.readyState !== 0) {
+          await mongoose.default.connection.close();
+          logger.info("✅ [Shutdown] MongoDB database connection closed cleanly");
+        }
+
+        const duration = Date.now() - shutdownStart;
+        logger.info(`✨ [Shutdown] Graceful shutdown completed in ${duration}ms. Goodbye! 👋`);
+        process.exit(0);
+      } catch (err) {
+        logger.error("💥 [Shutdown] Error encountered during shutdown sequence:", err);
+        process.exit(1);
+      }
     };
 
+    // Listen for OS Termination signals
     process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
     process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
-    // ── Unhandled rejections ──────────────────────────────────────────────────
-    process.on("unhandledRejection", (reason, promise) => {
-      logger.error("Unhandled Rejection at:", promise, "reason:", reason);
-      // Don't exit — log and continue (let health checks detect degraded state)
+    // ── Global Error Catchers ───────────────────────────────────────────────
+    process.on("unhandledRejection", (reason: unknown, promise: Promise<unknown>) => {
+      logger.error("🚨 [Unhandled Rejection] at promise:", promise, "reason:", reason);
     });
 
-    process.on("uncaughtException", (err) => {
-      logger.error("Uncaught Exception:", err);
+    process.on("uncaughtException", (error: Error) => {
+      logger.error("🚨 [Uncaught Exception] Critical application error:", error);
       gracefulShutdown("uncaughtException");
     });
+
   } catch (error) {
-    logger.error("💥 Failed to start server:", error);
+    logger.error("💥 [Fatal Error] Failed to boot server:", error);
     process.exit(1);
   }
 };
 
 startServer();
+
