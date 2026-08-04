@@ -4,8 +4,8 @@
  * Includes methods for creating, updating, and querying custom roles.
  */
 import mongoose from "mongoose";
-import { Role, RoleDocument } from "../models/Role";
-import { Permission, PermissionDocument } from "../models/Permission";
+import { Role, RoleDocument, IRole } from "../models/Role";
+import { Permission, PermissionDocument, IPermission } from "../models/Permission";
 import { User } from "../models/User";
 import { logActivity } from "../models/ActivityLog";
 import { ApiError } from "../utils/ApiError";
@@ -19,6 +19,31 @@ import {
   AssignRoleInput,
 } from "../validators/role.validator";
 
+// ─── Interfaces ───────────────────────────────────────────────────────────────
+
+export interface RoleWithCount extends IRole {
+  permissionCount: number;
+}
+
+export interface GroupedRolePermissions {
+  role: {
+    _id: mongoose.Types.ObjectId;
+    name: string;
+    displayName: string;
+    isSystem: boolean;
+  };
+  permissions: Record<string, IPermission[]>;
+  totalCount: number;
+}
+
+export interface ListPermissionsResult {
+  grouped: Record<
+    string,
+    Array<{ name: string; action: string; description: string; isSystem: boolean }>
+  >;
+  totalCount: number;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const validatePermissionsExist = async (permissions: string[]): Promise<void> => {
@@ -26,7 +51,7 @@ const validatePermissionsExist = async (permissions: string[]): Promise<void> =>
 
   const existing = await Permission.find({ name: { $in: permissions } })
     .select("name")
-    .lean();
+    .lean<Array<{ name: string }>>();
 
   const existingNames = existing.map((p) => p.name);
   const invalid = permissions.filter((p) => !existingNames.includes(p));
@@ -59,8 +84,8 @@ const getRoleById = async (id: string): Promise<RoleDocument> => {
  * Get all roles.
  * Returns a list of all roles (built-in and custom) configured in the system.
  */
-export const listRoles = async () => {
-  const roles = await Role.find({}).sort({ isSystem: -1, name: 1 }).lean();
+export const listRoles = async (): Promise<RoleWithCount[]> => {
+  const roles = await Role.find({}).sort({ isSystem: -1, name: 1 }).lean<IRole[]>();
   return roles.map((r) => ({
     ...r,
     permissionCount: r.permissions.length,
@@ -74,15 +99,17 @@ export const listRoles = async () => {
  * 
  * @param id - Role ID
  */
-export const getRolePermissions = async (id: string) => {
+export const getRolePermissions = async (
+  id: string
+): Promise<GroupedRolePermissions> => {
   const role = await getRoleById(id);
 
   const permissions = await Permission.find({ name: { $in: role.permissions } })
     .sort({ resource: 1, action: 1 })
-    .lean();
+    .lean<IPermission[]>();
 
   // Group by resource for a cleaner API response
-  const grouped = permissions.reduce<Record<string, PermissionDocument[]>>(
+  const grouped = permissions.reduce<Record<string, IPermission[]>>(
     (acc, p) => {
       if (!acc[p.resource]) acc[p.resource] = [];
       acc[p.resource].push(p);
@@ -214,7 +241,7 @@ export const updateRolePermissions = async (
 /**
  * List all permissions, grouped by resource.
  */
-export const listPermissions = async () => {
+export const listPermissions = async (): Promise<ListPermissionsResult> => {
   const permissions = await Permission.find({})
     .sort({ resource: 1, action: 1 })
     .lean();
