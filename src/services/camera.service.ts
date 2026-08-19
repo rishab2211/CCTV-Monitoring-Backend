@@ -6,6 +6,7 @@
 import mongoose from "mongoose";
 import { Camera, CameraDocument } from "../models/Camera";
 import { User } from "../models/User";
+import { Franchise } from "../models/Franchise";
 import { logActivity } from "../models/ActivityLog";
 import { ApiError } from "../utils/ApiError";
 import { parsePaginationParams } from "../utils/pagination";
@@ -45,11 +46,11 @@ export const validateCameraAccess = async (
       return;
     }
     // 2. Camera owned by a customer registered under this franchise
-    if (camera.customerId) {
+    if (camera.customerId && user.franchiseId) {
       const customer = await User.findOne({
         _id: camera.customerId,
         role: "customer",
-        "customerDetails.assignedFranchise": new mongoose.Types.ObjectId(user.franchiseId!),
+        "customerDetails.assignedFranchise": new mongoose.Types.ObjectId(user.franchiseId),
         isDeleted: false,
       }).select("_id");
       
@@ -342,11 +343,17 @@ export const assignCamera = async (
     camera.customerId = undefined;
   }
 
-  // Validate Franchise exists and is a Franchise
+  // Validate Franchise exists
   if (input.franchiseId) {
-    const franchise = await User.findOne({ _id: input.franchiseId, role: "franchise", isDeleted: false });
-    if (!franchise) throw ApiError.notFound("Franchise user");
-    camera.franchiseId = franchise._id;
+    const franchise = await Franchise.findById(input.franchiseId);
+    if (!franchise) {
+      const franchiseUser = await User.findOne({ _id: input.franchiseId, role: { $in: ["franchise", "franchise_admin"] }, isDeleted: false });
+      if (!franchiseUser) throw ApiError.notFound("Franchise not found");
+      const ownedFranchise = await Franchise.findOne({ ownerId: franchiseUser._id });
+      camera.franchiseId = ownedFranchise ? (ownedFranchise._id as any) : (franchiseUser.franchiseDetails?.franchiseRef || franchiseUser._id);
+    } else {
+      camera.franchiseId = franchise._id as any;
+    }
   } else if (input.franchiseId === null) {
     camera.franchiseId = undefined;
   }
@@ -581,11 +588,14 @@ export const getCustomerCameras = async (
   };
 
   // Franchise mapping check
-  if (user.role === "franchise") {
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) {
+      throw ApiError.forbidden("No franchise associated with your account");
+    }
     const customer = await User.findOne({
       _id: customerId,
       role: "customer",
-      "customerDetails.assignedFranchise": new mongoose.Types.ObjectId(user.userId),
+      "customerDetails.assignedFranchise": new mongoose.Types.ObjectId(user.franchiseId),
       isDeleted: false,
     });
     if (!customer) {

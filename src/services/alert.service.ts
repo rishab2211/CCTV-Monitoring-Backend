@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { Alert } from "../models/Alert";
 import { Camera } from "../models/Camera";
 import { ApiError } from "../utils/ApiError";
+import { parsePaginationParams } from "../utils/pagination";
 import { JwtAccessPayload } from "../types";
 import { validateCameraAccess } from "./camera.service";
 import { logActivity } from "../models/ActivityLog";
@@ -60,7 +61,8 @@ export const createAlert = async (data: any, user: JwtAccessPayload) => {
  * @param user - The requesting user
  */
 export const listAlerts = async (query: any, user: JwtAccessPayload) => {
-  const { page, limit, cameraId, status, priority, type } = query;
+  const { page, limit } = parsePaginationParams(query);
+  const { cameraId, status, priority, type } = query;
   const filter: any = {};
 
   if (cameraId) {
@@ -117,7 +119,8 @@ export const getAlertDetails = async (id: string, user: JwtAccessPayload) => {
     
   if (!alert) throw ApiError.notFound("Alert");
 
-  const camera = await Camera.findById(alert.cameraId).lean();
+  const rawCameraId = (alert.cameraId as any)?._id || alert.cameraId;
+  const camera = await Camera.findById(rawCameraId).lean();
   if (camera) {
     await validateCameraAccess(camera as any, user);
   }
@@ -359,6 +362,7 @@ export const updateAlertRules = async (
   }
 
   camera.settings.alertRules = { ...(camera.settings.alertRules || {}), ...rules };
+  camera.markModified("settings.alertRules");
   await camera.save();
 
   return camera.settings.alertRules;

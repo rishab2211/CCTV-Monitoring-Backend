@@ -9,6 +9,7 @@ import { RecordingSchedule } from "../models/RecordingSchedule";
 import { SystemSetting } from "../models/SystemSetting";
 import { Camera } from "../models/Camera";
 import { ApiError } from "../utils/ApiError";
+import { parsePaginationParams } from "../utils/pagination";
 import { JwtAccessPayload } from "../types";
 import { validateCameraAccess } from "./camera.service";
 import { logActivity } from "../models/ActivityLog";
@@ -43,7 +44,8 @@ export const createRecordingChunk = async (data: any) => {
  * @param user - The requesting user
  */
 export const listRecordings = async (query: any, user: JwtAccessPayload) => {
-  const { page, limit, cameraId, type, status, startDate, endDate } = query;
+  const { page, limit } = parsePaginationParams(query);
+  const { cameraId, type, status, startDate, endDate } = query;
   const filter: any = {};
 
   if (cameraId) {
@@ -99,7 +101,8 @@ export const getRecordingDetails = async (id: string, user: JwtAccessPayload) =>
   const recording = await Recording.findById(id).populate("cameraId", "name serialNumber operatorIds customerId");
   if (!recording) throw ApiError.notFound("Recording");
 
-  const camera = await Camera.findById(recording.cameraId).lean();
+  const rawCameraId = (recording.cameraId as any)?._id || recording.cameraId;
+  const camera = await Camera.findById(rawCameraId).lean();
   if (camera) {
     await validateCameraAccess(camera as any, user);
   }
@@ -117,6 +120,13 @@ export const getRecordingDetails = async (id: string, user: JwtAccessPayload) =>
 export const deleteRecording = async (id: string, user: JwtAccessPayload) => {
   const recording = await Recording.findById(id);
   if (!recording) throw ApiError.notFound("Recording");
+
+  const camera = await Camera.findById(recording.cameraId);
+  if (camera) {
+    await validateCameraAccess(camera, user);
+  } else if (user.role !== "super_admin" && user.role !== "admin") {
+    throw ApiError.forbidden("Cannot delete recording for unverified camera");
+  }
 
   // Soft delete in DB
   recording.status = "deleted";
@@ -265,4 +275,28 @@ export const getSchedule = async (cameraId: string, user: JwtAccessPayload) => {
 
   const schedule = await RecordingSchedule.findOne({ cameraId });
   return schedule || { cameraId, rules: [] }; // Return empty schedule if none exists
+};
+
+/**
+ * Delete Schedule
+ * Removes automated recording schedules for a camera.
+ * 
+ * @param cameraId - The target camera ID
+ * @param user - The requesting user
+ */
+export const deleteSchedule = async (cameraId: string, user: JwtAccessPayload) => {
+  const camera = await Camera.findOne({ _id: cameraId, isDeleted: false });
+  if (!camera) throw ApiError.notFound("Camera");
+  await validateCameraAccess(camera, user);
+
+  await RecordingSchedule.findOneAndDelete({ cameraId });
+
+  logActivity({
+    userId: new mongoose.Types.ObjectId(user.userId),
+    action: "SCHEDULE_UPDATED",
+    description: `Recording schedule deleted for camera ${camera.name}`,
+    metadata: { cameraId },
+  });
+
+  return { message: "Schedule deleted successfully" };
 };

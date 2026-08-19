@@ -8,6 +8,7 @@ import { SosAlert } from "../models/SosAlert";
 import { Camera } from "../models/Camera";
 import { User } from "../models/User";
 import { ApiError } from "../utils/ApiError";
+import { parsePaginationParams } from "../utils/pagination";
 import { JwtAccessPayload, SosStatus } from "../types";
 import { socketService } from "./socket.service";
 import * as notificationService from "./notification.service";
@@ -96,7 +97,8 @@ export const triggerSos = async (
  * @returns An object containing the populated SOS alerts array and pagination metadata
  */
 export const listSosAlerts = async (query: any, user: JwtAccessPayload) => {
-  const { page, limit, status, cameraId } = query;
+  const { page, limit } = parsePaginationParams(query);
+  const { status, cameraId } = query;
   const filter: any = {};
 
   if (status) filter.status = status;
@@ -330,8 +332,19 @@ export const addSosNote = async (id: string, text: string, user: JwtAccessPayloa
  * @returns An array of activity log documents
  */
 export const getSosTimeline = async (id: string, user: JwtAccessPayload) => {
+  const sos = await SosAlert.findById(id);
+  if (!sos) throw ApiError.notFound("SOS Alert not found");
+
+  if (user.role === "customer" && sos.triggeredBy.toString() !== user.userId) {
+    throw ApiError.forbidden("Access denied");
+  }
+
+  const idQuery = mongoose.Types.ObjectId.isValid(id)
+    ? { $in: [id, new mongoose.Types.ObjectId(id)] }
+    : id;
+
   const timeline = await mongoose.connection.collection("activitylogs")
-    .find({ "metadata.sosId": new mongoose.Types.ObjectId(id) })
+    .find({ "metadata.sosId": idQuery })
     .sort({ createdAt: 1 })
     .toArray();
 

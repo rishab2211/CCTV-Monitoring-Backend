@@ -21,12 +21,17 @@ const cameraSettingsSchema = z.object({
   recordingRetentionDays: z.number().int().min(1).max(90).default(7).optional(),
 }).optional();
 
+const rtspUrlSchema = z
+  .string()
+  .trim()
+  .regex(/^(rtsp|rtsps|http|https):\/\/[^\s]+$/, "Must be a valid RTSP or HTTP(S) stream URL");
+
 // ─── Create Camera Validator ──────────────────────────────────────────────────
 
 export const createCameraSchema = z.object({
   name: z.string().min(2).max(100).trim(),
   serialNumber: z.string().min(2).max(100).trim(),
-  rtspUrl: z.string().url("Must be a valid RTSP/HTTP URL").trim(),
+  rtspUrl: rtspUrlSchema,
   location: cameraLocationSchema,
   settings: cameraSettingsSchema,
   qrCode: z.string().max(100).optional(),
@@ -38,7 +43,7 @@ export type CreateCameraInput = z.infer<typeof createCameraSchema>;
 
 export const updateCameraSchema = z.object({
   name: z.string().min(2).max(100).trim().optional(),
-  rtspUrl: z.string().url("Must be a valid RTSP/HTTP URL").trim().optional(),
+  rtspUrl: rtspUrlSchema.optional(),
   location: cameraLocationSchema,
   settings: cameraSettingsSchema,
 });

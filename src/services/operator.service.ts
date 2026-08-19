@@ -80,13 +80,12 @@ export const clockOut = async (handoverNotes: string | undefined, user: JwtAcces
   // Calculate Metrics for the duration of this shift
   const [incidentsResolved, sosAcknowledged] = await Promise.all([
     Incident.countDocuments({ 
-      resolvedBy: user.userId, 
-      status: "resolved",
-      resolvedAt: { $gte: activeShift.startTime, $lte: endTime } 
+      assignedTo: user.userId, 
+      status: { $in: ["resolved", "closed"] },
+      updatedAt: { $gte: activeShift.startTime, $lte: endTime } 
     }),
     SosAlert.countDocuments({
       acknowledgedBy: user.userId,
-      status: "acknowledged",
       acknowledgedAt: { $gte: activeShift.startTime, $lte: endTime }
     })
   ]);
@@ -352,7 +351,7 @@ export const getPendingAlerts = async (user: JwtAccessPayload) => {
 
   // Import Alert dynamically to avoid circular dep; use require-style import from model path
   const { Alert } = await import("../models/Alert");
-  const alerts = await Alert.find({ cameraId: { $in: assignedCameraIds }, status: "pending" })
+  const alerts = await Alert.find({ cameraId: { $in: assignedCameraIds }, status: "new" })
     .populate("cameraId", "name serialNumber location")
     .sort({ createdAt: -1 })
     .lean();
@@ -402,7 +401,7 @@ export const getOperatorCalls = async (user: JwtAccessPayload) => {
   const { TalkbackSession } = await import("../models/TalkbackSession");
   const calls = await TalkbackSession.find({ cameraId: { $in: assignedCameraIds } })
     .populate("cameraId", "name serialNumber location")
-    .populate("initiatedBy", "name role")
+    .populate("operatorId", "name role")
     .sort({ startedAt: -1 })
     .limit(50)
     .lean();

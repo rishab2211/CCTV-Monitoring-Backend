@@ -335,7 +335,7 @@ export const refundPayment = async (id: string, reason: string = "", user: JwtAc
 
   logActivity({
     userId: new mongoose.Types.ObjectId(user.userId),
-    action: "SYSTEM_CONFIG_UPDATED",
+    action: "PAYMENT_REFUNDED",
     description: `Refunded payment ${payment._id}. Reason: ${reason}`,
   });
 

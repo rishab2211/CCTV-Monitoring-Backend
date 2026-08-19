@@ -28,6 +28,18 @@ const router = Router();
 // ─── Module 1: Auth ───────────────────────────────────────────────────────────
 router.use("/auth", authRoutes);
 
+// ─── Module 14: Operator Module ────────────────────────────────
+// /operator (singular) — self-service panel for the logged-in operator
+router.use("/operator", operatorPanelRoutes); 
+// /operators (plural) — admin-facing CRUD: shift list, camera assignment, performance
+router.use("/operators", operatorRoutes);
+
+// ─── Module 15: Customer Module ────────────────────────────────
+// /customer (singular) — spec-correct self-service panel for the logged-in customer
+router.use("/customer", customerRoutes);
+// /customers (plural) — legacy alias kept for backwards compatibility
+router.use("/customers", customerRoutes);
+
 // ─── Module 2: User Management ───────────────────────────────────────────────
 router.use("/users", userRoutes);
 router.use("/admins", adminRoutes);
@@ -69,18 +81,6 @@ router.use("/franchises", franchiseRoutes);
 // Mounted at /installations per the project spec; /jobs is kept as a legacy alias
 router.use("/installations", jobRoutes);
 router.use("/jobs", jobRoutes); // legacy alias — both resolve to the same router
-
-// ─── Module 14: Operator Module ────────────────────────────────
-// /operators (plural) — admin-facing CRUD: shift list, camera assignment, performance
-router.use("/operators", operatorRoutes);
-// /operator (singular) — self-service panel for the logged-in operator
-router.use("/operator", operatorPanelRoutes); 
-
-// ─── Module 15: Customer Module ────────────────────────────────
-// /customer (singular) — spec-correct self-service panel for the logged-in customer
-router.use("/customer", customerRoutes);
-// /customers (plural) — legacy alias kept for backwards compatibility
-router.use("/customers", customerRoutes);
 
 // ─── Module 16: Payment & Subscription Module ──────────────────
 router.use("/plans", planRouter);

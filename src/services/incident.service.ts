@@ -436,8 +436,12 @@ export const getIncidentTimeline = async (id: string, user: JwtAccessPayload) =>
     throw ApiError.forbidden("Access denied");
   }
 
+  const idQuery = mongoose.Types.ObjectId.isValid(id)
+    ? { $in: [id, new mongoose.Types.ObjectId(id)] }
+    : id;
+
   const timeline = await mongoose.connection.collection("activitylogs")
-    .find({ "metadata.incidentId": new mongoose.Types.ObjectId(id) })
+    .find({ "metadata.incidentId": idQuery })
     .sort({ createdAt: 1 })
     .toArray();
 

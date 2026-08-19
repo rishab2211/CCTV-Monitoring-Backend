@@ -207,8 +207,20 @@ export const getStreamToken = async (
 
   const sessionId = uuidv4();
   const token = signStreamToken(camera._id.toString(), user.userId, sessionId, pathName);
+  const tokenHash = hashToken(token);
+
+  await StreamSession.create({
+    sessionId,
+    cameraId: camera._id,
+    userId: user.userId === "system" ? camera._id : new mongoose.Types.ObjectId(user.userId),
+    role: user.role,
+    startedAt: new Date(),
+    isActive: true,
+    tokenHash,
+  });
 
   return {
+    sessionId,
     streamToken: token,
     pathName,
     webrtcUrl: `${env.MEDIAMTX_URL}/${pathName}`,

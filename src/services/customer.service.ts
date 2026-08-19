@@ -5,6 +5,7 @@
 import mongoose from "mongoose";
 import { User } from "../models/User";
 import { Subscription } from "../models/Subscription";
+import { Plan } from "../models/Plan";
 import { BillingInvoice } from "../models/BillingInvoice";
 import { Camera } from "../models/Camera";
 import { Incident } from "../models/Incident";
@@ -41,7 +42,19 @@ export const subscribeToPlan = async (planName: string, durationMonths: number, 
     throw ApiError.badRequest("You already have an active subscription. Please cancel it before changing plans.");
   }
 
-  const pricePerMonth = PLAN_PRICES[planName] || 9.99;
+  let plan = await Plan.findOne({ name: planName });
+  if (!plan) {
+    const pricePerMonth = PLAN_PRICES[planName] || 9.99;
+    plan = await Plan.create({
+      name: planName,
+      price: pricePerMonth,
+      durationMonths: 1,
+      isActive: true,
+      features: [`${planName} package access`],
+    });
+  }
+
+  const pricePerMonth = plan.price || PLAN_PRICES[planName] || 9.99;
   const totalAmount = pricePerMonth * durationMonths;
 
   const startDate = new Date();
@@ -50,7 +63,8 @@ export const subscribeToPlan = async (planName: string, durationMonths: number, 
 
   const subscription = await Subscription.create({
     customerId: customer._id,
-    planName,
+    planId: plan._id,
+    planName: plan.name,
     status: "active",
     startDate,
     endDate,
@@ -178,7 +192,7 @@ export const getDashboard = async (user: JwtAccessPayload) => {
     }).lean(),
 
     // 2. Get cameras owned by this customer
-    Camera.find({ ownerId: user.userId, isDeleted: false })
+    Camera.find({ customerId: user.userId, isDeleted: false })
       .select("name location status streamUrl")
       .lean(),
 

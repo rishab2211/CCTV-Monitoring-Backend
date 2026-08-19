@@ -85,11 +85,11 @@ export const getAlertAnalytics = async (user: JwtAccessPayload) => {
     }
   ]);
 
-  const severityStats = await Alert.aggregate([
+  const priorityStats = await Alert.aggregate([
     matchStage,
     {
       $group: {
-        _id: "$severity",
+        _id: "$priority",
         count: { $sum: 1 }
       }
     }
@@ -97,7 +97,7 @@ export const getAlertAnalytics = async (user: JwtAccessPayload) => {
 
   return {
     statusBreakdown: stats,
-    severityBreakdown: severityStats,
+    priorityBreakdown: priorityStats,
     generatedAt: new Date()
   };
 };
@@ -175,7 +175,7 @@ export const getOperatorAnalytics = async (user: JwtAccessPayload) => {
  */
 export const getRevenueAnalytics = async (user: JwtAccessPayload) => {
   const franchiseId = ensureAdminOrFranchise(user);
-  const matchStage: any = { status: "paid" };
+  const matchStage: any = { status: "paid", paidAt: { $ne: null } };
   if (franchiseId) matchStage.franchiseId = new mongoose.Types.ObjectId(franchiseId);
 
   // Group by month

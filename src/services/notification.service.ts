@@ -110,7 +110,7 @@ export const sendNotification = async (
     });
 
     // Emit live to dashboard
-    socketService.emitGlobal(`notification:${userId}`, notification);
+    socketService.emitToUser(userId, "notification", notification);
   }
 
   // 2. Push Notification (FCM)

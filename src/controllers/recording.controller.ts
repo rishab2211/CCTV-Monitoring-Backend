@@ -123,8 +123,8 @@ export const getSchedule = catchAsync(async (req: Request, res: Response) => {
  */
 export const deleteSchedule = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
-  const result = await recordingService.getSchedule(req.params.cameraId, req.user);
-  res.status(200).json(new ApiResponse(200, result));
+  const result = await recordingService.deleteSchedule(req.params.cameraId, req.user);
+  res.status(200).json(new ApiResponse(200, result, "Schedule deleted"));
 });
 
 export const generateDownloadLink = catchAsync(async (req: Request, res: Response) => {
