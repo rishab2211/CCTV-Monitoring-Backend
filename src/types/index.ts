@@ -315,6 +315,7 @@ export interface IRecording {
   publicId?: string;
   sizeBytes: number;
   durationSeconds: number;
+  expiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
