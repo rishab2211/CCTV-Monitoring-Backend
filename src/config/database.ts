@@ -34,20 +34,8 @@ const connectDB = async (): Promise<void> => {
   } catch (error) {
     isConnected = false;
     isReconnecting = false;
-    retryCount++;
-
-    logger.error(
-      `❌ MongoDB connection failed (attempt ${retryCount}/${MAX_RETRIES}):`,
-      error
-    );
-
-    if (retryCount < MAX_RETRIES) {
-      logger.info(`⏳ Retrying in ${RETRY_DELAY_MS / 1000}s...`);
-      setTimeout(connectDB, RETRY_DELAY_MS);
-    } else {
-      logger.error("💥 Max retries reached. Exiting...");
-      process.exit(1);
-    }
+    logger.error("❌ MongoDB connection failed:", error);
+    throw error;
   }
 };
 

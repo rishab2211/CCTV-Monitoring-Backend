@@ -28,6 +28,7 @@ const SYSTEM_PERMISSIONS = [
   { name: "recordings:read",    resource: "recordings",    action: "read",         description: "View recording list and metadata" },
   { name: "recordings:download",resource: "recordings",    action: "download",     description: "Generate recording download links" },
   { name: "recordings:delete",  resource: "recordings",    action: "delete",       description: "Delete recordings" },
+  { name: "recordings:manage",  resource: "recordings",    action: "manage",       description: "Manage recording retention, schedules, and storage" },
 
   // Alerts
   { name: "alerts:read",        resource: "alerts",        action: "read",         description: "View alerts and alert history" },
@@ -95,7 +96,7 @@ const SYSTEM_ROLES = [
       "cameras:read", "cameras:write", "cameras:delete", "cameras:assign",
       "cameras:restart", "cameras:configure",
       "streams:view",
-      "recordings:read", "recordings:download", "recordings:delete",
+      "recordings:read", "recordings:download", "recordings:delete", "recordings:manage",
       "alerts:read", "alerts:write", "alerts:resolve",
       "sos:read",
       "incidents:read", "incidents:write",
@@ -133,7 +134,7 @@ const SYSTEM_ROLES = [
       "users:read", "users:write", "users:delete",
       "cameras:read", "cameras:write", "cameras:assign", "cameras:configure", "cameras:restart",
       "streams:view",
-      "recordings:read", "recordings:download", "recordings:delete",
+      "recordings:read", "recordings:download", "recordings:delete", "recordings:manage",
       "alerts:read", "alerts:write", "alerts:resolve",
       "sos:read",
       "incidents:read", "incidents:write",
@@ -164,7 +165,7 @@ const SYSTEM_ROLES = [
     displayName: "Field Technician",
     description: "Installs and maintains cameras on-site",
     permissions: [
-      "cameras:read", "cameras:write",
+      "cameras:read", "cameras:write", "cameras:configure",
       "installations:read", "installations:write",
       "notifications:read",
     ],

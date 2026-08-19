@@ -32,6 +32,48 @@ import { logger } from "../utils/logger";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
+ * Resolves the franchiseId for a user and verifies that the franchise is not suspended.
+ */
+const resolveUserFranchise = async (user: UserDocument): Promise<string | undefined> => {
+  let resolvedFranchiseId: string | undefined;
+  let franchiseIdToCheck: unknown = null;
+
+  if (user.role === "franchise") {
+    const ownedFranchise = await Franchise.findOne({ ownerId: user._id });
+    if (ownedFranchise) {
+      if (ownedFranchise.status === "suspended") {
+        throw ApiError.forbidden("Your franchise account is suspended. Please contact the administrator.");
+      }
+      resolvedFranchiseId = ownedFranchise._id.toString();
+    }
+  } else if (user.role === "franchise_admin") {
+    const franchiseRef = user.franchiseDetails?.franchiseRef;
+    if (franchiseRef) {
+      franchiseIdToCheck = franchiseRef;
+      resolvedFranchiseId = franchiseRef.toString();
+    }
+  } else if (user.role === "operator" && user.operatorDetails?.assignedFranchise) {
+    franchiseIdToCheck = user.operatorDetails.assignedFranchise;
+    resolvedFranchiseId = user.operatorDetails.assignedFranchise.toString();
+  } else if (user.role === "technician" && user.technicianDetails?.assignedFranchise) {
+    franchiseIdToCheck = user.technicianDetails.assignedFranchise;
+    resolvedFranchiseId = user.technicianDetails.assignedFranchise.toString();
+  } else if (user.role === "customer" && user.customerDetails?.assignedFranchise) {
+    franchiseIdToCheck = user.customerDetails.assignedFranchise;
+    resolvedFranchiseId = user.customerDetails.assignedFranchise.toString();
+  }
+
+  if (franchiseIdToCheck) {
+    const franchise = await Franchise.findById(franchiseIdToCheck);
+    if (franchise && franchise.status === "suspended") {
+      throw ApiError.forbidden("Your assigned franchise is suspended. Please contact support.");
+    }
+  }
+
+  return resolvedFranchiseId;
+};
+
+/**
  * Parses device information from a User-Agent string.
  */
 const parseDeviceInfo = (userAgent: string = "", ipAddress: string = ""): IDeviceInfo => {
@@ -187,44 +229,7 @@ export const login = async (
   }
 
   // ── Resolve franchiseId & check franchise suspension ─────────────────────────
-  let resolvedFranchiseId: string | undefined;
-  let franchiseIdToCheck: unknown = null;
-
-  if (user.role === "franchise") {
-    // Franchise owner — find the Franchise document they own
-    const ownedFranchise = await Franchise.findOne({ ownerId: user._id });
-    if (ownedFranchise) {
-      if (ownedFranchise.status === "suspended") {
-        throw ApiError.forbidden("Your franchise account is suspended. Please contact the administrator.");
-      }
-      resolvedFranchiseId = ownedFranchise._id.toString();
-    }
-  } else if (user.role === "franchise_admin") {
-    // Franchise admin — franchiseRef stored on their franchiseDetails sub-doc
-    const franchiseRef = user.franchiseDetails?.franchiseRef;
-    if (franchiseRef) {
-      franchiseIdToCheck = franchiseRef;
-      resolvedFranchiseId = franchiseRef.toString();
-    }
-  } else if (user.role === "operator" && user.operatorDetails?.assignedFranchise) {
-    franchiseIdToCheck = user.operatorDetails.assignedFranchise;
-    resolvedFranchiseId = user.operatorDetails.assignedFranchise.toString();
-  } else if (user.role === "technician" && user.technicianDetails?.assignedFranchise) {
-    franchiseIdToCheck = user.technicianDetails.assignedFranchise;
-    resolvedFranchiseId = user.technicianDetails.assignedFranchise.toString();
-  } else if (user.role === "customer" && user.customerDetails?.assignedFranchise) {
-    franchiseIdToCheck = user.customerDetails.assignedFranchise;
-    resolvedFranchiseId = user.customerDetails.assignedFranchise.toString();
-  }
-  // super_admin and admin have no franchise scope — resolvedFranchiseId stays undefined
-
-  // Check if the assigned/owning franchise is suspended
-  if (franchiseIdToCheck) {
-    const franchise = await Franchise.findById(franchiseIdToCheck);
-    if (franchise && franchise.status === "suspended") {
-      throw ApiError.forbidden("Your assigned franchise is suspended. Please contact support.");
-    }
-  }
+  const resolvedFranchiseId = await resolveUserFranchise(user);
 
   // Verify password
   const isPasswordValid = await user.comparePassword(input.password);
@@ -297,13 +302,16 @@ export const refreshAccessToken = async (
     throw ApiError.unauthorized("User not found or deactivated");
   }
 
+  // Resolve franchiseId for the user
+  const resolvedFranchiseId = await resolveUserFranchise(user);
+
   // Revoke the used token (rotation)
   storedToken.isRevoked = true;
   await storedToken.save();
 
-  // Issue new token pair
+  // Issue new token pair (preserving franchiseId)
   const parsedDevice = parseDeviceInfo(userAgent, ipAddress);
-  const tokens = await issueTokens(user, parsedDevice);
+  const tokens = await issueTokens(user, parsedDevice, resolvedFranchiseId);
 
   // Deactivate old session
   await DeviceSession.findOneAndUpdate(
