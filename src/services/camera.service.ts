@@ -622,6 +622,21 @@ export const getOperatorCameras = async (
     throw ApiError.forbidden("You can only access your own assigned cameras");
   }
 
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId) {
+      throw ApiError.forbidden("No franchise associated with your account");
+    }
+    const operator = await User.findOne({
+      _id: operatorId,
+      role: "operator",
+      "operatorDetails.assignedFranchise": new mongoose.Types.ObjectId(user.franchiseId),
+      isDeleted: false,
+    });
+    if (!operator) {
+      throw ApiError.forbidden("Operator is not registered under your franchise territory");
+    }
+  }
+
   const cameras = await Camera.find({
     operatorIds: new mongoose.Types.ObjectId(operatorId),
     isDeleted: false,
