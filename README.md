@@ -624,9 +624,11 @@ curl http://localhost:5000/api/health
 
 ---
 
-## 🧪 Testing with Postman
+## 🧪 Testing Guide & Postman Collection
 
-A comprehensive **automated Postman collection** covering all 204 endpoints is available.
+For the full, exhaustive testing guide covering all 20 modules, request/response schemas, edge cases, and multi-tenant security verification, see **[TESTING_GUIDE.md](./TESTING_GUIDE.md)**.
+
+A comprehensive **automated Postman collection** covering all 204 endpoints is also available.
 
 ### Importing
 
