@@ -69,7 +69,7 @@ const validatePermissionsExist = async (permissions: string[]): Promise<void> =>
  * 
  * @param id - Role ID
  */
-const getRoleById = async (id: string): Promise<RoleDocument> => {
+export const getRoleById = async (id: string): Promise<RoleDocument> => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw ApiError.badRequest("Invalid role ID format");
   }

@@ -76,11 +76,12 @@ export const getLiveView = catchAsync(async (req: Request, res: Response) => {
 
 export const getPlayback = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
-  const { startTime, endTime } = req.query as { startTime?: string, endTime?: string };
-  if (!startTime || !endTime) {
-    throw ApiError.badRequest("startTime and endTime query params are required");
+  const start = (req.query.startTime || req.query.start) as string;
+  const end = (req.query.endTime || req.query.end) as string;
+  if (!start || !end) {
+    throw ApiError.badRequest("startTime (or start) and endTime (or end) query params are required");
   }
-  const result = await recordingService.getPlaybackChunks(req.params.id, startTime, endTime, req.user);
+  const result = await recordingService.getPlaybackChunks(req.params.id, start, end, req.user);
   res.status(200).json(new ApiResponse(200, result, "Playback URL generated"));
 });
 

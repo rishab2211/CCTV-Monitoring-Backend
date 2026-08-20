@@ -16,6 +16,15 @@ export const listRoles = catchAsync(async (_req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/v1/roles/:id
+ * Get single role by ID.
+ */
+export const getRole = catchAsync(async (req: Request, res: Response) => {
+  const role = await roleService.getRoleById(req.params.id);
+  res.status(200).json(new ApiResponse(200, { role }));
+});
+
+/**
  * POST /api/v1/roles
  * Create a new custom role.
  */

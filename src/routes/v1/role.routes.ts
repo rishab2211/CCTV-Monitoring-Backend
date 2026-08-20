@@ -78,6 +78,15 @@ router.put(
   roleController.updateRolePermissions
 );
 
+/** GET /api/v1/roles/:id */
+router.get(
+  "/roles/:id",
+  authenticate,
+  authorize("super_admin"),
+  validate(roleIdParamSchema, "params"),
+  roleController.getRole
+);
+
 /** PUT /api/v1/roles/:id */
 router.put(
   "/roles/:id",

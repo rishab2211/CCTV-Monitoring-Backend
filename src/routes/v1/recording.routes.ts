@@ -57,12 +57,28 @@ router.post(
   recordingController.updateSchedule
 );
 
+router.put(
+  "/:cameraId/schedule",
+  authenticate,
+  permit("cameras:configure"),
+  validate(cameraIdParamSchema, "params"),
+  recordingController.updateSchedule
+);
+
 router.get(
   "/:cameraId/schedule",
   authenticate,
   permit("recordings:read"),
   validate(cameraIdParamSchema, "params"),
   recordingController.getSchedule
+);
+
+router.delete(
+  "/:cameraId/schedule",
+  authenticate,
+  permit("cameras:configure"),
+  validate(cameraIdParamSchema, "params"),
+  recordingController.deleteSchedule
 );
 
 // ─── Camera-Specific Playback & Timeline ──────────────────────────────────────

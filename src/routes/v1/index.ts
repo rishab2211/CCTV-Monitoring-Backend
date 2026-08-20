@@ -35,10 +35,8 @@ router.use("/operator", operatorPanelRoutes);
 router.use("/operators", operatorRoutes);
 
 // ─── Module 15: Customer Module ────────────────────────────────
-// /customer (singular) — spec-correct self-service panel for the logged-in customer
+// /customer (singular) — self-service panel for the logged-in customer
 router.use("/customer", customerRoutes);
-// /customers (plural) — legacy alias kept for backwards compatibility
-router.use("/customers", customerRoutes);
 
 // ─── Module 2: User Management ───────────────────────────────────────────────
 router.use("/users", userRoutes);
