@@ -26,10 +26,17 @@ export const listRecordingsQuerySchema = paginationSchema.extend({
   endDate: z.string().datetime().optional(),
 });
 
-export const timeRangeQuerySchema = z.object({
-  start: z.string().datetime(),
-  end: z.string().datetime(),
-});
+export const timeRangeQuerySchema = z
+  .object({
+    start: z.string().optional(),
+    end: z.string().optional(),
+    startTime: z.string().optional(),
+    endTime: z.string().optional(),
+  })
+  .refine(
+    (data) => Boolean((data.start || data.startTime) && (data.end || data.endTime)),
+    { message: "Both start (or startTime) and end (or endTime) query parameters are required" }
+  );
 
 export const dateQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format must be YYYY-MM-DD"), // YYYY-MM-DD

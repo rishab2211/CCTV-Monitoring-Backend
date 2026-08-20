@@ -59,7 +59,11 @@ export const deleteRecording = catchAsync(async (req: Request, res: Response) =>
  */
 export const getPlaybackChunks = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
-  const { start, end } = req.query as { start: string; end: string };
+  const start = (req.query.start || req.query.startTime) as string;
+  const end = (req.query.end || req.query.endTime) as string;
+  if (!start || !end) {
+    throw ApiError.badRequest("start (or startTime) and end (or endTime) query params are required");
+  }
   const chunks = await recordingService.getPlaybackChunks(req.params.cameraId, start, end, req.user);
   res.status(200).json(new ApiResponse(200, { chunks, count: chunks.length }));
 });
