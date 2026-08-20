@@ -401,6 +401,11 @@ export const transferCamera = async (
   const camera = await Camera.findOne({ _id: id, isDeleted: false });
   if (!camera) throw ApiError.notFound("Camera");
 
+  // Prevent redundant self-transfer if camera is already owned by this customer
+  if (camera.customerId && camera.customerId.toString() === customerId) {
+    throw ApiError.badRequest("Camera is already assigned to this customer");
+  }
+
   const newCustomer = await User.findOne({ _id: customerId, role: "customer", isDeleted: false });
   if (!newCustomer) throw ApiError.notFound("Target customer user");
 
