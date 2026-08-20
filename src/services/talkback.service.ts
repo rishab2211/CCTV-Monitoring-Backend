@@ -106,14 +106,16 @@ export const stopSession = async (cameraId: string, user: JwtAccessPayload) => {
   if (!camera) throw ApiError.notFound("Camera");
   await validateCameraAccess(camera, user);
 
-  const session = await TalkbackSession.findOne({
-    cameraId,
-    operatorId: user.userId,
-    status: "active",
-  });
+  const sessionQuery: any = { cameraId, status: "active" };
+  const isAdminOrFranchise = ["super_admin", "admin", "franchise", "franchise_admin"].includes(user.role);
+  if (!isAdminOrFranchise) {
+    sessionQuery.operatorId = user.userId;
+  }
+
+  const session = await TalkbackSession.findOne(sessionQuery);
 
   if (!session) {
-    throw ApiError.notFound("No active talkback session found for you on this camera");
+    throw ApiError.notFound("No active talkback session found on this camera");
   }
 
   session.status = "completed";

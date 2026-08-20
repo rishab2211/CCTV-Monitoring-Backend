@@ -65,7 +65,7 @@ const cameraSchema = new Schema<CameraDocument>(
     ],
     franchiseId: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Franchise",
       default: null,
       index: true,
     },

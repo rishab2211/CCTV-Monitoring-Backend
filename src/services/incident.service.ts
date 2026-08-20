@@ -241,7 +241,7 @@ export const updateIncidentStatus = async (id: string, updateData: any, user: Jw
  * @throws ApiError if user lacks permission, or if assignee/incident is not found
  */
 export const assignIncident = async (id: string, assignedTo: string, user: JwtAccessPayload) => {
-  if (user.role !== "admin" && user.role !== "super_admin" && user.role !== "franchise") {
+  if (user.role !== "admin" && user.role !== "super_admin" && user.role !== "franchise" && user.role !== "franchise_admin") {
     throw ApiError.forbidden("Only admins can assign incidents");
   }
 
@@ -474,7 +474,7 @@ export const getIncidentReport = async (id: string, user: JwtAccessPayload) => {
   if (!incident) throw ApiError.notFound("Incident not found");
 
   const timeline = await mongoose.connection.collection("activitylogs")
-    .find({ "metadata.incidentId": new mongoose.Types.ObjectId(id) })
+    .find({ "metadata.incidentId": { $in: [id, new mongoose.Types.ObjectId(id)] } })
     .sort({ createdAt: 1 })
     .toArray();
 

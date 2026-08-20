@@ -247,8 +247,8 @@ export const shareCamera = async (cameraId: string, emailToShareWith: string, us
     throw ApiError.badRequest("You cannot share a camera with yourself");
   }
 
-  // Ensure not already shared
-  if (camera.sharedWith && camera.sharedWith.includes(familyMember._id as any)) {
+  // Ensure not already shared (comparing ObjectIds by string)
+  if (camera.sharedWith && camera.sharedWith.some((id) => id.toString() === familyMember._id.toString())) {
     throw ApiError.badRequest("Camera is already shared with this user");
   }
 
@@ -289,10 +289,12 @@ export const revokeCameraShare = async (cameraId: string, userIdToRevoke: string
 export const getMyCameras = async (user: JwtAccessPayload) => {
   if (user.role !== "customer") throw ApiError.forbidden();
 
+  const userObjId = new mongoose.Types.ObjectId(user.userId);
+
   return await Camera.find({
     $or: [
-      { customerId: user.userId },
-      { sharedWith: user.userId }
+      { customerId: userObjId },
+      { sharedWith: userObjId }
     ],
     isDeleted: false
   }).lean();

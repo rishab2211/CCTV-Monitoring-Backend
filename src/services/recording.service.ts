@@ -58,10 +58,11 @@ export const listRecordings = async (query: any, user: JwtAccessPayload) => {
     filter.franchiseId = user.franchiseId;
   } else if (user.role !== "super_admin" && user.role !== "admin") {
     // If no cameraId provided, non-admins can only see their assigned cameras
+    const userObjId = new mongoose.Types.ObjectId(user.userId);
     const accessibleCameras = await Camera.find({
       $or: [
-        { operatorIds: user.userId },
-        { customerId: user.userId },
+        { operatorIds: userObjId },
+        { customerId: userObjId },
       ],
       isDeleted: false,
     }).select("_id");
