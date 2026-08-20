@@ -189,6 +189,20 @@ export const createUser = async (
     } else if (input.role === "customer") {
       input.customerDetails = { ...input.customerDetails, assignedFranchise: fId as any };
     }
+  } else {
+    // Created by super_admin or admin (global). Must explicitly pass franchise bindings.
+    if (input.role === "franchise_admin" && !input.franchiseDetails?.franchiseRef) {
+      throw ApiError.badRequest("franchiseRef is required when creating a franchise_admin");
+    }
+    if (input.role === "operator" && !input.operatorDetails?.assignedFranchise) {
+      throw ApiError.badRequest("assignedFranchise is required when creating an operator");
+    }
+    if (input.role === "technician" && !input.technicianDetails?.assignedFranchise) {
+      throw ApiError.badRequest("assignedFranchise is required when creating a technician");
+    }
+    if (input.role === "customer" && !input.customerDetails?.assignedFranchise) {
+      throw ApiError.badRequest("assignedFranchise is required when creating a customer");
+    }
   }
 
   const user = await User.create(input);

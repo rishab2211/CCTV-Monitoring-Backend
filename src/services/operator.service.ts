@@ -159,8 +159,13 @@ export const assignCameras = async (operatorId: string, cameraIds: string[], use
   }
   await operator.save();
 
-  // Update Cameras (Add this operator to their operatorIds if not already present)
-  // For simplicity, we push to `operatorIds` (as a set)
+  // Symmetrically update Camera documents:
+  // 1. Remove this operator from any cameras they were previously assigned to
+  await Camera.updateMany(
+    { operatorIds: operator._id },
+    { $pull: { operatorIds: operator._id } }
+  );
+  // 2. Add this operator to the new assigned cameras
   await Camera.updateMany(
     { _id: { $in: objectIds } },
     { $addToSet: { operatorIds: operator._id } }
@@ -296,10 +301,15 @@ export const getOperatorDashboard = async (user: JwtAccessPayload) => {
 
   const assignedCameraIds = operator.operatorDetails?.assignedCameras ?? [];
 
+  const sosFilter: any = { status: { $in: ["active", "acknowledged"] } };
+  if (user.franchiseId) {
+    sosFilter.franchiseId = new mongoose.Types.ObjectId(user.franchiseId);
+  }
+
   const [assignedCameras, openIncidents, activeSos, activeShift] = await Promise.all([
     Camera.countDocuments({ _id: { $in: assignedCameraIds }, isDeleted: false }),
-    Incident.countDocuments({ assignedTo: user.userId, status: { $in: ["open", "in_progress"] } }),
-    SosAlert.countDocuments({ status: { $in: ["active", "acknowledged"] } }),
+    Incident.countDocuments({ assignedTo: user.userId, status: { $in: ["open", "investigating"] } }),
+    SosAlert.countDocuments(sosFilter),
     OperatorShift.findOne({ operatorId: user.userId, endTime: { $exists: false } }).lean(),
   ]);
 
@@ -328,7 +338,7 @@ export const getAssignedCameras = async (user: JwtAccessPayload) => {
   const assignedCameraIds = operator.operatorDetails?.assignedCameras ?? [];
 
   const cameras = await Camera.find({ _id: { $in: assignedCameraIds }, isDeleted: false })
-    .select("name serialNumber location status streamUrl")
+    .select("name serialNumber location status rtspUrl")
     .lean();
 
   return cameras;
@@ -399,7 +409,12 @@ export const getOperatorCalls = async (user: JwtAccessPayload) => {
   const assignedCameraIds = operator.operatorDetails?.assignedCameras ?? [];
 
   const { TalkbackSession } = await import("../models/TalkbackSession");
-  const calls = await TalkbackSession.find({ cameraId: { $in: assignedCameraIds } })
+  const calls = await TalkbackSession.find({
+    $or: [
+      { operatorId: new mongoose.Types.ObjectId(user.userId) },
+      { cameraId: { $in: assignedCameraIds } }
+    ]
+  })
     .populate("cameraId", "name serialNumber location")
     .populate("operatorId", "name role")
     .sort({ startedAt: -1 })
