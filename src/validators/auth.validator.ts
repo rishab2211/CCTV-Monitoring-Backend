@@ -28,7 +28,15 @@ export const registerSchema = z.object({
   phone: phoneSchema,
   password: passwordSchema,
   role: z.enum(
-    ["super_admin", "admin", "franchise", "franchise_admin", "operator", "technician", "customer"],
+    [
+      "super_admin",
+      "admin",
+      "franchise",
+      "franchise_admin",
+      "operator",
+      "technician",
+      "customer",
+    ],
     { errorMap: () => ({ message: "Invalid role" }) }
   ),
 });

@@ -217,16 +217,15 @@ export const updateJobStatus = async (id: string, updateData: any, user: JwtAcce
  * Admins/Franchise Managers can move a job to a different technician.
  */
 export const reassignJob = async (id: string, newTechnicianId: string, user: JwtAccessPayload) => {
-  if (user.role !== "super_admin" && user.role !== "admin" && user.role !== "franchise") {
+  if (user.role !== "super_admin" && user.role !== "admin" && user.role !== "franchise" && user.role !== "franchise_admin") {
     throw ApiError.forbidden("You do not have permission to reassign jobs");
   }
 
   const job = await InstallationJob.findById(id);
   if (!job) throw ApiError.notFound("Job not found");
 
-  if (user.role === "franchise") {
-    const ownedFranchise = await Franchise.findOne({ ownerId: user.userId });
-    if (!ownedFranchise || job.franchiseId?.toString() !== ownedFranchise._id.toString()) {
+  if (user.role === "franchise" || user.role === "franchise_admin") {
+    if (!user.franchiseId || job.franchiseId?.toString() !== user.franchiseId.toString()) {
       throw ApiError.forbidden("You do not have access to this job");
     }
   }

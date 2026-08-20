@@ -71,10 +71,14 @@ export type CreatePermissionInput = z.infer<typeof createPermissionSchema>;
 // ─── Assign Role to User ──────────────────────────────────────────────────────
 
 export const assignRoleSchema = z.object({
-  role: z.enum(
-    ["admin", "franchise", "operator", "technician", "customer"],
-    { errorMap: () => ({ message: "Invalid role. Cannot assign super_admin via API." }) }
-  ),
+  role: z
+    .string()
+    .min(2, "Role name must be at least 2 characters")
+    .max(50, "Role name cannot exceed 50 characters")
+    .regex(/^[a-z0-9_]+$/, "Role name must be lowercase letters, numbers, or underscores")
+    .refine((val) => val !== "super_admin", {
+      message: "Invalid role. Cannot assign super_admin via API.",
+    }),
 });
 
 export type AssignRoleInput = z.infer<typeof assignRoleSchema>;
