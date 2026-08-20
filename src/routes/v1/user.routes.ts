@@ -13,6 +13,8 @@ import {
   userIdParamSchema,
 } from "../../validators/user.validator";
 
+import { upload } from "../../middleware/upload";
+
 const router = Router();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,7 +37,8 @@ router.put(
 router.put(
   "/profile/avatar",
   authenticate,
-  userController.updateAvatar // 501 placeholder — no body validation needed
+  upload.single("avatar"),
+  userController.updateAvatar
 );
 
 // ─── Admin: Generic User CRUD ─────────────────────────────────────────────────

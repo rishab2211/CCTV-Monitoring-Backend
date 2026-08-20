@@ -107,13 +107,12 @@ export const updateOwnProfile = catchAsync(async (req: Request, res: Response) =
 
 /**
  * PUT /api/v1/users/profile/avatar
- * Upload avatar — placeholder (501 Not Implemented).
+ * Upload and update avatar for the authenticated user.
  */
 export const updateAvatar = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
-  await userService.updateAvatar(req.user.userId);
-  // updateAvatar always throws 501, this line is unreachable
-  res.status(501).json(new ApiResponse(501, null, "Not implemented"));
+  const user = await userService.updateAvatar(req.user.userId, req.file);
+  res.status(200).json(new ApiResponse(200, { user }, "Avatar updated successfully"));
 });
 
 // ─── Role-Specific List/Create Helpers ───────────────────────────────────────

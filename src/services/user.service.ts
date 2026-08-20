@@ -19,6 +19,9 @@ import {
   ListUsersQuery,
 } from "../validators/user.validator";
 import { logger } from "../utils/logger";
+import { cloudinary } from "../config/cloudinary";
+import { env } from "../config/env";
+import fs from "fs";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -425,11 +428,58 @@ export const updateOwnProfile = async (
 };
 
 /**
- * Update avatar — placeholder (Cloudinary not yet configured).
- * Returns 501 Not Implemented.
+ * Update avatar for a user using Cloudinary or local storage fallback.
+ * 
+ * @param userId - ID of the user
+ * @param file - Uploaded Multer file
  */
-export const updateAvatar = async (_userId: string): Promise<never> => {
-  throw new ApiError(501, "Avatar upload is not yet implemented. Cloudinary integration coming soon.");
+export const updateAvatar = async (
+  userId: string,
+  file?: Express.Multer.File
+): Promise<UserDocument> => {
+  if (!file) {
+    throw ApiError.badRequest("No avatar image file provided");
+  }
+
+  let avatarUrl = `/uploads/${file.filename}`;
+
+  const isCloudinaryConfigured = Boolean(
+    env.CLOUDINARY_CLOUD_NAME && env.CLOUDINARY_API_KEY && env.CLOUDINARY_API_SECRET
+  );
+
+  if (isCloudinaryConfigured) {
+    try {
+      const uploadResult = await cloudinary.uploader.upload(file.path, {
+        folder: "avatars",
+        public_id: `avatar_${userId}`,
+        overwrite: true,
+        transformation: [{ width: 300, height: 300, crop: "fill" }],
+      });
+      avatarUrl = uploadResult.secure_url;
+      // Clean up local temp file after upload
+      fs.unlink(file.path, () => {});
+    } catch (error) {
+      logger.warn("Cloudinary upload failed, using local file path as fallback:", error);
+      avatarUrl = `/uploads/${file.filename}`;
+    }
+  }
+
+  const updated = await User.findByIdAndUpdate(
+    userId,
+    { avatar: avatarUrl },
+    { new: true }
+  );
+
+  if (!updated) throw ApiError.notFound("User");
+
+  logActivity({
+    userId: updated._id,
+    action: "PROFILE_UPDATED",
+    description: "Updated profile avatar image",
+    metadata: { avatarUrl },
+  });
+
+  return updated;
 };
 
 /**

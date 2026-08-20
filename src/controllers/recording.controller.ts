@@ -105,7 +105,9 @@ export const getStorageStats = catchAsync(async (req: Request, res: Response) =>
  */
 export const updateSchedule = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
-  const { cameraId, rules } = req.body;
+  const cameraId = req.params.cameraId || req.body.cameraId;
+  const rules = req.body.rules !== undefined ? req.body.rules : req.body;
+  if (!cameraId) throw ApiError.badRequest("Camera ID is required");
   const result = await recordingService.updateSchedule(cameraId, rules, req.user);
   res.status(200).json(new ApiResponse(200, result, "Schedule updated"));
 });
