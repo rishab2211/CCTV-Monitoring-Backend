@@ -420,6 +420,29 @@ curl -X POST http://localhost:5000/api/v1/operators \
 }
 ```
 
+#### Upload Avatar: `PUT /api/v1/users/profile/avatar`
+```bash
+curl -X PUT http://localhost:5000/api/v1/users/profile/avatar \
+  -H "Authorization: Bearer <accessToken>" \
+  -F "avatar=@/path/to/profile.png"
+```
+**Response `200`:**
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Avatar updated successfully",
+  "data": {
+    "user": {
+      "_id": "668abc123def456789012345",
+      "name": "Operator Jack",
+      "email": "jack.operator@franchise1.com",
+      "avatar": "https://res.cloudinary.com/cctv/image/upload/v123456/avatars/avatar_668abc123def456789012345.png"
+    }
+  }
+}
+```
+
 ---
 
 ## Module 03: Roles & Permissions Matrix
@@ -575,14 +598,73 @@ curl -X POST http://localhost:5000/api/v1/streams/start \
 | `POST` | `/recordings` | `recordings:manage` | Ingest new recording segment |
 | `GET` | `/recordings/storage` | `recordings:view` | Get total storage GB and chunk statistics |
 | `PUT` | `/recordings/retention` | `recordings:manage` | Update global storage retention policy (days) |
-| `POST` | `/recordings/schedule` | `recordings:manage` | Upsert camera recording schedule |
+| `POST` | `/recordings/schedule` | `cameras:configure` | Upsert camera recording schedule (body-based) |
+| `PUT` | `/recordings/:cameraId/schedule` | `cameras:configure` | Update camera recording schedule (param-based) |
 | `GET` | `/recordings/:cameraId/schedule` | `recordings:view` | Get camera recording schedule |
-| `GET` | `/recordings/:cameraId/playback` | `recordings:view` | Get playback segments timeline |
-| `GET` | `/recordings/:cameraId/timeline` | `recordings:view` | Get recording activity timeline |
+| `DELETE` | `/recordings/:cameraId/schedule` | `cameras:configure` | Delete camera recording schedule |
+| `GET` | `/recordings/:cameraId/playback` | `recordings:view` | Get playback segments (supports `?start=...&end=...` or `?startTime=...&endTime=...`) |
+| `GET` | `/recordings/:cameraId/timeline` | `recordings:view` | Get recording activity timeline (`?date=YYYY-MM-DD`) |
 | `GET` | `/recordings` | `recordings:view` | List recording chunks (paginated & filtered) |
 | `GET` | `/recordings/:id` | `recordings:view` | Get recording segment metadata |
 | `POST` | `/recordings/:id/download` | `recordings:export` | Generate signed download URL |
 | `DELETE` | `/recordings/:id` | `recordings:manage` | Soft delete recording segment |
+
+---
+
+### Key Test Case: Upsert & Delete Recording Schedule
+
+#### 1. Set Schedule: `PUT /recordings/:cameraId/schedule`
+```bash
+curl -X PUT http://localhost:5000/api/v1/recordings/668cam123def456789012345/schedule \
+  -H "Authorization: Bearer <accessToken>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rules": [
+      {
+        "daysOfWeek": [1, 2, 3, 4, 5],
+        "startTime": "09:00",
+        "endTime": "18:00",
+        "type": "continuous"
+      },
+      {
+        "daysOfWeek": [0, 6],
+        "startTime": "00:00",
+        "endTime": "23:59",
+        "type": "motion"
+      }
+    ]
+  }'
+```
+**Response `200`:**
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Schedule updated",
+  "data": {
+    "cameraId": "668cam123def456789012345",
+    "rules": [
+      { "daysOfWeek": [1, 2, 3, 4, 5], "startTime": "09:00", "endTime": "18:00", "type": "continuous" },
+      { "daysOfWeek": [0, 6], "startTime": "00:00", "endTime": "23:59", "type": "motion" }
+    ]
+  }
+}
+```
+
+#### 2. Delete Schedule: `DELETE /recordings/:cameraId/schedule`
+```bash
+curl -X DELETE http://localhost:5000/api/v1/recordings/668cam123def456789012345/schedule \
+  -H "Authorization: Bearer <accessToken>"
+```
+**Response `200`:**
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Schedule deleted",
+  "data": { "acknowledged": true }
+}
+```
 
 ---
 
@@ -763,7 +845,7 @@ curl -X POST http://localhost:5000/api/v1/sos \
 | `GET` | `/installations/assigned` | `technician` | Get jobs assigned to current technician |
 | `GET` | `/installations/:id` | Authenticated | Get job details |
 | `PUT` | `/installations/:id` | `isFranchiseAdmin`, `technician` | Update job status/schedule |
-| `PUT` | `/installations/:id/reassign` | `super_admin`, `admin`, `franchise` | Reassign job to different technician |
+| `PUT` | `/installations/:id/reassign` | `super_admin`, `admin`, `franchise`, `franchise_admin` | Reassign job to different technician |
 | `POST` | `/installations/:id/checklist` | `technician`, `super_admin` | Submit completed installation checklist |
 | `POST` | `/installations/:id/photos` | `technician`, `super_admin` (Multipart) | Upload site photos |
 | `POST` | `/installations/:id/signature` | `technician`, `super_admin` (Multipart) | Upload customer sign-off signature |
@@ -801,7 +883,7 @@ curl -X POST http://localhost:5000/api/v1/sos \
 
 ## Module 15: Customer Self-Service Panel
 
-**Base Paths:** `/api/v1/customer`, `/api/v1/customers`
+**Base Path:** `/api/v1/customer`
 
 ### Endpoints Matrix
 | Method | Route Path | Allowed Roles | Description |
@@ -812,7 +894,7 @@ curl -X POST http://localhost:5000/api/v1/sos \
 | `GET` | `/customer/dashboard` | `customer` | Aggregated customer home screen KPIs |
 | `GET` | `/customer/cameras` | `customer` | List customer's owned cameras |
 | `GET` | `/customer/cameras/:id/live` | `customer` | Live stream URL for customer camera |
-| `GET` | `/customer/cameras/:id/playback` | `customer` | Playback VOD for customer camera |
+| `GET` | `/customer/cameras/:id/playback` | `customer` | Playback VOD for customer camera (supports `?start=...&end=...` or `?startTime=...&endTime=...`) |
 | `POST` | `/customer/cameras/:id/share` | `customer` | Share camera access with family/staff |
 | `DELETE` | `/customer/cameras/:id/share/:userId` | `customer` | Revoke shared camera access |
 | `GET` | `/customer/subscription` | `customer` | View active subscription details |
