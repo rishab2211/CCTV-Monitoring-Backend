@@ -83,6 +83,12 @@ export const errorHandler = (
     message = "Token has expired";
   }
 
+  // ── SyntaxError (Malformed JSON in request body from body-parser) ──
+  else if (err instanceof SyntaxError && "body" in err) {
+    statusCode = 400;
+    message = `Malformed JSON in request body: ${err.message}`;
+  }
+
   // ── Unknown Error ──
   else {
     logger.error(`[Unhandled Error] ${req.method} ${req.path}`, {

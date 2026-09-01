@@ -7,6 +7,7 @@ import mongoose from "mongoose";
 import { Role, RoleDocument, IRole } from "../models/Role";
 import { Permission, PermissionDocument, IPermission } from "../models/Permission";
 import { User } from "../models/User";
+import { UserRole } from "../types";
 import { logActivity } from "../models/ActivityLog";
 import { ApiError } from "../utils/ApiError";
 import { invalidateRoleCache } from "../middleware/permit";
@@ -316,7 +317,7 @@ export const assignRoleToUser = async (
   if (!roleDoc) throw ApiError.notFound("Role");
 
   const previousRole = user.role;
-  user.role = input.role;
+  user.role = input.role as UserRole;
   await user.save();
 
   logActivity({
