@@ -9,7 +9,7 @@ import { Camera } from "../models/Camera";
 import { User } from "../models/User";
 import { ApiError } from "../utils/ApiError";
 import { parsePaginationParams } from "../utils/pagination";
-import { JwtAccessPayload, SosStatus } from "../types";
+import { JwtAccessPayload, ListSosQuery, SosStatus } from "../types";
 import { socketService } from "./socket.service";
 import * as notificationService from "./notification.service";
 import { logActivity } from "../models/ActivityLog";
@@ -61,8 +61,8 @@ export const triggerSos = async (
     metadata: { sosId: sosAlert._id, cameraId, location },
   });
 
-  // 1. Broadcast via WebSocket (Global since it's an emergency)
-  socketService.emitGlobal("sos_triggered", populatedSos);
+  // 1. Broadcast via WebSocket (scoped to operators, admins, franchise, and user)
+  socketService.emitSosAlert("sos_triggered", populatedSos);
 
   // 2. Send Push Notifications to admins and operators
   // Since this is an emergency, we might want to bypass standard notification preferences.
@@ -96,10 +96,10 @@ export const triggerSos = async (
  * @param user - Requesting user
  * @returns An object containing the populated SOS alerts array and pagination metadata
  */
-export const listSosAlerts = async (query: any, user: JwtAccessPayload) => {
-  const { page, limit } = parsePaginationParams(query);
+export const listSosAlerts = async (query: ListSosQuery, user: JwtAccessPayload) => {
+  const { page, limit } = parsePaginationParams(query as unknown as Record<string, unknown>);
   const { status, cameraId } = query;
-  const filter: any = {};
+  const filter: Record<string, unknown> = {};
 
   if (status) filter.status = status;
   if (cameraId) filter.cameraId = cameraId;
@@ -175,7 +175,7 @@ export const acknowledgeSos = async (sosId: string, user: JwtAccessPayload) => {
     metadata: { sosId },
   });
 
-  socketService.emitGlobal("sos_acknowledged", populatedSos);
+  socketService.emitSosAlert("sos_acknowledged", populatedSos);
 
   return populatedSos;
 };
@@ -223,7 +223,7 @@ export const resolveSos = async (
     metadata: { sosId, notes },
   });
 
-  socketService.emitGlobal("sos_resolved", populatedSos);
+  socketService.emitSosAlert("sos_resolved", populatedSos);
 
   return populatedSos;
 };
@@ -260,7 +260,7 @@ export const getSosDetail = async (id: string, user: JwtAccessPayload) => {
  * @returns An array of active SOS alerts
  */
 export const getActiveSos = async (user: JwtAccessPayload) => {
-  const filter: any = { status: "active" };
+  const filter: Record<string, unknown> = { status: { $in: ["active", "acknowledged"] } };
 
   if (user.role === "franchise" || user.role === "franchise_admin") {
     if (!user.franchiseId) throw ApiError.forbidden("No franchise associated with your account");

@@ -32,6 +32,12 @@ export const tenantScope: RequestHandler = (
     return next();
   }
 
+  if (role === "customer") {
+    // Retail customers may not have an assigned franchise; allow access scoped to their owned cameras
+    req.franchiseScope = franchiseId || null;
+    return next();
+  }
+
   if (!franchiseId) {
     // Franchise-scoped role but no franchiseId in token — account not properly set up
     return next(
@@ -43,4 +49,5 @@ export const tenantScope: RequestHandler = (
 
   req.franchiseScope = franchiseId;
   next();
+
 };

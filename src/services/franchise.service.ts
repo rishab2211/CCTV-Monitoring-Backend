@@ -92,24 +92,40 @@ export const listFranchises = async (
     Franchise.countDocuments(filter),
   ]);
 
-  // Aggregate stats (users/cameras count) per franchise
-  const populatedFranchises = await Promise.all(
-    franchises.map(async (f) => {
-      const [cameraCount, customerCount, operatorCount] = await Promise.all([
-        Camera.countDocuments({ franchiseId: f._id, isDeleted: false }),
-        User.countDocuments({ "customerDetails.assignedFranchise": f._id, isDeleted: false }),
-        User.countDocuments({ "operatorDetails.assignedFranchise": f._id, isDeleted: false }),
-      ]);
-      return {
-        ...f,
-        stats: {
-          cameraCount,
-          customerCount,
-          operatorCount,
-        },
-      };
-    })
-  );
+  // Aggregate stats (users/cameras count) per franchise in batch (eliminates N+1 query storm)
+  const franchiseIds = franchises.map((f) => f._id);
+
+  const [cameraCounts, customerCounts, operatorCounts] = await Promise.all([
+    Camera.aggregate([
+      { $match: { franchiseId: { $in: franchiseIds }, isDeleted: false } },
+      { $group: { _id: "$franchiseId", count: { $sum: 1 } } }
+    ]),
+    User.aggregate([
+      { $match: { "customerDetails.assignedFranchise": { $in: franchiseIds }, isDeleted: false } },
+      { $group: { _id: "$customerDetails.assignedFranchise", count: { $sum: 1 } } }
+    ]),
+    User.aggregate([
+      { $match: { "operatorDetails.assignedFranchise": { $in: franchiseIds }, isDeleted: false } },
+      { $group: { _id: "$operatorDetails.assignedFranchise", count: { $sum: 1 } } }
+    ])
+  ]);
+
+  const cameraMap = new Map(cameraCounts.map((c) => [c._id.toString(), c.count]));
+  const customerMap = new Map(customerCounts.map((c) => [c._id.toString(), c.count]));
+  const operatorMap = new Map(operatorCounts.map((c) => [c._id.toString(), c.count]));
+
+  const populatedFranchises = franchises.map((f) => {
+    const idStr = f._id.toString();
+    return {
+      ...f,
+      stats: {
+        cameraCount: cameraMap.get(idStr) || 0,
+        customerCount: customerMap.get(idStr) || 0,
+        operatorCount: operatorMap.get(idStr) || 0,
+      },
+    };
+  });
+
 
   return { franchises: populatedFranchises, total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) };
 };

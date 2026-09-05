@@ -77,9 +77,14 @@ export const listAlerts = async (query: any, user: JwtAccessPayload) => {
     // Non-admins (operators, customers) only see alerts for their assigned cameras
     const userObjId = new mongoose.Types.ObjectId(user.userId);
     const accessibleCameras = await Camera.find({
-      $or: [{ operatorIds: userObjId }, { customerId: userObjId }],
+      $or: [
+        { operatorIds: userObjId },
+        { customerId: userObjId },
+        { sharedWith: userObjId },
+      ],
       isDeleted: false,
     }).select("_id");
+
     filter.cameraId = { $in: accessibleCameras.map((c) => c._id) };
   }
 

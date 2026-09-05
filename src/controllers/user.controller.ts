@@ -64,7 +64,8 @@ export const updateUser = catchAsync(async (req: Request, res: Response) => {
  * Soft deletes a user account.
  */
 export const deleteUser = catchAsync(async (req: Request, res: Response) => {
-  await userService.softDeleteUser(req.params.id);
+  if (!req.user) throw ApiError.unauthorized();
+  await userService.softDeleteUser(req.params.id, req.user.userId);
   res.status(200).json(new ApiResponse(200, null, "User deleted successfully"));
 });
 
@@ -94,6 +95,16 @@ export const getUserActivity = catchAsync(async (req: Request, res: Response) =>
 });
 
 // ─── Own Profile ──────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/v1/users/profile
+ * Get own profile details for authenticated session restoration.
+ */
+export const getOwnProfile = catchAsync(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const user = await userService.getUserById(req.user.userId);
+  res.status(200).json(new ApiResponse(200, { user }));
+});
 
 /**
  * PUT /api/v1/users/profile

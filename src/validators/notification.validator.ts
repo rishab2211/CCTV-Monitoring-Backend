@@ -32,3 +32,6 @@ export const listNotificationsQuerySchema = paginationSchema.extend({
 export const notificationIdParamSchema = z.object({
   id: objectIdSchema,
 });
+
+export type UpdatePreferencesInput = z.infer<typeof updatePreferencesSchema>;
+export type ListNotificationsQueryInput = z.infer<typeof listNotificationsQuerySchema>;

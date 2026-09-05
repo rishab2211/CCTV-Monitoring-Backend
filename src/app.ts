@@ -1,3 +1,4 @@
+import path from "path";
 import express, { Application } from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -68,6 +69,17 @@ if (env.NODE_ENV === "development") {
 }
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
+
+// Static uploads for evidence (with security headers)
+app.use(
+  "/uploads",
+  (_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    next();
+  },
+  express.static(path.join(__dirname, "../uploads"))
+);
 
 app.use("/api", router);
 

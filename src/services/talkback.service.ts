@@ -53,15 +53,23 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload) => 
   });
 
   if (existingSession) {
-    if (existingSession.operatorId.toString() === user.userId) {
+    const isStale = (Date.now() - new Date(existingSession.startedAt).getTime()) > 15 * 60 * 1000;
+    if (isStale) {
+      existingSession.status = "completed";
+
+      existingSession.endedAt = new Date();
+      await existingSession.save();
+    } else if (existingSession.operatorId.toString() === user.userId) {
       // It's the same operator, just return the existing session
       return {
         session: existingSession,
-        whipUrl: `http://${env.MEDIAMTX_HOST}:8889/camera_${cameraId}_talkback/whip`,
+        whipUrl: `${env.MEDIAMTX_URL}/camera_${cameraId}_talkback/whip`,
       };
+    } else {
+      throw ApiError.conflict("Camera is already in an active talkback session with another operator");
     }
-    throw ApiError.conflict("Camera is already in an active talkback session with another operator");
   }
+
 
   // Create new session
   const session = await TalkbackSession.create({
@@ -88,7 +96,7 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload) => 
   // Return the MediaMTX WHIP URL for the frontend to publish WebRTC audio to
   return {
     session,
-    whipUrl: `http://${env.MEDIAMTX_HOST}:8889/camera_${cameraId}_talkback/whip`,
+    whipUrl: `${env.MEDIAMTX_URL}/camera_${cameraId}_talkback/whip`,
   };
 };
 

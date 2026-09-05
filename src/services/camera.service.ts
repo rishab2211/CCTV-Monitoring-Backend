@@ -187,8 +187,18 @@ export const listCameras = async (
   } else if (role === "operator") {
     filter.operatorIds = userObjectId;
   } else if (role === "customer") {
-    filter.customerId = userObjectId;
+    const customerOr = [
+      { customerId: userObjectId },
+      { sharedWith: userObjectId },
+    ];
+    if (filter.$or) {
+      filter.$and = [{ $or: filter.$or }, { $or: customerOr }];
+      delete filter.$or;
+    } else {
+      filter.$or = customerOr;
+    }
   }
+
 
   // Explicit filter queries from admins
   if (query.customerId && (role === "super_admin" || role === "admin")) {
@@ -459,10 +469,24 @@ export const updateCameraStatus = async (
  */
 export const updateCameraHealth = async (
   id: string,
-  healthInput: HeartbeatInput
+  healthInput: HeartbeatInput,
+  user?: JwtAccessPayload
 ): Promise<CameraDocument> => {
   const camera = await Camera.findOne({ _id: id, isDeleted: false });
   if (!camera) throw ApiError.notFound("Camera");
+
+  // Validate ownership / franchise tenancy if authenticated as a tenant/user
+  if (user && user.userId !== "system" && user.role !== "super_admin" && user.role !== "admin") {
+    if (user.role === "franchise" || user.role === "franchise_admin") {
+      if (camera.franchiseId?.toString() !== user.franchiseId) {
+        throw ApiError.forbidden("Camera does not belong to your franchise");
+      }
+    } else if (user.role === "customer") {
+      if (camera.customerId?.toString() !== user.userId) {
+        throw ApiError.forbidden("You do not have permission to update this camera");
+      }
+    }
+  }
 
   camera.status = "online";
   camera.health.lastPing = new Date();
@@ -540,7 +564,10 @@ export const qrScanCamera = async (
 
   camera.status = "online";
   camera.health.lastPing = new Date();
-  camera.qrCode = `configured-tech-${technicianId}-${Date.now()}`;
+  // Ensure camera has a permanent QR code identifier without overwriting existing one
+  if (!camera.qrCode) {
+    camera.qrCode = `CAM-${camera._id}`;
+  }
   await camera.save();
 
   logActivity({

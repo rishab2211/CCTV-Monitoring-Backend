@@ -1,6 +1,7 @@
 import rateLimit from "express-rate-limit";
 import { ApiError } from "../utils/ApiError";
 import { env } from "../config/env";
+import { safeCompare } from "../utils/helpers";
 
 /**
  * General API rate limiter — 100 requests per 15 minutes per IP.
@@ -11,7 +12,13 @@ export const generalLimiter = rateLimit({
   max: env.RATE_LIMIT_MAX,
   standardHeaders: true, // Return rate limit info in RateLimit-* headers
   legacyHeaders: false,
+  skip: (req) => {
+    // Whitelist internal hardware and automated system requests from rate limiting
+    const key = req.headers["x-system-key"];
+    return typeof key === "string" && safeCompare(key, env.SYSTEM_API_KEY);
+  },
   handler: (_req, _res, next) => {
+
     next(
       new ApiError(
         429,

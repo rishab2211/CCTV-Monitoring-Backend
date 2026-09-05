@@ -78,6 +78,13 @@ const deviceSessionSchema = new Schema<DeviceSessionDocument>(
 // Compound index for fast active session lookups per user
 deviceSessionSchema.index({ userId: 1, isActive: 1 });
 
+// TTL index — auto-delete inactive session documents 60 days after last update
+deviceSessionSchema.index(
+  { updatedAt: 1 },
+  { expireAfterSeconds: 60 * 24 * 60 * 60 }
+);
+
+
 // ─── Model ───────────────────────────────────────────────────────────────────
 
 export const DeviceSession: Model<DeviceSessionDocument> =

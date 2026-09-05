@@ -101,7 +101,7 @@ export interface JwtAccessPayload {
 
 export interface JwtRefreshPayload {
   userId: string;
-  tokenId: string; // UUID stored in the DB
+  tokenId?: string;
   iat?: number;
   exp?: number;
 }
@@ -577,4 +577,35 @@ export interface IBillingInvoice {
   billingDate: Date;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// ─── Query Interfaces ─────────────────────────────────────────────────────────
+
+export interface PaginationQuery {
+  page?: number | string;
+  limit?: number | string;
+  sort?: string;
+}
+
+export interface ListSosQuery extends PaginationQuery {
+  status?: string;
+  cameraId?: string;
+  franchiseId?: string;
+}
+
+export interface ListRecordingsQuery extends PaginationQuery {
+  cameraId?: string;
+  date?: string;
+  status?: string;
+  triggerType?: string;
+}
+
+export interface ListNotificationsQuery extends PaginationQuery {
+  read?: string | boolean;
+  type?: string;
+}
+
+export interface ListBillingQuery extends PaginationQuery {
+  status?: string;
+  customerId?: string;
 }

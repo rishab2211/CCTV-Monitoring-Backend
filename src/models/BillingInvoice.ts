@@ -47,6 +47,8 @@ const billingInvoiceSchema = new Schema<BillingInvoiceDocument>(
 );
 
 billingInvoiceSchema.index({ customerId: 1, status: 1 });
+billingInvoiceSchema.index({ subscriptionId: 1, status: 1, createdAt: -1 });
+billingInvoiceSchema.index({ franchiseId: 1, status: 1, createdAt: -1 });
 
 export const BillingInvoice: Model<BillingInvoiceDocument> = mongoose.model<BillingInvoiceDocument>(
   "BillingInvoice",

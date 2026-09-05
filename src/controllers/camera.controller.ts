@@ -110,7 +110,7 @@ export const updateCameraStatus = catchAsync(async (req: Request, res: Response)
  * Heartbeat ping from camera hardware/polling systems.
  */
 export const updateCameraHealth = catchAsync(async (req: Request, res: Response) => {
-  const camera = await cameraService.updateCameraHealth(req.params.id, req.body);
+  const camera = await cameraService.updateCameraHealth(req.params.id, req.body, req.user);
   res.status(200).json(new ApiResponse(200, { camera }, "Heartbeat received successfully"));
 });
 
@@ -121,7 +121,7 @@ export const updateCameraHealth = catchAsync(async (req: Request, res: Response)
 export const restartCamera = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
   await cameraService.restartCamera(req.params.id, req.user);
-  res.status(200).json(new ApiResponse(200, null, "Restart command sent successfully"));
+  res.status(200).json(new ApiResponse(200, { restartInitiated: true, cameraId: req.params.id }, "Restart command sent successfully"));
 });
 
 /**

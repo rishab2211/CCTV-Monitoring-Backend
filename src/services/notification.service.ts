@@ -6,6 +6,7 @@ import { DeviceToken } from "../models/DeviceToken";
 import { User } from "../models/User";
 import { ApiError } from "../utils/ApiError";
 import { JwtAccessPayload, NotificationType } from "../types";
+import { ListNotificationsQueryInput, UpdatePreferencesInput } from "../validators/notification.validator";
 import { env } from "../config/env";
 import { logger } from "../utils/logger";
 import { socketService } from "./socket.service";
@@ -180,9 +181,9 @@ export const sendPushNotification = async (
  * @param query - Pagination and filter parameters (e.g., isRead, type)
  * @returns Paginated notification list
  */
-export const getUserNotifications = async (userId: string, query: any) => {
-  const { page, limit, isRead, type } = query;
-  const filter: any = { userId };
+export const getUserNotifications = async (userId: string, query: Partial<ListNotificationsQueryInput> | Record<string, any>) => {
+  const { page = 1, limit = 20, isRead, type } = query;
+  const filter: Record<string, unknown> = { userId };
 
   if (typeof isRead === "boolean") filter.isRead = isRead;
   if (type) filter.type = type;
@@ -276,9 +277,9 @@ export const getPreferences = async (userId: string) => {
  * @param userId - The target user ID
  * @param data - The partial preferences object to update
  */
-export const updatePreferences = async (userId: string, data: any) => {
+export const updatePreferences = async (userId: string, data: UpdatePreferencesInput) => {
   // Dot notation update to only update provided fields without overwriting the whole object
-  const updateObj: any = {};
+  const updateObj: Record<string, boolean> = {};
   if (data.alerts) {
     if (typeof data.alerts.push === "boolean") updateObj["notificationPreferences.alerts.push"] = data.alerts.push;
     if (typeof data.alerts.inApp === "boolean") updateObj["notificationPreferences.alerts.inApp"] = data.alerts.inApp;

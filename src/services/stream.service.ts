@@ -9,6 +9,7 @@ import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import { Camera } from "../models/Camera";
 import { StreamSession } from "../models/StreamSession";
+import { Subscription } from "../models/Subscription";
 import { logActivity } from "../models/ActivityLog";
 import { ApiError } from "../utils/ApiError";
 import { env } from "../config/env";
@@ -73,7 +74,16 @@ export const startStream = async (
 
   await validateCameraAccess(camera, user);
 
+  // Enforce Subscription Check for Customers
+  if (user.role === "customer") {
+    const activeSub = await Subscription.findOne({ customerId: user.userId, status: "active" });
+    if (!activeSub) {
+      throw ApiError.forbidden("Active subscription required to start live streams");
+    }
+  }
+
   // 2. Register path in MediaMTX (sourceOnDemand — no actual RTSP pull yet)
+
   const pathName = toPathName(camera.serialNumber);
   await addMediaMTXPath(pathName, camera.rtspUrl);
 
@@ -174,9 +184,8 @@ export const stopStream = async (input: StopStreamInput, user: JwtAccessPayload)
   };
 };
 
-import { Subscription } from "../models/Subscription";
-
 /**
+
  * Get a fresh stream token for a camera the user already has access to.
  * Does NOT create a new StreamSession (user is already watching).
  */
@@ -274,8 +283,17 @@ export const listActiveStreams = async (user: JwtAccessPayload) => {
 
   const isAdmin = user.role === "super_admin" || user.role === "admin";
   if (!isAdmin) {
-    filter.userId = new mongoose.Types.ObjectId(user.userId);
+    if ((user.role === "franchise" || user.role === "franchise_admin") && user.franchiseId) {
+      const franchiseCameras = await Camera.find({
+        franchiseId: new mongoose.Types.ObjectId(user.franchiseId),
+        isDeleted: false,
+      }).select("_id");
+      filter.cameraId = { $in: franchiseCameras.map((c) => c._id) };
+    } else {
+      filter.userId = new mongoose.Types.ObjectId(user.userId);
+    }
   }
+
 
   const sessions = await StreamSession.find(filter)
     .populate("cameraId", "name serialNumber status")

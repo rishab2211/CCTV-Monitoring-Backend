@@ -2,7 +2,9 @@ import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utils/ApiError";
 import { logger } from "../utils/logger";
 import mongoose from "mongoose";
+import multer from "multer";
 import { env } from "../config/env";
+
 
 interface ErrorResponse {
   success: false;
@@ -89,6 +91,15 @@ export const errorHandler = (
     message = `Malformed JSON in request body: ${err.message}`;
   }
 
+  // ── Multer Error (file upload failures, e.g. LIMIT_FILE_SIZE) ──
+  else if (err instanceof multer.MulterError) {
+    statusCode = 400;
+    message = `File upload error: ${err.message}`;
+    if (err.code === "LIMIT_FILE_SIZE") {
+      message = "File size exceeds the allowed limit of 10MB";
+    }
+  }
+
   // ── Unknown Error ──
   else {
     logger.error(`[Unhandled Error] ${req.method} ${req.path}`, {
@@ -102,8 +113,9 @@ export const errorHandler = (
     statusCode,
     message,
     ...(errors.length > 0 && { errors }),
-    // ...(env.NODE_ENV === "development" && { stack: err.stack }),
+    ...(env.NODE_ENV === "development" && { stack: err.stack }),
   };
+
 
   res.status(statusCode).json(response);
 };

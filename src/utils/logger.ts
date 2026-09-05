@@ -1,9 +1,16 @@
 import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import path from "path";
+import fs from "fs";
 import { env } from "../config/env";
 
 const { combine, timestamp, printf, colorize, errors, json } = winston.format;
+
+// Ensure log directory exists dynamically
+const logDir = path.resolve(process.cwd(), "logs");
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir, { recursive: true });
+}
 
 // Custom format for console output
 const consoleFormat = printf(({ level, message, timestamp, stack }) => {
@@ -13,7 +20,7 @@ const consoleFormat = printf(({ level, message, timestamp, stack }) => {
 
 // File transport — daily rotation, keeps 14 days of logs
 const fileRotateTransport = new DailyRotateFile({
-  filename: path.join("src/logs", "cctv-%DATE%.log"),
+  filename: path.join(logDir, "cctv-%DATE%.log"),
   datePattern: "YYYY-MM-DD",
   maxFiles: "14d",
   maxSize: "20m",
@@ -22,13 +29,14 @@ const fileRotateTransport = new DailyRotateFile({
 
 // Error-only file transport
 const errorFileTransport = new DailyRotateFile({
-  filename: path.join("src/logs", "error-%DATE%.log"),
+  filename: path.join(logDir, "error-%DATE%.log"),
   datePattern: "YYYY-MM-DD",
   maxFiles: "30d",
   maxSize: "20m",
   level: "error",
   format: combine(timestamp(), errors({ stack: true }), json()),
 });
+
 
 export const logger = winston.createLogger({
   level: env.NODE_ENV === "production" ? "info" : "debug",

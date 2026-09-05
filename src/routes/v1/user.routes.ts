@@ -25,6 +25,13 @@ const router = Router();
 
 // ─── Own Profile (any authenticated user) ────────────────────────────────────
 
+/** GET /api/v1/users/profile */
+router.get(
+  "/profile",
+  authenticate,
+  userController.getOwnProfile
+);
+
 /** PUT /api/v1/users/profile */
 router.put(
   "/profile",

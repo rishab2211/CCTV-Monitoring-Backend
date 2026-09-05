@@ -77,7 +77,9 @@ const paymentSchema = new Schema<PaymentDocument>(
   { timestamps: true }
 );
 
-paymentSchema.index({ customerId: 1, status: 1 });
+paymentSchema.index({ customerId: 1, status: 1, createdAt: -1 });
+paymentSchema.index({ franchiseId: 1, status: 1, createdAt: -1 });
+paymentSchema.index({ subscriptionId: 1, status: 1 });
 paymentSchema.index({ providerOrderId: 1 });
 
 export const Payment: Model<PaymentDocument> = mongoose.model<PaymentDocument>("Payment", paymentSchema);

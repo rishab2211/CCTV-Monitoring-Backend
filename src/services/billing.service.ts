@@ -9,11 +9,12 @@ import { Subscription } from "../models/Subscription";
 import { Payment } from "../models/Payment";
 import { BillingInvoice } from "../models/BillingInvoice";
 import { ApiError } from "../utils/ApiError";
-import { JwtAccessPayload } from "../types";
+import { JwtAccessPayload, ListBillingQuery } from "../types";
 import { logActivity } from "../models/ActivityLog";
 import * as notificationService from "./notification.service";
 import crypto from "crypto";
 import { env } from "../config/env";
+import { safeCompare } from "../utils/helpers";
 
 // ─── Plans ───────────────────────────────────────────────────────────────────
 
@@ -120,9 +121,9 @@ export const createSubscription = async (data: { planId: string, customerId?: st
   return subscription;
 };
 
-export const listSubscriptions = async (query: any, user: JwtAccessPayload) => {
+export const listSubscriptions = async (query: ListBillingQuery, user: JwtAccessPayload) => {
   const { page = 1, limit = 20, status, customerId } = query;
-  const filter: any = {};
+  const filter: Record<string, unknown> = {};
   if (status) filter.status = status;
   if (customerId) filter.customerId = customerId;
 
@@ -256,9 +257,19 @@ export const createPaymentOrder = async (subscriptionId: string, user: JwtAccess
 };
 
 export const verifyPayment = async (razorpayOrderId: string, razorpayPaymentId: string, razorpaySignature: string) => {
-  // In a real app, verify signature using Razorpay SDK
-  // const expectedSignature = crypto.createHmac('sha256', env.RAZORPAY_SECRET).update(razorpayOrderId + '|' + razorpayPaymentId).digest('hex');
-  // if (expectedSignature !== razorpaySignature) throw ApiError.badRequest("Invalid signature");
+  if (env.RAZORPAY_KEY_SECRET) {
+    const expectedSignature = crypto
+      .createHmac("sha256", env.RAZORPAY_KEY_SECRET)
+      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+      .digest("hex");
+
+    if (!safeCompare(expectedSignature, razorpaySignature)) {
+      throw ApiError.badRequest("Invalid payment signature");
+    }
+
+  } else if (env.NODE_ENV === "production") {
+    throw ApiError.internal("Razorpay secret is not configured");
+  }
 
   const payment = await Payment.findOne({ providerOrderId: razorpayOrderId });
   if (!payment) throw ApiError.notFound("Payment order not found");
@@ -281,9 +292,9 @@ export const verifyPayment = async (razorpayOrderId: string, razorpayPaymentId: 
   return payment;
 };
 
-export const listPayments = async (query: any, user: JwtAccessPayload) => {
+export const listPayments = async (query: ListBillingQuery, user: JwtAccessPayload) => {
   const { page = 1, limit = 20, status, customerId } = query;
-  const filter: any = {};
+  const filter: Record<string, unknown> = {};
   if (status) filter.status = status;
   if (customerId) filter.customerId = customerId;
 
@@ -344,9 +355,9 @@ export const refundPayment = async (id: string, reason: string = "", user: JwtAc
 
 // ─── Invoices ────────────────────────────────────────────────────────────────
 
-export const listInvoices = async (query: any, user: JwtAccessPayload) => {
+export const listInvoices = async (query: ListBillingQuery, user: JwtAccessPayload) => {
   const { page = 1, limit = 20, status, customerId } = query;
-  const filter: any = {};
+  const filter: Record<string, unknown> = {};
   if (status) filter.status = status;
   if (customerId) filter.customerId = customerId;
 

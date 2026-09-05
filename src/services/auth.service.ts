@@ -12,9 +12,10 @@ import { DeviceSession } from "../models/DeviceSession";
 import { DeviceToken } from "../models/DeviceToken";
 import { Franchise } from "../models/Franchise";
 import { OTPVerification } from "../models/OTPVerification";
+import { PasswordResetToken } from "../models/PasswordResetToken";
 import { logActivity } from "../models/ActivityLog";
 import { ApiError } from "../utils/ApiError";
-import { hashToken, generateOTP, generateSecureToken, addMinutes } from "../utils/helpers";
+import { hashToken, generateOTP, generateSecureToken, addMinutes, safeCompare } from "../utils/helpers";
 import { sendOTPEmail } from "./email.service";
 import { env } from "../config/env";
 import { AuthTokens, IDeviceInfo, JwtRefreshPayload } from "../types";
@@ -30,6 +31,19 @@ import { logger } from "../utils/logger";
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const parseExpiryToSeconds = (expiry: string): number => {
+  const match = String(expiry).match(/^(\d+)([smhd])$/);
+  if (!match) return 15 * 60;
+  const val = parseInt(match[1], 10);
+  switch (match[2]) {
+    case "s": return val;
+    case "m": return val * 60;
+    case "h": return val * 3600;
+    case "d": return val * 86400;
+    default: return 15 * 60;
+  }
+};
 
 /**
  * Resolves the franchiseId for a user and verifies that the franchise is not suspended.
@@ -145,7 +159,7 @@ const issueTokens = async (
     accessToken,
     refreshToken: rawRefreshToken,
     sessionId,
-    expiresIn: 15 * 60, // 15 minutes in seconds
+    expiresIn: parseExpiryToSeconds(env.ACCESS_TOKEN_EXPIRY),
   };
 };
 
@@ -422,7 +436,7 @@ export const verifyOtp = async (
     throw ApiError.tooManyRequests("Maximum OTP attempts exceeded. Please request a new OTP.");
   }
 
-  if (otpRecord.otpHash !== otpHash) {
+  if (!safeCompare(otpRecord.otpHash, otpHash)) {
     otpRecord.attempts += 1;
     await otpRecord.save();
     const remaining = 5 - otpRecord.attempts;
@@ -430,6 +444,7 @@ export const verifyOtp = async (
       `Invalid OTP. ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining.`
     );
   }
+
 
   // OTP is valid — mark as used
   otpRecord.isUsed = true;
@@ -439,14 +454,12 @@ export const verifyOtp = async (
   const resetToken = generateSecureToken(32);
   const resetTokenHash = hashToken(resetToken);
 
-  // Store reset token temporarily (reuse OTP record pattern — same TTL)
-  await OTPVerification.create({
+  // Store reset token securely in dedicated PasswordResetToken collection
+  await PasswordResetToken.create({
     email: input.email,
-    otpHash: resetTokenHash, // Reusing otpHash field to store reset token hash
-    type: "forgot_password",
+    tokenHash: resetTokenHash,
     expiresAt: addMinutes(15),
     isUsed: false,
-    attempts: 99, // Prevents this from being used as OTP
   });
 
   return { resetToken };
@@ -460,12 +473,10 @@ export const resetPassword = async (
 ): Promise<void> => {
   const resetTokenHash = hashToken(input.resetToken);
 
-  // Find the reset token record (attempts = 99 distinguishes it from OTP records)
-  const tokenRecord = await OTPVerification.findOne({
-    otpHash: resetTokenHash,
-    type: "forgot_password",
+  // Find the reset token record
+  const tokenRecord = await PasswordResetToken.findOne({
+    tokenHash: resetTokenHash,
     isUsed: false,
-    attempts: 99,
   });
 
   if (!tokenRecord || tokenRecord.expiresAt < new Date()) {

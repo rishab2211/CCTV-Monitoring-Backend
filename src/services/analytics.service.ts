@@ -27,10 +27,10 @@ const ensureAdminOrFranchise = (user: JwtAccessPayload) => {
 export const getDashboardAnalytics = async (user: JwtAccessPayload) => {
   const franchiseId = ensureAdminOrFranchise(user);
   
-  const userMatch: any = { isDeleted: false };
-  const cameraMatch: any = { isDeleted: false };
-  const incidentMatch: any = { status: { $in: ["open", "investigating"] } };
-  const paymentMatch: any = { status: "paid" };
+  const userMatch: Record<string, unknown> = { isDeleted: false };
+  const cameraMatch: Record<string, unknown> = { isDeleted: false };
+  const incidentMatch: Record<string, unknown> = { status: { $in: ["open", "investigating"] } };
+  const paymentMatch: Record<string, unknown> = { status: "paid" };
 
   if (franchiseId) {
     const fId = new mongoose.Types.ObjectId(franchiseId);
@@ -63,9 +63,10 @@ export const getDashboardAnalytics = async (user: JwtAccessPayload) => {
     totalUsers,
     totalCameras,
     activeIncidents,
-    totalRevenue: recentPayments[0]?.totalRevenue || 0,
+    totalRevenue: (recentPayments[0]?.totalRevenue || 0) / 100,
     generatedAt: new Date()
   };
+
 };
 
 /**
@@ -107,7 +108,7 @@ export const getAlertAnalytics = async (user: JwtAccessPayload) => {
  */
 export const getCameraAnalytics = async (user: JwtAccessPayload) => {
   const franchiseId = ensureAdminOrFranchise(user);
-  const matchStage: any = { isDeleted: false };
+  const matchStage: Record<string, unknown> = { isDeleted: false };
   if (franchiseId) matchStage.franchiseId = new mongoose.Types.ObjectId(franchiseId);
 
   const statusStats = await Camera.aggregate([
@@ -131,14 +132,25 @@ export const getCameraAnalytics = async (user: JwtAccessPayload) => {
  */
 export const getOperatorAnalytics = async (user: JwtAccessPayload) => {
   const franchiseId = ensureAdminOrFranchise(user);
-  const matchStage = franchiseId ? { $match: { "operator.operatorDetails.assignedFranchise": new mongoose.Types.ObjectId(franchiseId) } } : { $match: {} };
+
+  let initialMatch: Record<string, any> = {};
+  if (franchiseId) {
+    const operatorUsers = await User.find({
+      "operatorDetails.assignedFranchise": new mongoose.Types.ObjectId(franchiseId),
+      isDeleted: false,
+    }).select("_id");
+    const operatorIds = operatorUsers.map((u) => u._id);
+    initialMatch = { operatorId: { $in: operatorIds } };
+  }
 
   const performance = await OperatorShift.aggregate([
+    { $match: initialMatch },
     {
       $group: {
         _id: "$operatorId",
         totalShifts: { $sum: 1 },
-        totalDurationMs: { $sum: { $subtract: ["$endTime", "$startTime"] } },
+        totalDurationMs: { $sum: { $subtract: [{ $ifNull: ["$endTime", "$$NOW"] }, "$startTime"] } },
+
         incidentsResolved: { $sum: "$metrics.incidentsResolved" }
       }
     },
@@ -151,7 +163,6 @@ export const getOperatorAnalytics = async (user: JwtAccessPayload) => {
       }
     },
     { $unwind: "$operator" },
-    matchStage,
     {
       $project: {
         operatorName: "$operator.name",
@@ -175,7 +186,7 @@ export const getOperatorAnalytics = async (user: JwtAccessPayload) => {
  */
 export const getRevenueAnalytics = async (user: JwtAccessPayload) => {
   const franchiseId = ensureAdminOrFranchise(user);
-  const matchStage: any = { status: "paid", paidAt: { $ne: null } };
+  const matchStage: Record<string, unknown> = { status: "paid", paidAt: { $ne: null } };
   if (franchiseId) matchStage.franchiseId = new mongoose.Types.ObjectId(franchiseId);
 
   // Group by month
@@ -217,7 +228,7 @@ export const getSubscriptionAnalytics = async (user: JwtAccessPayload) => {
     }
   ]);
 
-  const matchStage2: any = { status: "active" };
+  const matchStage2: Record<string, unknown> = { status: "active" };
   if (franchiseId) matchStage2.franchiseId = new mongoose.Types.ObjectId(franchiseId);
 
   const byPlan = await Subscription.aggregate([

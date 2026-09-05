@@ -161,12 +161,19 @@ export const getIncidentDetails = async (id: string, user: JwtAccessPayload) => 
     
   if (!incident) throw ApiError.notFound("Incident not found");
 
-  // Basic access check
+  // Access checks
   if (user.role === "customer" && incident.reportedBy._id.toString() !== user.userId) {
     throw ApiError.forbidden("Access denied");
   }
 
+  if ((user.role === "franchise" || user.role === "franchise_admin") && incident.franchiseId) {
+    if (!user.franchiseId || incident.franchiseId.toString() !== user.franchiseId) {
+      throw ApiError.forbidden("Access denied: Incident belongs to another franchise");
+    }
+  }
+
   return incident;
+
 };
 
 /**

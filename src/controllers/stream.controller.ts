@@ -9,6 +9,7 @@ import { ApiResponse } from "../utils/ApiResponse";
 import { ApiError } from "../utils/ApiError";
 import * as streamService from "../services/stream.service";
 import { env } from "../config/env";
+import { safeCompare } from "../utils/helpers";
 
 /**
  * Start Live Stream Endpoint
@@ -114,10 +115,11 @@ export const mediamtxAuthWebhook = catchAsync(async (req: Request, res: Response
   // Verify the shared secret sent by MediaMTX
   if (env.MEDIAMTX_STREAM_SECRET) {
     const sentSecret = req.headers["x-mediamtx-secret"];
-    if (sentSecret !== env.MEDIAMTX_STREAM_SECRET) {
+    if (typeof sentSecret !== "string" || !safeCompare(sentSecret, env.MEDIAMTX_STREAM_SECRET)) {
       throw ApiError.unauthorized("Invalid MediaMTX webhook secret");
     }
   }
+
 
   // Extract token from query string or user field
   const rawQuery = req.body.query as string | undefined;

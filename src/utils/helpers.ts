@@ -36,10 +36,14 @@ export const generateSecureToken = (bytes: number = 32): string => {
  * Safely compare two strings in constant time.
  * Prevents timing attacks when comparing tokens/OTPs.
  */
-export const safeCompare = (a: string, b: string): boolean => {
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+export const safeCompare = (a?: string | null, b?: string | null): boolean => {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
 };
+
 
 /**
  * Formats a Date object as a human-readable string.

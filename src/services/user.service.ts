@@ -289,7 +289,11 @@ export const updateUser = async (
  * 
  * @param id - The target user ID
  */
-export const softDeleteUser = async (id: string): Promise<void> => {
+export const softDeleteUser = async (id: string, requestingUserId?: string): Promise<void> => {
+  if (requestingUserId && id === requestingUserId) {
+    throw ApiError.badRequest("You cannot delete your own account");
+  }
+
   const user = await getUserById(id);
 
   if (user.role === "super_admin") {

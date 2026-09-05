@@ -10,7 +10,7 @@ import { SystemSetting } from "../models/SystemSetting";
 import { Camera } from "../models/Camera";
 import { ApiError } from "../utils/ApiError";
 import { parsePaginationParams } from "../utils/pagination";
-import { JwtAccessPayload } from "../types";
+import { IRecordingScheduleRule, JwtAccessPayload, ListRecordingsQuery } from "../types";
 import { validateCameraAccess } from "./camera.service";
 import { logActivity } from "../models/ActivityLog";
 import { logger } from "../utils/logger";
@@ -43,10 +43,10 @@ export const createRecordingChunk = async (data: any) => {
  * @param query - Pagination and filtering rules
  * @param user - The requesting user
  */
-export const listRecordings = async (query: any, user: JwtAccessPayload) => {
-  const { page, limit } = parsePaginationParams(query);
-  const { cameraId, type, status, startDate, endDate } = query;
-  const filter: any = {};
+export const listRecordings = async (query: ListRecordingsQuery, user: JwtAccessPayload) => {
+  const { page, limit } = parsePaginationParams(query as unknown as Record<string, unknown>);
+  const { cameraId, type, status, startDate, endDate } = query as any;
+  const filter: Record<string, unknown> = {};
 
   if (cameraId) {
     const camera = await Camera.findOne({ _id: cameraId, isDeleted: false });
@@ -63,18 +63,21 @@ export const listRecordings = async (query: any, user: JwtAccessPayload) => {
       $or: [
         { operatorIds: userObjId },
         { customerId: userObjId },
+        { sharedWith: userObjId },
       ],
       isDeleted: false,
     }).select("_id");
+
     filter.cameraId = { $in: accessibleCameras.map((c) => c._id) };
   }
 
   if (type) filter.type = type;
   if (status) filter.status = status;
   if (startDate || endDate) {
-    filter.startTime = {};
-    if (startDate) filter.startTime.$gte = new Date(startDate);
-    if (endDate) filter.startTime.$lte = new Date(endDate);
+    const timeFilter: Record<string, Date> = {};
+    if (startDate) timeFilter.$gte = new Date(startDate);
+    if (endDate) timeFilter.$lte = new Date(endDate);
+    filter.startTime = timeFilter;
   }
 
   const skip = (page - 1) * limit;
@@ -241,7 +244,7 @@ export const getStorageStats = async () => {
  * @param rules - Array of schedule rules (days, times, recording type)
  * @param user - The requesting user
  */
-export const updateSchedule = async (cameraId: string, rules: any[], user: JwtAccessPayload) => {
+export const updateSchedule = async (cameraId: string, rules: IRecordingScheduleRule[], user: JwtAccessPayload) => {
   const camera = await Camera.findOne({ _id: cameraId, isDeleted: false });
   if (!camera) throw ApiError.notFound("Camera");
   await validateCameraAccess(camera, user);

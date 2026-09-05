@@ -3,6 +3,13 @@ import jwt from "jsonwebtoken";
 import { ApiError } from "../utils/ApiError";
 import { env } from "../config/env";
 import { JwtAccessPayload } from "../types";
+import { safeCompare } from "../utils/helpers";
+
+/**
+ * Standard system user ObjectId (24 hex characters) to ensure compatibility
+ * with Mongoose ObjectId queries, activity logs, and schema foreign keys.
+ */
+export const SYSTEM_USER_ID = "000000000000000000000000";
 
 /**
  * Authentication middleware — verifies the JWT access token.
@@ -19,9 +26,9 @@ export const authenticate = (
   try {
     // ── Check System API Key (bypass JWT for internal hardware/cron requests) ──
     const systemKey = req.headers["x-system-key"];
-    if (systemKey && systemKey === env.SYSTEM_API_KEY) {
+    if (typeof systemKey === "string" && safeCompare(systemKey, env.SYSTEM_API_KEY)) {
       req.user = {
-        userId: "system",
+        userId: SYSTEM_USER_ID,
         role: "super_admin",
         sessionId: "system-session",
         email: "system@cctvmonitor.com",

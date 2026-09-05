@@ -49,7 +49,6 @@ const envSchema = z.object({
   FIREBASE_SERVICE_ACCOUNT_BASE64: z.string().optional(),
 
   // MediaMTX
-  MEDIAMTX_HOST: z.string().default("localhost"),
   MEDIAMTX_URL: z.string().default("http://localhost:9997"),
   MEDIAMTX_API_URL: z.string().default("http://localhost:9997/v3"),
   MEDIAMTX_STREAM_SECRET: z.string().optional(),
@@ -67,8 +66,8 @@ const envSchema = z.object({
   // CORS
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
 
-  // System API Key
-  SYSTEM_API_KEY: z.string().default("system_dev_secret_key"),
+  // System API Key (must be provided and at least 32 characters)
+  SYSTEM_API_KEY: z.string().min(32, "SYSTEM_API_KEY must be at least 32 characters"),
 });
 
 

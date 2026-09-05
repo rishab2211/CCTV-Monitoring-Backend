@@ -61,6 +61,8 @@ const sosAlertSchema = new Schema<SosAlertDocument>(
 sosAlertSchema.index({ status: 1 });
 sosAlertSchema.index({ cameraId: 1, status: 1 });
 sosAlertSchema.index({ createdAt: -1 });
+sosAlertSchema.index({ franchiseId: 1, status: 1, createdAt: -1 });
+sosAlertSchema.index({ triggeredBy: 1, createdAt: -1 });
 
 export const SosAlert: Model<SosAlertDocument> = mongoose.model<SosAlertDocument>(
   "SosAlert",

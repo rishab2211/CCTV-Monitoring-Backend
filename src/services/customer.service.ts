@@ -7,7 +7,9 @@ import { User } from "../models/User";
 import { Subscription } from "../models/Subscription";
 import { Plan } from "../models/Plan";
 import { BillingInvoice } from "../models/BillingInvoice";
+import { Payment } from "../models/Payment";
 import { Camera } from "../models/Camera";
+
 import { Incident } from "../models/Incident";
 import { SosAlert } from "../models/SosAlert";
 import { ApiError } from "../utils/ApiError";
@@ -82,12 +84,24 @@ export const subscribeToPlan = async (planName: string, durationMonths: number, 
     invoiceUrl: `https://billing.example.com/inv/${new mongoose.Types.ObjectId().toString()}` // Mock URL
   });
 
+  await Payment.create({
+    customerId: customer._id,
+    franchiseId: customer.customerDetails?.assignedFranchise || undefined,
+    subscriptionId: subscription._id,
+    amount: Math.round(totalAmount * 100), // stored in paise
+    currency: "INR",
+    status: "paid",
+    provider: "manual",
+    paidAt: startDate,
+  });
+
   logActivity({
     userId: new mongoose.Types.ObjectId(user.userId),
     action: "SUBSCRIPTION_CREATED",
     description: `Subscribed to ${planName} plan for ${durationMonths} months`,
     metadata: { subscriptionId: subscription._id, invoiceId: invoice._id, amount: totalAmount },
   });
+
 
   await notificationService.sendNotification(
     user.userId,
@@ -191,10 +205,17 @@ export const getDashboard = async (user: JwtAccessPayload) => {
       status: { $in: ["active", "past_due"] } 
     }).lean(),
 
-    // 2. Get cameras owned by this customer
-    Camera.find({ customerId: user.userId, isDeleted: false })
-      .select("name location status streamUrl")
+    // 2. Get cameras owned by or shared with this customer
+    Camera.find({
+      $or: [
+        { customerId: user.userId },
+        { sharedWith: user.userId },
+      ],
+      isDeleted: false,
+    })
+      .select("name location status rtspUrl")
       .lean(),
+
 
     // 3. Get the 5 most recent incidents
     Incident.find({ reportedBy: user.userId })

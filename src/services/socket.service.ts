@@ -10,6 +10,9 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 import { logger } from "../utils/logger";
 import { JwtAccessPayload } from "../types";
+import mongoose from "mongoose";
+import { Camera } from "../models/Camera";
+import { validateCameraAccess } from "./camera.service";
 
 class SocketService {
   private io: Server | null = null;
@@ -19,16 +22,27 @@ class SocketService {
    * Sets up CORS and the JWT authentication middleware.
    */
   public initialize(server: HttpServer) {
+    const allowedOrigins = env.CORS_ORIGIN.split(",").map((o) => o.trim());
+
     this.io = new Server(server, {
       cors: {
-        origin: "*", // In production, this should be restricted to the frontend URL
+        origin: allowedOrigins,
         methods: ["GET", "POST"],
+        credentials: true,
       },
     });
 
     // Authentication Middleware
     this.io.use((socket: Socket, next) => {
-      const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(" ")[1];
+      let rawToken = socket.handshake.auth?.token || socket.handshake.headers?.authorization;
+      if (typeof rawToken === "string") {
+        if (rawToken.startsWith("Bearer ")) {
+          rawToken = rawToken.slice(7).trim();
+        } else if (rawToken.includes(" ")) {
+          rawToken = rawToken.split(" ")[1]?.trim();
+        }
+      }
+      const token = rawToken;
       
       if (!token) {
         return next(new Error("Authentication error: No token provided"));
@@ -48,6 +62,11 @@ class SocketService {
       const user = socket.data.user as JwtAccessPayload;
       logger.debug(`[Socket.IO] Client connected: ${user.userId} (${user.role})`);
 
+      // Automatically join private per-user room
+      const userRoom = `user_${user.userId}`;
+      socket.join(userRoom);
+      logger.debug(`[Socket.IO] User ${user.userId} joined private room ${userRoom}`);
+
       // Automatically join franchise room if user belongs to one
       if (user.franchiseId) {
         const franchiseRoom = `franchise_${user.franchiseId}`;
@@ -55,12 +74,37 @@ class SocketService {
         logger.debug(`[Socket.IO] User ${user.userId} joined room ${franchiseRoom}`);
       }
 
+      // Staff roles join emergency monitors room for SOS panic boards
+      if (["super_admin", "admin", "operator"].includes(user.role)) {
+        socket.join("sos_monitors");
+        logger.debug(`[Socket.IO] User ${user.userId} joined room sos_monitors`);
+      }
+
       // Client can request to join specific camera rooms to receive alerts for them
-      socket.on("join_camera", (cameraId: string) => {
-        const roomName = `camera_${cameraId}`;
-        socket.join(roomName);
-        logger.debug(`[Socket.IO] User ${user.userId} joined room ${roomName}`);
+      socket.on("join_camera", async (cameraId: string) => {
+        try {
+          if (!cameraId || !mongoose.Types.ObjectId.isValid(cameraId)) {
+            socket.emit("error", { message: "Invalid camera ID format" });
+            return;
+          }
+
+          const camera = await Camera.findOne({ _id: cameraId, isDeleted: false });
+          if (!camera) {
+            socket.emit("error", { message: "Camera not found" });
+            return;
+          }
+
+          await validateCameraAccess(camera, user);
+
+          const roomName = `camera_${cameraId}`;
+          socket.join(roomName);
+          logger.debug(`[Socket.IO] User ${user.userId} joined room ${roomName}`);
+        } catch (err: any) {
+          logger.warn(`[Socket.IO] Unauthorized join_camera attempt by ${user.userId} for camera ${cameraId}: ${err.message}`);
+          socket.emit("error", { message: err.message || "Unauthorized to join camera room" });
+        }
       });
+
 
       socket.on("leave_camera", (cameraId: string) => {
         const roomName = `camera_${cameraId}`;
@@ -109,9 +153,9 @@ class SocketService {
   /**
    * Emit Global Event
    * Broadcasts an event to all connected clients globally.
-   * Used for system-wide notifications or targeted user notifications via uniquely named events.
+   * Used for system-wide announcements.
    * 
-   * @param event - Event name (e.g., 'notification:1234')
+   * @param event - Event name
    * @param data - Payload to send
    */
   public emitGlobal(event: string, data: any) {
@@ -120,16 +164,42 @@ class SocketService {
   }
 
   /**
-   * Emit to a specific user
-   * Because users can have multiple sockets, we could use a user-specific room
-   * But for simplicity with global emits, we emit globally with a user-specific event name,
-   * OR we could maintain a map of user to socket IDs.
-   * Assuming the client listens to `event_name` globally and filters, or listens to `event_name:${userId}`.
-   * We will emit `event:${userId}` globally.
+   * Emit to a specific user via private room.
+   * Also emits `${event}:${userId}` for backwards compatibility with any client filtering patterns.
    */
   public emitToUser(userId: string, event: string, data: any) {
     if (!this.io) return;
-    this.io.emit(`${event}:${userId}`, data);
+    const roomName = `user_${userId}`;
+    this.io.to(roomName).emit(event, data);
+    this.io.to(roomName).emit(`${event}:${userId}`, data);
+  }
+
+  /**
+   * Emit SOS alert event scoped to relevant audiences:
+   * - sos_monitors (operators, admins, super_admins)
+   * - franchise_<id> (franchise staff)
+   * - user_<id> (triggering customer)
+   * - camera_<id> (camera subscribers)
+   * Prevents customer PII leak to other customers.
+   */
+  public emitSosAlert(event: string, sos: any) {
+    if (!this.io) return;
+    this.io.to("sos_monitors").emit(event, sos);
+
+    if (sos.franchiseId) {
+      const franchiseIdStr = sos.franchiseId._id ? sos.franchiseId._id.toString() : sos.franchiseId.toString();
+      this.io.to(`franchise_${franchiseIdStr}`).emit(event, sos);
+    }
+
+    if (sos.triggeredBy) {
+      const customerId = sos.triggeredBy._id ? sos.triggeredBy._id.toString() : sos.triggeredBy.toString();
+      this.io.to(`user_${customerId}`).emit(event, sos);
+    }
+
+    if (sos.cameraId) {
+      const camId = sos.cameraId._id ? sos.cameraId._id.toString() : sos.cameraId.toString();
+      this.io.to(`camera_${camId}`).emit(event, sos);
+    }
   }
 }
 

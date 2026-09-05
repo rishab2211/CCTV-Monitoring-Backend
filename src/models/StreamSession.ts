@@ -69,6 +69,13 @@ streamSessionSchema.index(
   { expireAfterSeconds: 86400, sparse: true } // sparse so active sessions (endedAt=null) are not affected
 );
 
+// Fallback TTL index — auto-delete abandoned/orphaned sessions 7 days after creation
+streamSessionSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 7 * 24 * 60 * 60 }
+);
+
+
 // ─── Model ───────────────────────────────────────────────────────────────────
 
 export const StreamSession: Model<StreamSessionDocument> =
