@@ -101,7 +101,7 @@ When any user (`franchise`, `franchise_admin`, `operator`, `technician`, etc.) l
 6. Active Sessions (/auth/sessions)    → View connected devices
 7. Forgot Password (/auth/forgot-password) → Trigger OTP email
 8. Verify OTP (/auth/verify-otp)       → Verify 6-digit code
-9. Reset Password (/auth/reset-password) → Set new password with OTP
+9. Reset Password (/auth/reset-password) → Set new password with resetToken
 10. Revoke Session (/auth/sessions/:id)→ Invalidate specific device
 11. Logout (/auth/logout)              → Terminate active session
 ```
@@ -295,8 +295,10 @@ curl -X POST http://localhost:5000/api/v1/auth/verify-otp \
 {
   "success": true,
   "statusCode": 200,
-  "message": "OTP verified successfully",
-  "data": { "verified": true }
+  "message": "OTP verified successfully. Use the reset token to set a new password.",
+  "data": {
+    "resetToken": "460a941e2b057d16c1670b40802ce2fb5caa3f4e4a95da536c13ad7d78380ad7"
+  }
 }
 ```
 
@@ -305,9 +307,9 @@ curl -X POST http://localhost:5000/api/v1/auth/verify-otp \
 curl -X POST http://localhost:5000/api/v1/auth/reset-password \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "admin@cctvmonitor.com",
-    "otp": "123456",
-    "newPassword": "NewAdmin@9999Password"
+    "resetToken": "460a941e2b057d16c1670b40802ce2fb5caa3f4e4a95da536c13ad7d78380ad7",
+    "newPassword": "NewAdmin@9999Password",
+    "confirmPassword": "NewAdmin@9999Password"
   }'
 ```
 **Response `200`:**

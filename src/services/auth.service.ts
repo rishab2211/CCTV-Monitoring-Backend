@@ -438,8 +438,16 @@ export const verifyOtp = async (
 
   if (!safeCompare(otpRecord.otpHash, otpHash)) {
     otpRecord.attempts += 1;
+    if (otpRecord.attempts >= 5) {
+      otpRecord.isUsed = true;
+    }
     await otpRecord.save();
-    const remaining = 5 - otpRecord.attempts;
+    const remaining = Math.max(0, 5 - otpRecord.attempts);
+    if (remaining === 0) {
+      throw ApiError.tooManyRequests(
+        "Maximum OTP attempts exceeded. Please request a new OTP."
+      );
+    }
     throw ApiError.badRequest(
       `Invalid OTP. ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining.`
     );

@@ -41,7 +41,7 @@ const otpVerificationSchema = new Schema<OTPVerificationDocument>(
     attempts: {
       type: Number,
       default: 0,
-      max: [5, "Maximum verification attempts exceeded"],
+      min: 0,
     },
     isUsed: {
       type: Boolean,
