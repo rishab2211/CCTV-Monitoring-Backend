@@ -27,7 +27,20 @@ export const registerSchema = z.object({
   email: z.string().email("Invalid email address").toLowerCase().trim(),
   phone: phoneSchema,
   password: passwordSchema,
-  role: z.literal("customer").default("customer"),
+  role: z
+    .enum(
+      [
+        "super_admin",
+        "admin",
+        "franchise",
+        "franchise_admin",
+        "operator",
+        "technician",
+        "customer",
+      ],
+      { errorMap: () => ({ message: "Invalid role" }) }
+    )
+    .default("customer"),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
