@@ -290,7 +290,7 @@ curl -X POST http://localhost:5000/api/v1/auth/verify-otp \
     "otp": "123456"
   }'
 ```
-**Response `200`:**
+**Response `200` (Success):**
 ```json
 {
   "success": true,
@@ -299,6 +299,34 @@ curl -X POST http://localhost:5000/api/v1/auth/verify-otp \
   "data": {
     "resetToken": "460a941e2b057d16c1670b40802ce2fb5caa3f4e4a95da536c13ad7d78380ad7"
   }
+}
+```
+
+**Response `400` (Wrong OTP — Attempts Remaining):**
+```json
+{
+  "success": false,
+  "statusCode": 400,
+  "message": "Invalid OTP. 4 attempts remaining."
+}
+```
+
+**Response `429` (5th Attempt Failed — Account Lockout / Exhausted):**
+```json
+{
+  "success": false,
+  "statusCode": 429,
+  "message": "Maximum OTP attempts exceeded. Please request a new OTP."
+}
+```
+> **Security Note:** The active OTP is automatically invalidated upon reaching 5 failed attempts to protect against brute-force attacks.
+
+**Response `400` (Expired or Already Used OTP):**
+```json
+{
+  "success": false,
+  "statusCode": 400,
+  "message": "No active OTP found. Please request a new one."
 }
 ```
 
@@ -1044,6 +1072,8 @@ socket.on("connect", () => {
 | **Privilege Escalation** | `403` | `"You don't have permission to perform this action"` | Role lacks required permission key |
 | **Duplicate Unique Keys** | `409` | `"Resource already exists"` | Duplicate email, phone, or serialNumber |
 | **Rate Limit Exceeded** | `429` | `"Too many requests. Please try again later."` | Exceeded 100 req/15m or 10 req/15m on auth |
+| **OTP Attempts Exceeded** | `429` | `"Maximum OTP attempts exceeded. Please request a new OTP."` | 5 failed verification attempts reached (OTP invalidated) |
+| **Invalid OTP Code** | `400` | `"Invalid OTP. <N> attempts remaining."` | Incorrect 6-digit OTP entered |
 | **Invalid ObjectId Format** | `400` | `"Invalid ID format"` | String is not a 24-char BSON hex ObjectId |
 
 ---
