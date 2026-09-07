@@ -11,7 +11,6 @@ interface ErrorResponse {
   statusCode: number;
   message: string;
   errors?: unknown[];
-  stack?: string;
 }
 
 /**
@@ -113,7 +112,6 @@ export const errorHandler = (
     statusCode,
     message,
     ...(errors.length > 0 && { errors }),
-    ...(env.NODE_ENV === "development" && { stack: err.stack }),
   };
 
 
