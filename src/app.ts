@@ -30,20 +30,29 @@ app.use(
 
 // CORS
 const allowedOrigins = env.CORS_ORIGIN.split(",").map((o) => o.trim());
+const isWildcard = allowedOrigins.includes("*");
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, Postman, curl)
+      // Allow requests with no origin (mobile apps, Postman, server-to-server)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin) || env.NODE_ENV === "development") {
+      // Wildcard — allow all origins (not recommended for credentialed requests)
+      if (isWildcard) return callback(null, true);
+      // Development — allow everything
+      if (env.NODE_ENV === "development") return callback(null, true);
+      // Production — explicit allowlist check
+      if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error(`CORS policy: Origin ${origin} not allowed`));
+        // Return null (block) instead of throwing — prevents 500, lets CORS module send 403
+        callback(null, false);
       }
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    optionsSuccessStatus: 204, // Some legacy browsers (IE11) choke on 204
   })
 );
 
