@@ -2,7 +2,7 @@
 
 **Base URL:** `http://localhost:5000/api/v1`  
 **Server Start:** `bun run dev` (or `npm run dev`)  
-**Health Check:** `curl http://localhost:5000/api/health`  
+**Health Check:** `curl http://localhost:5000/api/v1/health`  
 **WebSocket URL:** `ws://localhost:5000`
 
 > 💾 Store the `accessToken`, `refreshToken`, and entity IDs (`cameraId`, `franchiseId`, `incidentId`, etc.) from responses — you'll need them for subsequent and protected routes.
@@ -110,7 +110,7 @@ When any user (`franchise`, `franchise_admin`, `operator`, `technician`, etc.) l
 
 ### 1.1 Health Check
 ```bash
-curl -X GET http://localhost:5000/api/health
+curl -X GET http://localhost:5000/api/v1/health
 ```
 **Response `200`:**
 ```json
@@ -1100,7 +1100,7 @@ Copy and run this bash script to test the core lifecycle from registration to st
 BASE="http://localhost:5000/api/v1"
 
 echo "=== 1. Health Check ==="
-curl -s "$BASE/../health" | python3 -m json.tool
+curl -s "$BASE/health" | python3 -m json.tool
 
 echo "=== 2. Register Super Admin ==="
 REGISTER_RES=$(curl -s -X POST "$BASE/auth/register" \

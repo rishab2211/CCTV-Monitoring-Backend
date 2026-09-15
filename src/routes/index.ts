@@ -1,6 +1,6 @@
-import { Router, Request, Response } from "express";
-import mongoose from "mongoose";
+import { Router } from "express";
 import v1Router from "./v1";
+import healthRoutes from "./v1/health.routes";
 
 const router = Router();
 
@@ -8,28 +8,8 @@ const router = Router();
 
 router.use("/v1", v1Router);
 
-// ─── Health Check ─────────────────────────────────────────────────────────────
-
-router.get("/health", (_req: Request, res: Response) => {
-  const isDbConnected = mongoose.connection.readyState === 1;
-  const status = isDbConnected ? 200 : 503;
-
-  res.status(status).json({
-    success: isDbConnected,
-    message: isDbConnected ? "CCTV Monitoring API is healthy" : "Database disconnected",
-    version: "1.0.0",
-    services: {
-      database: isDbConnected ? "connected" : "disconnected",
-      uptimeSeconds: Math.floor(process.uptime()),
-    },
-    memory: {
-      rssMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
-      heapUsedMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-    },
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || "development",
-  });
-});
-
+// ─── Backwards Compatibility Health Route (/api/health) ───────────────────────
+// Delegates to /api/v1/health handlers
+router.use("/health", healthRoutes);
 
 export default router;

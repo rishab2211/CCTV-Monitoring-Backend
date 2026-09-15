@@ -13,7 +13,19 @@ export const generalLimiter = rateLimit({
   standardHeaders: true, // Return rate limit info in RateLimit-* headers
   legacyHeaders: false,
   skip: (req) => {
-    // Whitelist internal hardware and automated system requests from rate limiting
+    // Whitelist health check endpoints and root probes
+    if (
+      req.path === "/" ||
+      req.path === "/health" ||
+      req.path === "/api/health" ||
+      req.path === "/api/v1/health" ||
+      req.path.startsWith("/api/v1/health") ||
+      req.path.startsWith("/health")
+    ) {
+      return true;
+    }
+
+    // Whitelist internal hardware and automated system requests
     const key = req.headers["x-system-key"];
     return typeof key === "string" && safeCompare(key, env.SYSTEM_API_KEY);
   },

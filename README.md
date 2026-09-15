@@ -619,7 +619,7 @@ bun run build
 
 **Health check:**
 ```bash
-curl http://localhost:5000/api/health
+curl http://localhost:5000/api/v1/health
 ```
 
 ---

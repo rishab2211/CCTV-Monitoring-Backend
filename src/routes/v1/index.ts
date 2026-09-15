@@ -22,6 +22,7 @@ import analyticsRoutes from "./analytics.routes";
 import { auditRouter, activityRouter } from "./audit.routes";
 import ticketRoutes from "./ticket.routes";
 import settingRoutes from "./setting.routes";
+import healthRoutes from "./health.routes";
 
 const router = Router();
 
@@ -96,8 +97,9 @@ router.use("/tickets", ticketRoutes);
 // ─── Module 20: System Settings ──────────────────────────────────────────────
 router.use("/settings", settingRoutes);
 
-// ─── Future Modules (uncomment as built) ─────────────────────────────────────
-// router.use("/reports", reportRoutes);
 router.use("/analytics", analyticsRoutes);
+
+// ─── Health & Diagnostics ───────────────────────────────────────────────────
+router.use("/health", healthRoutes);
 
 export default router;

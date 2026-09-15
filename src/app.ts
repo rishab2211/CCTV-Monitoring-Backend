@@ -4,6 +4,7 @@ import helmet from "helmet";
 import cors from "cors";
 import { env } from "./config/env";
 import router from "./routes";
+import healthRoutes from "./routes/v1/health.routes";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { generalLimiter } from "./middleware/rateLimiter";
 import { logger } from "./utils/logger";
@@ -54,6 +55,19 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // ─── Trust Proxy (for correct IP behind Nginx) ────────────────────────────────
 
 app.set("trust proxy", 1);
+
+// ─── Health Checks & Orchestrator Probes ──────────────────────────────────────
+// Mounted before rate limiter so health probes are never throttled or blocked
+app.use("/health", healthRoutes);
+
+// Fast HTTP/HEAD root ping for cloud orchestrators & load balancers
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "CCTV Monitoring Backend",
+    healthCheck: "/api/v1/health",
+  });
+});
 
 // ─── Global Rate Limiter ──────────────────────────────────────────────────────
 

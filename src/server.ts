@@ -65,7 +65,7 @@ const startServer = async (): Promise<void> => {
         `  Server Port :  ${env.PORT}`,
         `  Process ID  :  ${process.pid}`,
         `  API Base    :  http://localhost:${env.PORT}/api/v1`,
-        `  Health Check:  http://localhost:${env.PORT}/api/health`,
+        `  Health Check:  http://localhost:${env.PORT}/api/v1/health`,
         `  WebSockets  :  ws://localhost:${env.PORT}`,
         `  Boot Time   :  ${bootDuration} ms`,
         "════════════════════════════════════════════════════════════════",
