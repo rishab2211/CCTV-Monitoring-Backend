@@ -1,23 +1,11 @@
-FROM oven/bun:1.1-slim
+FROM bluenviron/mediamtx:1.9.3 AS mediamtx
+
+FROM oven/bun:1-slim
 
 WORKDIR /app
 
-# Install curl, ca-certificates, and tar to fetch the static MediaMTX binary
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
-    tar \
-    && rm -rf /var/lib/apt/lists/*
-
-# Download and install MediaMTX v1.9.3 static binary
-ENV MEDIAMTX_VERSION=v1.9.3
-RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then MTX_ARCH="amd64"; \
-    elif [ "$ARCH" = "aarch64" ]; then MTX_ARCH="arm64v8"; \
-    else MTX_ARCH="amd64"; fi && \
-    curl -fsSL "https://github.com/bluenviron/mediamtx/releases/download/${MEDIAMTX_VERSION}/mediamtx_${MEDIAMTX_VERSION}_linux_${MTX_ARCH}.tar.gz" \
-    | tar -xz -C /usr/local/bin mediamtx && \
-    chmod +x /usr/local/bin/mediamtx
+# Copy the static MediaMTX binary from the official image
+COPY --from=mediamtx /mediamtx /usr/local/bin/mediamtx
 
 # Copy package descriptors and install dependencies
 COPY package.json bun.lock ./
