@@ -37,7 +37,10 @@ const startServer = async (): Promise<void> => {
     const extStartTime = Date.now();
     logger.info("⚙️  [4/6] Initializing External Services (Cloudinary & SMTP)...");
     configureCloudinary();
-    await verifyEmailConnection();
+    // Non-blocking async verification so slow or blocked SMTP handshakes never delay HTTP server startup
+    verifyEmailConnection().catch((err) => {
+      logger.warn("⚠️  Async SMTP verification error:", err);
+    });
     logger.info(`✅ [4/6] External Services Initialized (${Date.now() - extStartTime}ms)`);
 
     // ── Stage 5: Start HTTP Server ──────────────────────────────────────────

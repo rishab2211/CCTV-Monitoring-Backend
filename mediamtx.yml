@@ -1,20 +1,24 @@
 # MediaMTX Configuration for CCTV Monitoring Platform
 api: yes
-apiAddress: :9997
+apiAddress: 127.0.0.1:9997
 
 # Logging
 logLevel: info
 logDestinations: [stdout]
 
-# RTSP Server
+# RTSP Server (internal)
 rtsp: yes
-rtspAddress: :8554
+rtspAddress: 127.0.0.1:8554
 protocols: [tcp, udp]
 
 # WebRTC (WHEP / WHIP)
 webrtc: yes
 webrtcAddress: :8889
 webrtcAllowOrigin: '*'
+
+# HLS (internal)
+hls: yes
+hlsAddress: 127.0.0.1:8888
 
 # Default path config to allow dynamic paths created via API
 paths:

@@ -13,6 +13,9 @@ const createTransporter = () => {
       user: env.SMTP_USER,
       pass: env.SMTP_PASS,
     },
+    connectionTimeout: 4000,
+    greetingTimeout: 4000,
+    socketTimeout: 4000,
   });
 };
 
@@ -110,12 +113,15 @@ export const sendOTPEmail = async (
 
 export const verifyEmailConnection = async (): Promise<void> => {
   try {
-    await getTransporter().verify();
+    const verifyPromise = getTransporter().verify();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("SMTP verification timed out (3s)")), 3000)
+    );
+    await Promise.race([verifyPromise, timeoutPromise]);
     logger.info("✅ SMTP connection verified");
   } catch (error) {
     logger.warn(
-      "⚠️  SMTP connection failed. Email features will be unavailable:",
-      error
+      `⚠️  SMTP connection failed or timed out (${error instanceof Error ? error.message : error}). Email features will be unavailable:`
     );
   }
 };

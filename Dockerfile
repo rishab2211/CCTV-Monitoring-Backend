@@ -17,7 +17,7 @@ COPY src ./src
 
 RUN chmod +x entrypoint.sh
 
-# Expose default HTTP port
-EXPOSE 5000 8554 8889 9997
+# Expose Render web service HTTP port
+EXPOSE 10000
 
 ENTRYPOINT ["/app/entrypoint.sh"]
