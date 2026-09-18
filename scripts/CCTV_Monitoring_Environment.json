@@ -1,0 +1,167 @@
+{
+  "id": "cctv-monitoring-env",
+  "name": "CCTV Monitoring Backend Env",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/v1",
+      "enabled": true
+    },
+    {
+      "key": "systemKey",
+      "value": "system_dev_secret_key",
+      "enabled": true
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "superAdminToken",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "operatorToken",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "customerToken",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "technicianToken",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "franchiseOwnerId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "franchiseId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "franchiseAdminId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "operatorUserId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "technicianUserId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "customerUserId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "cameraId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "recordingId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "streamToken",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "streamSessionId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "alertId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "sosId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "incidentId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "leadId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "installationId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "planId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "subscriptionId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "paymentId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "invoiceId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "ticketId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "auditLogId",
+      "value": "",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}
