@@ -11,9 +11,9 @@ rtsp: yes
 rtspAddress: 127.0.0.1:8554
 protocols: [tcp, udp]
 
-# WebRTC (WHEP / WHIP)
+# WebRTC (WHEP / WHIP - internal loopback)
 webrtc: yes
-webrtcAddress: :8889
+webrtcAddress: 127.0.0.1:8889
 webrtcAllowOrigin: '*'
 
 # HLS (internal)

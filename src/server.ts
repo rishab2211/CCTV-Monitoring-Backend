@@ -47,7 +47,7 @@ const startServer = async (): Promise<void> => {
     const httpStartTime = Date.now();
     logger.info(`📡 [5/6] Binding HTTP Server to Port ${env.PORT}...`);
 
-    const server = app.listen(env.PORT, () => {
+    const server = app.listen(env.PORT, "0.0.0.0", () => {
       const bootDuration = Date.now() - startTime;
 
       logger.info(`✅ [5/6] HTTP Server Ready (${Date.now() - httpStartTime}ms)`);
