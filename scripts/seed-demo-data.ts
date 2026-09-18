@@ -57,7 +57,7 @@ async function seedDemoData() {
   const franchiseAdmin = await User.create({
     name: "Marcus Sterling (Franchise Owner)",
     email: "franchise@cctv.com",
-    phone: "9876543211",
+    phone: "9876543288",
     password: "Franchise@123",
     role: "franchise_admin",
     isActive: true,
@@ -70,7 +70,7 @@ async function seedDemoData() {
     franchiseCode: "FR-METRO-01",
     ownerId: franchiseAdmin._id,
     contactEmail: "franchise@cctv.com",
-    contactPhone: "9876543211",
+    contactPhone: "9876543288",
     address: "Tower 4, Bandra Kurla Complex, Mumbai, MH",
     status: "active",
     territory: {
@@ -109,7 +109,7 @@ async function seedDemoData() {
   const operator = await User.create({
     name: "Rajesh Kumar (Command Operator)",
     email: "operator@cctv.com",
-    phone: "9876543212",
+    phone: "9876543289",
     password: "Operator@123",
     role: "operator",
     isActive: true,
@@ -126,7 +126,7 @@ async function seedDemoData() {
   const customer = await User.create({
     name: "Vikram Malhotra (Property Owner)",
     email: "customer@cctv.com",
-    phone: "9876543213",
+    phone: "9876543290",
     password: "Customer@123",
     role: "customer",
     isActive: true,
@@ -169,12 +169,13 @@ async function seedDemoData() {
   await Subscription.create({
     customerId: customer._id,
     planId: demoPlan._id,
+    planName: demoPlan.name,
     franchiseId: demoFranchise._id,
     status: "active",
     startDate: new Date(),
     endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     autoRenew: true,
-    pricePaid: 4999,
+    price: 4999,
   });
 
   // 9. Create 3 RTSP Demo Cameras
