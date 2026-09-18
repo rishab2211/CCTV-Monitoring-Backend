@@ -49,7 +49,7 @@ const envSchema = z.object({
   FIREBASE_SERVICE_ACCOUNT_BASE64: z.string().optional(),
 
   // MediaMTX
-  MEDIAMTX_URL: z.string().default("http://localhost:9997"),
+  MEDIAMTX_URL: z.string().default("http://localhost:8889"),
   MEDIAMTX_API_URL: z.string().default("http://localhost:9997/v3"),
   MEDIAMTX_STREAM_SECRET: z.string().optional(),
   STREAM_TOKEN_EXPIRY: z.string().default("24h"),

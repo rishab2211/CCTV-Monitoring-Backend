@@ -11,11 +11,15 @@ COPY --from=mediamtx /mediamtx /usr/local/bin/mediamtx
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile || bun install
 
-# Copy application files and configurations
+# Install ffmpeg for live synthetic CCTV feed generation
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Copy application files, scripts, and configurations
 COPY tsconfig.json mediamtx.yml entrypoint.sh ./
 COPY src ./src
+COPY scripts ./scripts
 
-RUN chmod +x entrypoint.sh
+RUN chmod +x entrypoint.sh scripts/*.sh || true
 
 # Expose Render web service HTTP port
 EXPOSE 10000

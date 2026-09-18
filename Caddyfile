@@ -1,0 +1,14 @@
+{
+    email {$EMAIL:admin@cctv.com}
+    admin off
+}
+
+{$DOMAIN:localhost} {
+    # Reverse proxy API and WebSocket traffic to Bun backend on port 5000
+    reverse_proxy localhost:5000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
