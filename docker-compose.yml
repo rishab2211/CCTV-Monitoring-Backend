@@ -1,44 +1,12 @@
 version: '3.8'
 
 services:
-  cctv-backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: cctv_backend
-    restart: unless-stopped
-    network_mode: host
-    env_file:
-      - .env
-    environment:
-      - PORT=5000
-      - NODE_ENV=production
-      - MEDIAMTX_URL=http://127.0.0.1:8889
-      - MEDIAMTX_API_URL=http://127.0.0.1:9997/v3
-      - ENABLE_DEMO_FEEDS=true
-      # MediaMTX will advertise this public IP to browsers for WebRTC NAT traversal
-      - MTX_WEBRTCADDITIONALHOSTS=${PUBLIC_IP:-}
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "20m"
-        max-file: "3"
-
-  caddy:
-    image: caddy:alpine
-    container_name: cctv_caddy
-    restart: unless-stopped
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: cctv_mediamtx
     network_mode: host
     environment:
-      - DOMAIN=${DOMAIN:-localhost}
-      - EMAIL=${EMAIL:-admin@cctv.com}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - cctv-backend
-
-volumes:
-  caddy_data:
-  caddy_config:
+      # These environment variables override the default mediamtx.yml settings inside the container
+      - MTX_API=yes
+      - MTX_APIADDRESS=:9997
+    restart: unless-stopped

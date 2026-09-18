@@ -31,3 +31,5 @@ services:
         sync: false
       - key: CORS_ORIGIN
         value: "https://cctv-monitoring-admin-panel.vercel.app"
+      - key: ENABLE_DEMO_FEEDS
+        value: "true"

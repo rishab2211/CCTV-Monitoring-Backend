@@ -11,8 +11,8 @@ COPY --from=mediamtx /mediamtx /usr/local/bin/mediamtx
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile || bun install
 
-# Install ffmpeg for live synthetic CCTV feed generation
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install ffmpeg and fonts for live synthetic CCTV feed generation
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Copy application files, scripts, and configurations
 COPY tsconfig.json mediamtx.yml entrypoint.sh ./
