@@ -1,0 +1,43 @@
+{
+  "cluster": "cctv-monitoring-cluster",
+  "serviceName": "cctv-monitoring-service",
+  "taskDefinition": "cctv-monitoring-backend",
+  "desiredCount": 1,
+  "launchType": "FARGATE",
+  "platformVersion": "LATEST",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": [
+        "subnet-XXXXXXXXXXXXXXXXX",
+        "subnet-XXXXXXXXXXXXXXXXX"
+      ],
+      "securityGroups": [
+        "sg-XXXXXXXXXXXXXXXXX"
+      ],
+      "assignPublicIp": "DISABLED"
+    }
+  },
+  "loadBalancers": [
+    {
+      "targetGroupArn": "arn:aws:elasticloadbalancing:ap-south-1:YOUR_ACCOUNT_ID:targetgroup/cctv-api-tg/XXXXXXXXXXXXXXXXX",
+      "containerName": "cctv-api",
+      "containerPort": 8080
+    }
+  ],
+  "deploymentConfiguration": {
+    "deploymentCircuitBreaker": {
+      "enable": true,
+      "rollback": true
+    },
+    "maximumPercent": 200,
+    "minimumHealthyPercent": 100
+  },
+  "healthCheckGracePeriodSeconds": 60,
+  "enableECSManagedTags": true,
+  "propagateTags": "SERVICE",
+  "tags": [
+    { "key": "Project",     "value": "CCTVMonitoring" },
+    { "key": "Environment", "value": "production" },
+    { "key": "ManagedBy",   "value": "ecs" }
+  ]
+}

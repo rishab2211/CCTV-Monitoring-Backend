@@ -4,8 +4,8 @@ import { env } from "../config/env";
 /**
  * Resolves the public base URL of the running service.
  * Prioritizes:
- * 1. Explicit PUBLIC_BASE_URL env var
- * 2. Render-provided RENDER_EXTERNAL_URL (e.g. https://cctv-monitoring-backend.onrender.com)
+ * 1. Explicit PUBLIC_BASE_URL env var (set this in AWS ECS / any platform)
+ * 2. RENDER_EXTERNAL_URL (legacy: auto-set by Render.com)
  * 3. Incoming Request Host (if available via proxy headers)
  * 4. Localhost fallback
  */

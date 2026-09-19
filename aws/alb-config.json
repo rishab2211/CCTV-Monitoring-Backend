@@ -1,0 +1,47 @@
+{
+  "_comment": "ALB Target Group health check configuration for the CCTV API container.",
+  "_usage": "Apply these settings when creating the ALB Target Group in AWS Console or via CLI.",
+  "TargetGroup": {
+    "Name": "cctv-api-tg",
+    "Protocol": "HTTP",
+    "Port": 8080,
+    "TargetType": "ip",
+    "VpcId": "vpc-XXXXXXXXXXXXXXXXX",
+    "HealthCheckProtocol": "HTTP",
+    "HealthCheckPort": "traffic-port",
+    "HealthCheckPath": "/health/live",
+    "HealthCheckIntervalSeconds": 30,
+    "HealthCheckTimeoutSeconds": 10,
+    "HealthyThresholdCount": 2,
+    "UnhealthyThresholdCount": 3,
+    "Matcher": {
+      "HttpCode": "200"
+    }
+  },
+  "ALBListenerRules": {
+    "HTTPSListener": {
+      "Port": 443,
+      "Protocol": "HTTPS",
+      "DefaultActions": [
+        {
+          "Type": "forward",
+          "TargetGroupArn": "arn:aws:elasticloadbalancing:ap-south-1:YOUR_ACCOUNT_ID:targetgroup/cctv-api-tg/XXXXXXXXXXXXXXXXX"
+        }
+      ]
+    },
+    "HTTPRedirectListener": {
+      "Port": 80,
+      "Protocol": "HTTP",
+      "DefaultActions": [
+        {
+          "Type": "redirect",
+          "RedirectConfig": {
+            "Protocol": "HTTPS",
+            "Port": "443",
+            "StatusCode": "HTTP_301"
+          }
+        }
+      ]
+    }
+  }
+}

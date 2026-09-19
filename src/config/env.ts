@@ -49,11 +49,14 @@ const envSchema = z.object({
   FIREBASE_SERVICE_ACCOUNT_BASE64: z.string().optional(),
 
   // Public URLs & Deployment
+  // PUBLIC_BASE_URL: primary URL for this service (e.g. https://api.yourdomain.com).
+  // On AWS ECS, set this via SSM Parameter Store / task definition environment.
   PUBLIC_BASE_URL: z.string().optional(),
+  // RENDER_EXTERNAL_URL: kept for backwards-compat with local dev on Render; ignored on AWS.
   RENDER_EXTERNAL_URL: z.string().optional(),
   ENABLE_DEMO_FEEDS: z
     .string()
-    .default("true")
+    .default("false")
     .transform((v) => v === "true"),
 
   // MediaMTX Internal & External
@@ -76,11 +79,10 @@ const envSchema = z.object({
   // CORS
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
 
-  // System API Key (defaults to secure 32+ char fallback if not provided)
+  // System API Key — REQUIRED, no default. Must be set via SSM / Secrets Manager on AWS.
   SYSTEM_API_KEY: z
     .string()
-    .min(32, "SYSTEM_API_KEY must be at least 32 characters")
-    .default("e06636c4cdd23564cbbdf3204f538a75dbe7e4e1f0d980dc38ebf406b060d77f"),
+    .min(32, "SYSTEM_API_KEY must be at least 32 characters"),
 });
 
 

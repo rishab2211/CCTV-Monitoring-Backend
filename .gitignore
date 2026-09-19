@@ -9,11 +9,25 @@ dist/
 .env
 .env.local
 .env.production
+.env.staging
+.env.*.local
+
+# AWS / secrets — never commit these
+*.pem
+*.key
+*.p12
+*.pfx
+firebase-*.json
+service-account*.json
+google-credentials*.json
 
 # Logs
 src/logs/*.log
 logs/
 *.log
+
+# Uploads (ephemeral — use Cloudinary/S3 in production)
+uploads/
 
 # OS
 .DS_Store
@@ -28,3 +42,15 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# Uploads (use Cloudinary/S3 in production)
+uploads/
+
+# TLS / secrets — never commit private keys or certificates
+*.pem
+*.key
+*.crt
+
+# Firebase service account JSON files
+firebase-*.json
+service-account*.json

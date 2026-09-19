@@ -1,0 +1,111 @@
+{
+  "family": "cctv-monitoring-backend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/cctvEcsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "cctv-api",
+      "image": "YOUR_ACCOUNT_ID.dkr.ecr.ap-south-1.amazonaws.com/cctv-monitoring-backend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "protocol": "tcp",
+          "name": "http"
+        }
+      ],
+      "environment": [
+        { "name": "NODE_ENV",                     "value": "production" },
+        { "name": "PORT",                         "value": "8080" },
+        { "name": "ENABLE_DEMO_FEEDS",            "value": "false" },
+        { "name": "ACCESS_TOKEN_EXPIRY",          "value": "15m" },
+        { "name": "REFRESH_TOKEN_EXPIRY",         "value": "30d" },
+        { "name": "OTP_EXPIRY_MINUTES",           "value": "10" },
+        { "name": "SMTP_PORT",                    "value": "587" },
+        { "name": "SMTP_SECURE",                  "value": "false" },
+        { "name": "RATE_LIMIT_WINDOW_MS",         "value": "900000" },
+        { "name": "RATE_LIMIT_MAX",               "value": "100" },
+        { "name": "AUTH_RATE_LIMIT_MAX",          "value": "10" },
+        { "name": "MEDIAMTX_URL",                 "value": "http://127.0.0.1:8889" },
+        { "name": "MEDIAMTX_INTERNAL_HLS_URL",   "value": "http://127.0.0.1:8888" },
+        { "name": "MEDIAMTX_INTERNAL_WEBRTC_URL","value": "http://127.0.0.1:8889" },
+        { "name": "MEDIAMTX_API_URL",             "value": "http://127.0.0.1:9997/v3" },
+        { "name": "STREAM_TOKEN_EXPIRY",          "value": "24h" }
+      ],
+      "secrets": [
+        { "name": "MONGODB_URI",              "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/MONGODB_URI" },
+        { "name": "ACCESS_TOKEN_SECRET",      "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/ACCESS_TOKEN_SECRET" },
+        { "name": "REFRESH_TOKEN_SECRET",     "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/REFRESH_TOKEN_SECRET" },
+        { "name": "SYSTEM_API_KEY",           "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/SYSTEM_API_KEY" },
+        { "name": "SMTP_HOST",                "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/SMTP_HOST" },
+        { "name": "SMTP_USER",                "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/SMTP_USER" },
+        { "name": "SMTP_PASS",                "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/SMTP_PASS" },
+        { "name": "EMAIL_FROM",               "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/EMAIL_FROM" },
+        { "name": "CLOUDINARY_CLOUD_NAME",    "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/CLOUDINARY_CLOUD_NAME" },
+        { "name": "CLOUDINARY_API_KEY",       "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/CLOUDINARY_API_KEY" },
+        { "name": "CLOUDINARY_API_SECRET",    "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/CLOUDINARY_API_SECRET" },
+        { "name": "FIREBASE_PROJECT_ID",      "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/FIREBASE_PROJECT_ID" },
+        { "name": "FIREBASE_CLIENT_EMAIL",    "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/FIREBASE_CLIENT_EMAIL" },
+        { "name": "FIREBASE_PRIVATE_KEY",     "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/FIREBASE_PRIVATE_KEY" },
+        { "name": "RAZORPAY_KEY_ID",          "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/RAZORPAY_KEY_ID" },
+        { "name": "RAZORPAY_KEY_SECRET",      "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/RAZORPAY_KEY_SECRET" },
+        { "name": "MEDIAMTX_STREAM_SECRET",   "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/MEDIAMTX_STREAM_SECRET" },
+        { "name": "CORS_ORIGIN",              "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/CORS_ORIGIN" },
+        { "name": "PUBLIC_BASE_URL",          "valueFrom": "arn:aws:ssm:ap-south-1:YOUR_ACCOUNT_ID:parameter/cctv/prod/PUBLIC_BASE_URL" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group":         "/ecs/cctv-monitoring-backend",
+          "awslogs-region":        "ap-south-1",
+          "awslogs-stream-prefix": "api",
+          "awslogs-create-group":  "true"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8080/health/live || exit 1"],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "stopTimeout": 30,
+      "linuxParameters": {
+        "initProcessEnabled": true
+      }
+    },
+    {
+      "name": "mediamtx",
+      "image": "bluenviron/mediamtx:1.9.3",
+      "essential": false,
+      "portMappings": [
+        { "containerPort": 8554, "protocol": "tcp", "name": "rtsp-tcp" },
+        { "containerPort": 8554, "protocol": "udp", "name": "rtsp-udp" },
+        { "containerPort": 8888, "protocol": "tcp", "name": "hls" },
+        { "containerPort": 8889, "protocol": "tcp", "name": "webrtc" },
+        { "containerPort": 9997, "protocol": "tcp", "name": "mediamtx-api" }
+      ],
+      "environment": [
+        { "name": "MTX_API",           "value": "yes" },
+        { "name": "MTX_APIADDRESS",    "value": "127.0.0.1:9997" },
+        { "name": "MTX_HLSADDRESS",    "value": "127.0.0.1:8888" },
+        { "name": "MTX_WEBRTCADDRESS", "value": "127.0.0.1:8889" },
+        { "name": "MTX_RTSPADDRESS",   "value": ":8554" },
+        { "name": "MTX_LOGLEVEL",      "value": "info" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group":         "/ecs/cctv-monitoring-backend",
+          "awslogs-region":        "ap-south-1",
+          "awslogs-stream-prefix": "mediamtx",
+          "awslogs-create-group":  "true"
+        }
+      }
+    }
+  ]
+}

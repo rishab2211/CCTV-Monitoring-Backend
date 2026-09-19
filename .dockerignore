@@ -1,0 +1,50 @@
+# ── Node dependencies ──────────────────────────────────────────────────────
+node_modules/
+
+# ── Build output ───────────────────────────────────────────────────────────
+dist/
+
+# ── Environment & secrets — NEVER in the image ────────────────────────────
+.env
+.env.*
+*.pem
+*.key
+*.p12
+firebase-*.json
+service-account*.json
+
+# ── Logs & uploads — ephemeral, not needed in image ───────────────────────
+logs/
+src/logs/
+uploads/
+
+# ── Dev & tooling files — not needed at runtime ───────────────────────────
+.git/
+.gitignore
+.dockerignore
+.vscode/
+.idea/
+
+# ── Documentation ─────────────────────────────────────────────────────────
+README.md
+TESTING_GUIDE.md
+AWS_DEPLOYMENT_GUIDE.md
+*.md
+
+# ── Postman / test scripts — large, not needed at runtime ─────────────────
+scripts/Complete_Postman_Collection.json
+scripts/CCTV_Monitoring_Environment.json
+scripts/generate-postman.js
+scripts/seed-demo-data.ts
+scripts/stream-webcam.sh
+
+# ── Render-specific (replaced by AWS config) ──────────────────────────────
+render.yaml
+
+# ── OS temp files ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+tmp/
+temp/
