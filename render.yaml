@@ -17,7 +17,13 @@ services:
         generateValue: true
       - key: REFRESH_TOKEN_SECRET
         generateValue: true
+      - key: SYSTEM_API_KEY
+        generateValue: true
       - key: MEDIAMTX_URL
+        value: http://127.0.0.1:8889
+      - key: MEDIAMTX_INTERNAL_HLS_URL
+        value: http://127.0.0.1:8888
+      - key: MEDIAMTX_INTERNAL_WEBRTC_URL
         value: http://127.0.0.1:8889
       - key: MEDIAMTX_API_URL
         value: http://127.0.0.1:9997/v3
@@ -30,6 +36,6 @@ services:
       - key: CLOUDINARY_API_SECRET
         sync: false
       - key: CORS_ORIGIN
-        value: "https://cctv-monitoring-admin-panel.vercel.app"
+        value: "https://cctv-monitoring-admin-panel.vercel.app,http://localhost:3000,http://localhost:5173"
       - key: ENABLE_DEMO_FEEDS
         value: "true"

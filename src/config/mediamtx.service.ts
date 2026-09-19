@@ -69,11 +69,12 @@ export const addMediaMTXPath = async (
   pathName: string,
   rtspUrl: string
 ): Promise<boolean> => {
+  const isLocalSource = rtspUrl.includes("localhost") || rtspUrl.includes("127.0.0.1");
   const config: IMediaMTXPathConfig = {
     source: rtspUrl,
     sourceProtocol: "tcp",
-    sourceOnDemand: true,
-    maxReaders: 20,
+    sourceOnDemand: !isLocalSource, // Keep local demo feeds pre-warmed for 0s lag
+    maxReaders: 50,
   };
 
   const result = await mediamtxFetch("POST", `/config/paths/add/${pathName}`, config);
@@ -81,7 +82,7 @@ export const addMediaMTXPath = async (
     // If path already exists, patch it to ensure the source RTSP URL is updated
     await mediamtxFetch("PATCH", `/config/paths/patch/${pathName}`, config);
   }
-  logger.debug(`[MediaMTX] Path registered/updated: ${pathName}`);
+  logger.debug(`[MediaMTX] Path registered/updated: ${pathName} (prewarmed: ${isLocalSource})`);
   return true;
 };
 

@@ -1,23 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# 📹 CCTV Platform - Synthetic RTSP Feed Generator for Live Demo & Pitch Videos
+# 📹 CCTV Platform - Resilient Synthetic RTSP Feed Generator for Live Demos
 # ==============================================================================
-# This script uses FFmpeg to stream live synthetic CCTV surveillance feeds into
-# MediaMTX (rtsp://localhost:8554) with running real-time timestamp overlays.
-#
-# If you have sample MP4 videos, place them in a folder and specify the path,
-# or run with no arguments to generate real-time synthetic camera feeds.
-#
-# Requirements:
-#   - ffmpeg installed (`sudo apt install ffmpeg` or `brew install ffmpeg`)
-#   - MediaMTX running on localhost:8554
-#
-# Usage:
-#   chmod +x scripts/stream-synthetic-feeds.sh
-#   ./scripts/stream-synthetic-feeds.sh
+# Continuously streams 3 synthetic CCTV surveillance feeds with running clock
+# overlays into MediaMTX with automatic restart on disconnect.
 # ==============================================================================
 
-set -euo pipefail
+set -uo pipefail
 
 RTSP_HOST="${RTSP_HOST:-localhost:8554}"
 
@@ -26,11 +15,30 @@ echo "🎥 CCTV Monitoring Platform — Synthetic Video Feed Generator"
 echo "Target RTSP Server: rtsp://${RTSP_HOST}"
 echo "=================================================================="
 
-# Check if ffmpeg is installed
+# Check ffmpeg installation
 if ! command -v ffmpeg >/dev/null 2>&1; then
-  echo "❌ Error: ffmpeg is not installed. Please install ffmpeg first."
+  echo "❌ Error: ffmpeg is not installed."
   exit 1
 fi
+
+# Detect available font for video timestamp overlay
+FONT_PARAM=""
+if [ -f "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" ]; then
+  FONT_PARAM=":fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+fi
+
+# Wait for MediaMTX RTSP listener to be ready before firing feeds
+echo "⏳ Waiting for MediaMTX RTSP listener on ${RTSP_HOST}..."
+RETRIES=0
+while ! (echo > /dev/tcp/127.0.0.1/8554) >/dev/null 2>&1; do
+  sleep 1
+  RETRIES=$((RETRIES + 1))
+  if [ $RETRIES -gt 30 ]; then
+    echo "⚠️ MediaMTX took more than 30s to bind. Attempting to start feeds anyway..."
+    break
+  fi
+done
+echo "✅ MediaMTX RTSP listener is ready!"
 
 cleanup() {
   echo ""
@@ -41,28 +49,34 @@ cleanup() {
 
 trap cleanup INT TERM EXIT
 
-echo "🚀 Starting Camera 1: Main Entrance [rtsp://${RTSP_HOST}/cam_entrance]..."
-ffmpeg -re -f lavfi -i "testsrc=size=1280x720:rate=25" \
-  -vf "drawbox=x=0:y=0:w=iw:h=ih:color=black@0.15:t=fill,drawtext=text='REC ● CAM-01 | MAIN ENTRANCE & RECEPTION':fontcolor=white:fontsize=22:box=1:boxcolor=black@0.7:boxborderw=6:x=30:y=30,drawtext=text='%{localtime\:%Y-%m-%d %H\:%M\:%S}':fontcolor=yellow:fontsize=20:box=1:boxcolor=black@0.7:boxborderw=4:x=30:y=65" \
-  -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -an -f rtsp "rtsp://${RTSP_HOST}/cam_entrance" >/dev/null 2>&1 &
+# Stream loop function with auto-restart
+stream_loop() {
+  local CAM_NAME="$1"
+  local STREAM_PATH="$2"
+  local SRC="$3"
+  local LABEL="$4"
 
-echo "🚀 Starting Camera 2: Warehouse Loading Bay [rtsp://${RTSP_HOST}/cam_warehouse]..."
-ffmpeg -re -f lavfi -i "smptebars=size=1280x720:rate=25" \
-  -vf "drawbox=x=0:y=0:w=iw:h=ih:color=black@0.2:t=fill,drawtext=text='REC ● CAM-02 | WAREHOUSE LOADING BAY':fontcolor=white:fontsize=22:box=1:boxcolor=black@0.7:boxborderw=6:x=30:y=30,drawtext=text='%{localtime\:%Y-%m-%d %H\:%M\:%S}':fontcolor=yellow:fontsize=20:box=1:boxcolor=black@0.7:boxborderw=4:x=30:y=65" \
-  -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -an -f rtsp "rtsp://${RTSP_HOST}/cam_warehouse" >/dev/null 2>&1 &
+  while true; do
+    echo "▶️ [${CAM_NAME}] Launching live synthetic feed to rtsp://${RTSP_HOST}/${STREAM_PATH}..."
+    ffmpeg -re -f lavfi -i "${SRC}" \
+      -vf "drawbox=x=0:y=0:w=iw:h=ih:color=black@0.15:t=fill,drawtext=text='REC ● ${LABEL}'${FONT_PARAM}:fontcolor=white:fontsize=22:box=1:boxcolor=black@0.7:boxborderw=6:x=30:y=30,drawtext=text='%{localtime\:%Y-%m-%d %H\:%M\:%S}'${FONT_PARAM}:fontcolor=yellow:fontsize=20:box=1:boxcolor=black@0.7:boxborderw=4:x=30:y=65" \
+      -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -an -f rtsp "rtsp://${RTSP_HOST}/${STREAM_PATH}" >/dev/null 2>&1 || true
 
-echo "🚀 Starting Camera 3: Perimeter Parking Area [rtsp://${RTSP_HOST}/cam_parking]..."
-ffmpeg -re -f lavfi -i "testsrc2=size=1280x720:rate=25" \
-  -vf "drawbox=x=0:y=0:w=iw:h=ih:color=black@0.2:t=fill,drawtext=text='REC ● CAM-03 | PERIMETER PARKING AREA':fontcolor=white:fontsize=22:box=1:boxcolor=black@0.7:boxborderw=6:x=30:y=30,drawtext=text='%{localtime\:%Y-%m-%d %H\:%M\:%S}':fontcolor=yellow:fontsize=20:box=1:boxcolor=black@0.7:boxborderw=4:x=30:y=65" \
-  -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -an -f rtsp "rtsp://${RTSP_HOST}/cam_parking" >/dev/null 2>&1 &
+    echo "⚠️ [${CAM_NAME}] Stream disconnected or interrupted. Restarting in 2 seconds..."
+    sleep 2
+  done
+}
+
+# Launch the 3 synthetic cameras in background loops
+stream_loop "CAM-01" "cam_entrance" "testsrc=size=1280x720:rate=25" "CAM-01 | MAIN ENTRANCE & RECEPTION" &
+stream_loop "CAM-02" "cam_warehouse" "smptebars=size=1280x720:rate=25" "CAM-02 | WAREHOUSE LOADING BAY" &
+stream_loop "CAM-03" "cam_parking" "testsrc2=size=1280x720:rate=25" "CAM-03 | PERIMETER PARKING AREA" &
 
 echo ""
-echo "✅ All 3 Synthetic RTSP Feeds are running live!"
+echo "✅ All 3 Synthetic RTSP Feeds are running in background loops!"
 echo "   1. rtsp://${RTSP_HOST}/cam_entrance"
 echo "   2. rtsp://${RTSP_HOST}/cam_warehouse"
 echo "   3. rtsp://${RTSP_HOST}/cam_parking"
 echo ""
-echo "Open the Admin Portal or Mobile Apps to watch the real-time WebRTC streams."
-echo "Press Ctrl+C to terminate the feeds when finished."
 
 wait

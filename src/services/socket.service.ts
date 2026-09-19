@@ -14,6 +14,8 @@ import mongoose from "mongoose";
 import { Camera } from "../models/Camera";
 import { validateCameraAccess } from "./camera.service";
 
+import { isOriginAllowed } from "../utils/url";
+
 class SocketService {
   private io: Server | null = null;
 
@@ -22,14 +24,19 @@ class SocketService {
    * Sets up CORS and the JWT authentication middleware.
    */
   public initialize(server: HttpServer) {
-    const allowedOrigins = env.CORS_ORIGIN.split(",").map((o) => o.trim());
-
     this.io = new Server(server, {
       cors: {
-        origin: allowedOrigins,
+        origin: (origin, callback) => {
+          if (isOriginAllowed(origin)) {
+            callback(null, true);
+          } else {
+            callback(new Error("CORS not allowed"), false);
+          }
+        },
         methods: ["GET", "POST"],
         credentials: true,
       },
+      transports: ["websocket", "polling"],
     });
 
     // Authentication Middleware

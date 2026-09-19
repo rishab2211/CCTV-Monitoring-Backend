@@ -23,6 +23,7 @@ import {
 import { validateCameraAccess } from "./camera.service";
 import { JwtAccessPayload } from "../types";
 import { StartStreamInput, StopStreamInput } from "../validators/stream.validator";
+import { getPublicBaseUrl } from "../utils/url";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -118,14 +119,15 @@ export const startStream = async (
 
   logger.info(`📹 Stream started: ${camera.name} (session: ${sessionId}) by user ${user.userId}`);
 
-  // 5. Build response URLs
-  const mediamtxBase = env.MEDIAMTX_URL;
+  // 5. Build response URLs using public base URL
+  const baseUrl = getPublicBaseUrl();
   return {
     sessionId,
     streamToken: token,
     pathName,
-    webrtcUrl: `${mediamtxBase}/${pathName}`,
-    hlsUrl: `${mediamtxBase}/${pathName}/index.m3u8`,
+    webrtcUrl: `${baseUrl}/webrtc/${pathName}`,
+    whepUrl: `${baseUrl}/webrtc/${pathName}/whep`,
+    hlsUrl: `${baseUrl}/hls/${pathName}/index.m3u8`,
     tokenExpiresIn: "24h",
   };
 };
@@ -228,11 +230,14 @@ export const getStreamToken = async (
     tokenHash,
   });
 
+  const baseUrl = getPublicBaseUrl();
   return {
     sessionId,
     streamToken: token,
     pathName,
-    webrtcUrl: `${env.MEDIAMTX_URL}/${pathName}`,
+    webrtcUrl: `${baseUrl}/webrtc/${pathName}`,
+    whepUrl: `${baseUrl}/webrtc/${pathName}/whep`,
+    hlsUrl: `${baseUrl}/hls/${pathName}/index.m3u8`,
     tokenExpiresIn: "24h",
   };
 };
@@ -371,13 +376,14 @@ export const relayWebRTCOffer = async (
 
   const pathName = toPathName(camera.serialNumber);
 
-  // Forward the SDP offer to MediaMTX's WebRTC endpoint
+  // Forward the SDP offer to MediaMTX's internal WebRTC endpoint
   try {
-    const res = await fetch(`${env.MEDIAMTX_URL}/${pathName}/whep`, {
+    const internalUrl = env.MEDIAMTX_INTERNAL_WEBRTC_URL || "http://127.0.0.1:8889";
+    const res = await fetch(`${internalUrl}/${pathName}/whep`, {
       method: "POST",
       headers: { "Content-Type": "application/sdp" },
       body: sdp,
-      signal: AbortSignal.timeout(30000) // Give MediaMTX up to 15 seconds to pull the RTSP stream
+      signal: AbortSignal.timeout(30000) // Give MediaMTX up to 30 seconds to pull the RTSP stream
     });
 
     if (res.status === 404) {
@@ -433,10 +439,12 @@ export const getICECandidates = async (
   // ICE candidates in WHEP flow are delivered via the SDP answer — this
   // endpoint returns the stream path info needed by the client.
   const pathName = toPathName(camera.serialNumber);
+  const baseUrl = getPublicBaseUrl();
   return {
     pathName,
-    webrtcUrl: `${env.MEDIAMTX_URL}/${pathName}`,
-    whepUrl: `${env.MEDIAMTX_URL}/${pathName}/whep`,
-    message: "Use WHEP protocol to connect. ICE candidates are exchanged via the WHEP signaling flow.",
+    webrtcUrl: `${baseUrl}/webrtc/${pathName}`,
+    whepUrl: `${baseUrl}/webrtc/${pathName}/whep`,
+    hlsUrl: `${baseUrl}/hls/${pathName}/index.m3u8`,
+    message: "Use WHEP or HLS protocol to connect. WHEP offer/answer can be sent directly to whepUrl or through /api/v1/streams/:cameraId/webrtc/offer.",
   };
 };

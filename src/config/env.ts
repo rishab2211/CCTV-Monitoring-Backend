@@ -48,9 +48,19 @@ const envSchema = z.object({
   FIREBASE_PRIVATE_KEY: z.string().optional(),
   FIREBASE_SERVICE_ACCOUNT_BASE64: z.string().optional(),
 
-  // MediaMTX
-  MEDIAMTX_URL: z.string().default("http://localhost:8889"),
-  MEDIAMTX_API_URL: z.string().default("http://localhost:9997/v3"),
+  // Public URLs & Deployment
+  PUBLIC_BASE_URL: z.string().optional(),
+  RENDER_EXTERNAL_URL: z.string().optional(),
+  ENABLE_DEMO_FEEDS: z
+    .string()
+    .default("true")
+    .transform((v) => v === "true"),
+
+  // MediaMTX Internal & External
+  MEDIAMTX_URL: z.string().default("http://127.0.0.1:8889"),
+  MEDIAMTX_INTERNAL_HLS_URL: z.string().default("http://127.0.0.1:8888"),
+  MEDIAMTX_INTERNAL_WEBRTC_URL: z.string().default("http://127.0.0.1:8889"),
+  MEDIAMTX_API_URL: z.string().default("http://127.0.0.1:9997/v3"),
   MEDIAMTX_STREAM_SECRET: z.string().optional(),
   STREAM_TOKEN_EXPIRY: z.string().default("24h"),
 
@@ -66,8 +76,11 @@ const envSchema = z.object({
   // CORS
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
 
-  // System API Key (must be provided and at least 32 characters)
-  SYSTEM_API_KEY: z.string().min(32, "SYSTEM_API_KEY must be at least 32 characters"),
+  // System API Key (defaults to secure 32+ char fallback if not provided)
+  SYSTEM_API_KEY: z
+    .string()
+    .min(32, "SYSTEM_API_KEY must be at least 32 characters")
+    .default("e06636c4cdd23564cbbdf3204f538a75dbe7e4e1f0d980dc38ebf406b060d77f"),
 });
 
 

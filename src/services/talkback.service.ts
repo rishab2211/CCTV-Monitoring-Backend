@@ -7,6 +7,7 @@ import { validateCameraAccess } from "./camera.service";
 import { logActivity } from "../models/ActivityLog";
 import { socketService } from "./socket.service";
 import { env } from "../config/env";
+import { getPublicBaseUrl } from "../utils/url";
 
 /**
  * Get Talkback Capabilities
@@ -61,9 +62,10 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload) => 
       await existingSession.save();
     } else if (existingSession.operatorId.toString() === user.userId) {
       // It's the same operator, just return the existing session
+      const baseUrl = getPublicBaseUrl();
       return {
         session: existingSession,
-        whipUrl: `${env.MEDIAMTX_URL}/camera_${cameraId}_talkback/whip`,
+        whipUrl: `${baseUrl}/webrtc/camera_${cameraId}_talkback/whip`,
       };
     } else {
       throw ApiError.conflict("Camera is already in an active talkback session with another operator");
@@ -94,9 +96,10 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload) => 
   });
 
   // Return the MediaMTX WHIP URL for the frontend to publish WebRTC audio to
+  const baseUrl = getPublicBaseUrl();
   return {
     session,
-    whipUrl: `${env.MEDIAMTX_URL}/camera_${cameraId}_talkback/whip`,
+    whipUrl: `${baseUrl}/webrtc/camera_${cameraId}_talkback/whip`,
   };
 };
 

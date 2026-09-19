@@ -9,52 +9,54 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { generalLimiter } from "./middleware/rateLimiter";
 import { logger } from "./utils/logger";
 
+import { createMediaProxy } from "./middleware/streamProxy";
+import { isOriginAllowed } from "./utils/url";
+
 const app: Application = express();
 
 // ─── Security Middleware ──────────────────────────────────────────────────────
 
-// Helmet — sets secure HTTP headers
+// Helmet — sets secure HTTP headers (permits cross-origin media embedding for CCTV video players)
 app.use(
   helmet({
-    crossOriginEmbedderPolicy: false, // Needed for WebRTC later
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+        mediaSrc: ["'self'", "data:", "https:", "blob:", "*"],
+        connectSrc: ["'self'", "https:", "wss:", "ws:", "*"],
       },
     },
   })
 );
 
-// CORS
-const allowedOrigins = env.CORS_ORIGIN.split(",").map((o) => o.trim());
-const isWildcard = allowedOrigins.includes("*");
+// ─── Dynamic Permissive CORS ──────────────────────────────────────────────────
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, Postman, server-to-server)
-      if (!origin) return callback(null, true);
-      // Wildcard — allow all origins (not recommended for credentialed requests)
-      if (isWildcard) return callback(null, true);
-      // Development — allow everything
-      if (env.NODE_ENV === "development") return callback(null, true);
-      // Production — explicit allowlist check
-      if (allowedOrigins.includes(origin)) {
+      if (isOriginAllowed(origin)) {
         callback(null, true);
       } else {
-        // Return null (block) instead of throwing — prevents 500, lets CORS module send 403
         callback(null, false);
       }
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-    optionsSuccessStatus: 204, // Some legacy browsers (IE11) choke on 204
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-MediaMTX-Secret", "Range"],
+    exposedHeaders: ["Content-Range", "Accept-Ranges", "Content-Length", "Location"],
+    optionsSuccessStatus: 204,
   })
 );
+
+// ─── Media Streaming Reverse Proxy (Port 10000 -> MediaMTX 8888 & 8889) ──────
+// Mounted BEFORE body parsers and rate limiting so high-frequency HLS video chunks
+// and WHEP signaling are streamed directly with zero latency and never throttled.
+app.use("/hls", createMediaProxy(8888, "MediaMTX HLS"));
+app.use("/webrtc", createMediaProxy(8889, "MediaMTX WebRTC/WHEP"));
 
 // ─── Body Parsers ─────────────────────────────────────────────────────────────
 

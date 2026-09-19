@@ -4,6 +4,8 @@ import { configureCloudinary } from "./config/cloudinary";
 import { verifyEmailConnection } from "./services/email.service";
 import { seedPermissionsAndRoles } from "./config/permissions.seed";
 import { syncMediaMTXPaths } from "./config/mediamtx.service";
+import { ensureDemoDataSeeded } from "./config/demo-seed";
+import { getPublicBaseUrl } from "./utils/url";
 import { env } from "./config/env";
 import { logger } from "./utils/logger";
 import { socketService } from "./services/socket.service";
@@ -25,7 +27,12 @@ const startServer = async (): Promise<void> => {
     const seedStartTime = Date.now();
     logger.info("🔐 [2/6] Seeding System Permissions & Roles...");
     await seedPermissionsAndRoles();
-    logger.info(`✅ [2/6] Permissions & Roles Synced (${Date.now() - seedStartTime}ms)`);
+
+    // Verify & sync demo accounts and cameras if demo feeds are enabled
+    if (env.ENABLE_DEMO_FEEDS) {
+      await ensureDemoDataSeeded();
+    }
+    logger.info(`✅ [2/6] Permissions, Roles & Demo State Synced (${Date.now() - seedStartTime}ms)`);
 
     // ── Stage 3: Sync MediaMTX Paths ────────────────────────────────────────
     const mediaStartTime = Date.now();
@@ -49,6 +56,7 @@ const startServer = async (): Promise<void> => {
 
     const server = app.listen(env.PORT, "0.0.0.0", () => {
       const bootDuration = Date.now() - startTime;
+      const publicUrl = getPublicBaseUrl();
 
       logger.info(`✅ [5/6] HTTP Server Ready (${Date.now() - httpStartTime}ms)`);
 
@@ -67,9 +75,10 @@ const startServer = async (): Promise<void> => {
         `  Environment :  ${env.NODE_ENV.toUpperCase()}`,
         `  Server Port :  ${env.PORT}`,
         `  Process ID  :  ${process.pid}`,
-        `  API Base    :  http://localhost:${env.PORT}/api/v1`,
-        `  Health Check:  http://localhost:${env.PORT}/api/v1/health`,
-        `  WebSockets  :  ws://localhost:${env.PORT}`,
+        `  API Base    :  ${publicUrl}/api/v1`,
+        `  Health Check:  ${publicUrl}/api/v1/health`,
+        `  HLS Stream  :  ${publicUrl}/hls/<camera-path>/index.m3u8`,
+        `  WebSockets  :  ${publicUrl.replace(/^http/, "ws")}`,
         `  Boot Time   :  ${bootDuration} ms`,
         "════════════════════════════════════════════════════════════════",
       ].join("\n");

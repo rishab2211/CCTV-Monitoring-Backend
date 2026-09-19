@@ -15,10 +15,16 @@ protocols: [tcp, udp]
 webrtc: yes
 webrtcAddress: 127.0.0.1:8889
 webrtcAllowOrigin: '*'
+webrtcICEServers2:
+  - url: stun:stun.l.google.com:19302
 
-# HLS (internal)
+# High-Performance Low-Latency HLS (LL-HLS)
 hls: yes
 hlsAddress: 127.0.0.1:8888
+hlsAllowOrigin: '*'
+hlsPartDuration: 200ms
+hlsSegmentDuration: 1s
+hlsSegmentCount: 7
 
 # Default path config to allow dynamic paths created via API
 paths:
