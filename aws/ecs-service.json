@@ -19,7 +19,7 @@
   },
   "loadBalancers": [
     {
-      "targetGroupArn": "arn:aws:elasticloadbalancing:ap-south-1:YOUR_ACCOUNT_ID:targetgroup/cctv-api-tg/XXXXXXXXXXXXXXXXX",
+      "targetGroupArn": "arn:aws:elasticloadbalancing:ap-southeast-2:735726037671:targetgroup/cctv-api-tg/REPLACE_WITH_TG_ID",
       "containerName": "cctv-api",
       "containerPort": 8080
     }

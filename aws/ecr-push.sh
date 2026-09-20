@@ -4,14 +4,14 @@
 # ==============================================================================
 # Usage:
 #   chmod +x aws/ecr-push.sh
-#   ./aws/ecr-push.sh                   # uses defaults (ap-south-1, latest tag)
+#   ./aws/ecr-push.sh                   # uses defaults (ap-southeast-2, latest tag)
 #   ./aws/ecr-push.sh us-east-1 v1.2.0 # custom region and tag
 # ==============================================================================
 
 set -euo pipefail
 
 # ── Config — edit these before first use ──────────────────────────────────────
-AWS_REGION="${1:-ap-south-1}"
+AWS_REGION="${1:-ap-southeast-2}"
 IMAGE_TAG="${2:-latest}"
 
 # Auto-detect AWS account ID from caller identity
