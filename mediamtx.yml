@@ -6,9 +6,9 @@ apiAddress: 127.0.0.1:9997
 logLevel: info
 logDestinations: [stdout]
 
-# RTSP Server (internal)
+# RTSP Server
 rtsp: yes
-rtspAddress: 127.0.0.1:8554
+rtspAddress: :8554
 protocols: [tcp, udp]
 
 # WebRTC (WHEP / WHIP - internal loopback)

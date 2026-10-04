@@ -20,8 +20,8 @@ set -euo pipefail
 
 # ─── Configuration ─────────────────────────────────────────────────────────────
 WEBCAM="${WEBCAM:-/dev/video0}"
-RTSP_HOST="${RTSP_HOST:-localhost:8554}"
-PATH_NAME="${1:-cam-test-1}"
+RTSP_HOST="${RTSP_HOST:-200.141.12.143:8554}"
+PATH_NAME="${1:-webcam_01}"
 RTSP_URL="rtsp://${RTSP_HOST}/${PATH_NAME}"
 RESOLUTION="${RESOLUTION:-1280x720}"
 FRAMERATE="${FRAMERATE:-25}"
