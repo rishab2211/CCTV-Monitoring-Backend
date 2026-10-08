@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { Alert } from "../models/Alert";
+import { Incident } from "../models/Incident";
 import { Camera } from "../models/Camera";
 import { ApiError } from "../utils/ApiError";
 import { parsePaginationParams } from "../utils/pagination";
@@ -232,19 +233,43 @@ export const escalateAlert = async (id: string, user: JwtAccessPayload) => {
   if (!camera) throw ApiError.notFound("Camera");
   await validateCameraAccess(camera, user);
 
+  // Map alert type to formal incident classification
+  let incidentType: "theft" | "vandalism" | "technical_issue" | "other" = "other";
+  if (alert.type === "tampering") incidentType = "vandalism";
+  else if (alert.type === "offline") incidentType = "technical_issue";
+
+  const incident = await Incident.create({
+    title: `Escalated Alert: ${alert.type.toUpperCase()} - ${camera.name}`,
+    description: alert.description || `Alert "${alert.type}" escalated by ${user.role} on camera "${camera.name}" (ID: ${camera._id})`,
+    type: incidentType,
+    severity: (alert.priority && ["low", "medium", "high", "critical"].includes(alert.priority)) ? alert.priority : "medium",
+    status: "open",
+    cameraId: camera._id,
+    franchiseId: camera.franchiseId,
+    reportedBy: new mongoose.Types.ObjectId(user.userId),
+    assignedTo: alert.assignedTo,
+    attachments: [],
+  });
+
   alert.status = "escalated";
   await alert.save();
 
   socketService.emitToCamera(alert.cameraId.toString(), "alert_escalated", alert);
+  socketService.emitToCamera(alert.cameraId.toString(), "new_incident", incident);
 
   logActivity({
     userId: new mongoose.Types.ObjectId(user.userId),
     action: "ALERT_ESCALATED",
-    description: `Escalated alert ${alert._id}`,
-    metadata: { alertId: alert._id },
+    description: `Escalated alert ${alert._id} to incident ${incident._id}`,
+    metadata: { alertId: alert._id, incidentId: incident._id },
   });
 
-  return alert;
+  return {
+    ...incident.toObject(),
+    alert,
+    incident,
+    _id: incident._id,
+  };
 };
 
 /**
