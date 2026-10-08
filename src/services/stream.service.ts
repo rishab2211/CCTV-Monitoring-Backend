@@ -205,6 +205,50 @@ export const stopStream = async (input: StopStreamInput, user: JwtAccessPayload)
 };
 
 /**
+ * Heartbeat an active stream session to keep it alive.
+ * Updates lastHeartbeat to prevent the session reaper from closing it.
+ */
+export const heartbeatSession = async (sessionId: string) => {
+  const session = await StreamSession.findOne({ sessionId, isActive: true });
+  if (!session) {
+    throw ApiError.notFound("Active stream session");
+  }
+
+  session.lastHeartbeat = new Date();
+  await session.save();
+
+  return {
+    sessionId,
+    lastHeartbeat: session.lastHeartbeat,
+  };
+};
+
+/**
+ * Reap Stale Sessions (Background Worker)
+ * Automatically marks stream sessions inactive if no heartbeat is received within 3 minutes.
+ * Prevents phantom viewer counts when browser tabs close or crash unexpectedly.
+ */
+export const reapStaleSessions = async () => {
+  const staleThreshold = new Date(Date.now() - 3 * 60 * 1000); // 3 minutes without heartbeat
+  const staleSessions = await StreamSession.find({
+    isActive: true,
+    $or: [
+      { lastHeartbeat: { $lt: staleThreshold } },
+      { lastHeartbeat: { $exists: false }, startedAt: { $lt: staleThreshold } },
+    ],
+  });
+
+  if (staleSessions.length > 0) {
+    const ids = staleSessions.map((s) => s._id);
+    await StreamSession.updateMany(
+      { _id: { $in: ids } },
+      { $set: { isActive: false, endedAt: new Date() } }
+    );
+    logger.info(`🧹 Reaped ${staleSessions.length} stale stream session(s)`);
+  }
+};
+
+/**
 
  * Get a fresh stream token for a camera the user already has access to.
  * Does NOT create a new StreamSession (user is already watching).
@@ -247,6 +291,7 @@ export const getStreamToken = async (
     userId: user.userId === "system" ? camera._id : new mongoose.Types.ObjectId(user.userId),
     role: user.role,
     startedAt: new Date(),
+    lastHeartbeat: new Date(),
     isActive: true,
     tokenHash,
   });

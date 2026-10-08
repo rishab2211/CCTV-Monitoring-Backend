@@ -54,6 +54,11 @@ const streamSessionSchema = new Schema<StreamSessionDocument>(
       type: String,
       default: null,
     },
+    lastHeartbeat: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
   },
   { timestamps: true }
 );

@@ -270,6 +270,7 @@ export interface IStreamSession {
   isActive: boolean;
   tokenHash: string; // SHA-256 of the issued stream token (for revocation)
   ipAddress?: string;
+  lastHeartbeat?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

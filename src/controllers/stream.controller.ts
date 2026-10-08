@@ -40,6 +40,17 @@ export const stopStream = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
+ * Heartbeat Live Stream Endpoint
+ * POST /api/v1/streams/heartbeat/:sessionId
+ * Signals that the browser client is actively viewing the stream.
+ */
+export const heartbeatStream = catchAsync(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const result = await streamService.heartbeatSession(req.params.sessionId);
+  res.status(200).json(new ApiResponse(200, result, "Stream session heartbeat acknowledged"));
+});
+
+/**
  * GET /api/v1/streams/:cameraId/token
  * Issue a fresh stream token for a camera.
  */

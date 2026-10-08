@@ -9,6 +9,7 @@ import { getPublicBaseUrl } from "./utils/url";
 import { env } from "./config/env";
 import { logger } from "./utils/logger";
 import { socketService } from "./services/socket.service";
+import * as streamService from "./services/stream.service";
 
 const startServer = async (): Promise<void> => {
   const startTime = Date.now();
@@ -65,6 +66,16 @@ const startServer = async (): Promise<void> => {
       logger.info("🔌 [6/6] Initializing Socket.IO WebSocket Engine...");
       socketService.initialize(server);
       logger.info(`✅ [6/6] WebSocket Engine Ready (${Date.now() - socketStartTime}ms)`);
+
+      // ── Background Workers: Ghost Stream Session Reaper ──────────────────
+      const reaperInterval = setInterval(async () => {
+        try {
+          await streamService.reapStaleSessions();
+        } catch (err) {
+          logger.error(`Error running stream session reaper: ${(err as Error).message}`);
+        }
+      }, 60000);
+      reaperInterval.unref();
 
       // ── Print System Banner ──────────────────────────────────────────────
       const banner = [

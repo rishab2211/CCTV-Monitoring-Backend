@@ -45,6 +45,14 @@ router.post(
   streamController.stopStream
 );
 
+/** POST /api/v1/streams/heartbeat/:sessionId */
+router.post(
+  "/heartbeat/:sessionId",
+  authenticate,
+  permit("streams:view"),
+  streamController.heartbeatStream
+);
+
 /** GET /api/v1/streams/active — Admin/Operator view of all sessions */
 router.get(
   "/active",
