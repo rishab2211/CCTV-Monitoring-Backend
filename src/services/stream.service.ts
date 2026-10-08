@@ -48,6 +48,22 @@ const signStreamToken = (
   );
 };
 
+/**
+ * Resolves the MediaMTX stream path for a camera.
+ * If the camera rtspUrl points to an internal MediaMTX path (e.g. rtsp://localhost:8554/webcam_01),
+ * extracts and uses that path directly ('webcam_01').
+ * Otherwise, falls back to the normalized camera serial number.
+ */
+export const getCameraStreamPath = (camera: { serialNumber: string; rtspUrl?: string }): string => {
+  if (camera.rtspUrl) {
+    const localMatch = camera.rtspUrl.match(/^rtsp:\/\/(?:localhost|127\.0\.0\.1|200\.141\.12\.143|0\.0\.0\.0):8554\/([a-zA-Z0-9_.-]+)/i);
+    if (localMatch && localMatch[1]) {
+      return localMatch[1].trim();
+    }
+  }
+  return toPathName(camera.serialNumber);
+};
+
 // ─── Service Functions ────────────────────────────────────────────────────────
 
 /**
@@ -83,10 +99,12 @@ export const startStream = async (
     }
   }
 
-  // 2. Register path in MediaMTX (sourceOnDemand — no actual RTSP pull yet)
-
-  const pathName = toPathName(camera.serialNumber);
-  await addMediaMTXPath(pathName, camera.rtspUrl);
+  // 2. Register path in MediaMTX (only if external RTSP pull is needed)
+  const pathName = getCameraStreamPath(camera);
+  const isDirectPublish = pathName !== toPathName(camera.serialNumber);
+  if (!isDirectPublish && camera.rtspUrl) {
+    await addMediaMTXPath(pathName, camera.rtspUrl);
+  }
 
   // 3. Create session record
   const sessionId = uuidv4();
@@ -213,8 +231,11 @@ export const getStreamToken = async (
   }
 
   // Ensure path is registered
-  const pathName = toPathName(camera.serialNumber);
-  await addMediaMTXPath(pathName, camera.rtspUrl);
+  const pathName = getCameraStreamPath(camera);
+  const isDirectPublish = pathName !== toPathName(camera.serialNumber);
+  if (!isDirectPublish && camera.rtspUrl) {
+    await addMediaMTXPath(pathName, camera.rtspUrl);
+  }
 
   const sessionId = uuidv4();
   const token = signStreamToken(camera._id.toString(), user.userId, sessionId, pathName);
@@ -259,7 +280,7 @@ export const getStreamStatus = async (
 
   await validateCameraAccess(camera, user);
 
-  const pathName = toPathName(camera.serialNumber);
+  const pathName = getCameraStreamPath(camera);
   const [pathStatus, sessionCount] = await Promise.all([
     getMediaMTXPathStatus(pathName),
     StreamSession.countDocuments({
@@ -374,7 +395,7 @@ export const relayWebRTCOffer = async (
     }
   }
 
-  const pathName = toPathName(camera.serialNumber);
+  const pathName = getCameraStreamPath(camera);
 
   // Forward the SDP offer to MediaMTX's internal WebRTC endpoint
   try {
@@ -438,7 +459,7 @@ export const getICECandidates = async (
 
   // ICE candidates in WHEP flow are delivered via the SDP answer — this
   // endpoint returns the stream path info needed by the client.
-  const pathName = toPathName(camera.serialNumber);
+  const pathName = getCameraStreamPath(camera);
   const baseUrl = getPublicBaseUrl();
   return {
     pathName,

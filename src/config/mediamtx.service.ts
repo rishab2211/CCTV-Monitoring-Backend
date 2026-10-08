@@ -117,7 +117,7 @@ export const listMediaMTXPaths = async (): Promise<IMediaMTXPath[]> => {
  * Converts to lowercase slug: "CAM-FG-1004" → "cam-fg-1004"
  */
 export const toPathName = (serialNumber: string): string =>
-  serialNumber.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  serialNumber.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
 
 /**
  * Startup sync — registers all non-deleted cameras as MediaMTX paths.
