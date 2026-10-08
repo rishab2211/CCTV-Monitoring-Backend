@@ -51,10 +51,12 @@ if [ ! -e "${WEBCAM}" ]; then
   exit 1
 fi
 
-# Check MediaMTX is accessible
-if ! curl -sf "http://127.0.0.1:9997/v3/config/global/get" > /dev/null 2>&1; then
-  echo "⚠️  Warning: MediaMTX API not reachable at :9997."
-  echo "   Make sure MediaMTX is running (./mediamtx mediamtx.yml) and try again."
+# Check RTSP host connectivity
+RTSP_HOST_IP="${RTSP_HOST%%:*}"
+RTSP_HOST_PORT="${RTSP_HOST##*:}"
+if ! nc -zv -w 3 "${RTSP_HOST_IP}" "${RTSP_HOST_PORT}" > /dev/null 2>&1; then
+  echo "⚠️  Warning: Cannot reach RTSP server at ${RTSP_HOST}."
+  echo "   Make sure port ${RTSP_HOST_PORT} is open and accessible."
   exit 1
 fi
 
@@ -67,15 +69,17 @@ cleanup() {
 }
 trap cleanup INT TERM
 
-# ─── Register path in MediaMTX API (so backend detects it) ────────────────────
-echo "📡 Registering path '${PATH_NAME}' in MediaMTX..."
-curl -sf -X POST "http://127.0.0.1:9997/v3/config/paths/add/${PATH_NAME}" \
-  -H "Content-Type: application/json" \
-  -d '{"source": "publisher", "maxReaders": 20}' > /dev/null 2>&1 || \
-curl -sf -X PATCH "http://127.0.0.1:9997/v3/config/paths/patch/${PATH_NAME}" \
-  -H "Content-Type: application/json" \
-  -d '{"source": "publisher", "maxReaders": 20}' > /dev/null 2>&1 || true
-echo "✅ Path registered"
+# ─── Register path in MediaMTX API if running locally ──────────────────────────
+if curl -sf "http://127.0.0.1:9997/v3/config/global/get" > /dev/null 2>&1; then
+  echo "📡 Registering path '${PATH_NAME}' in MediaMTX..."
+  curl -sf -X POST "http://127.0.0.1:9997/v3/config/paths/add/${PATH_NAME}" \
+    -H "Content-Type: application/json" \
+    -d '{"source": "publisher", "maxReaders": 20}' > /dev/null 2>&1 || \
+  curl -sf -X PATCH "http://127.0.0.1:9997/v3/config/paths/patch/${PATH_NAME}" \
+    -H "Content-Type: application/json" \
+    -d '{"source": "publisher", "maxReaders": 20}' > /dev/null 2>&1 || true
+  echo "✅ Path registered"
+fi
 
 # ─── Start FFmpeg webcam → RTSP publisher ─────────────────────────────────────
 echo ""
