@@ -32,7 +32,20 @@ export const listAuditLogs = async (query: any, user: JwtAccessPayload) => {
     "USER_DELETED",
     "FRANCHISE_SUSPENDED",
     "USER_DEACTIVATED",
-    "ALL_SESSIONS_REVOKED"
+    "ALL_SESSIONS_REVOKED",
+    "STREAM_STARTED",
+    "STREAM_STOPPED",
+    "RECORDING_DELETED",
+    "SCHEDULE_UPDATED",
+    "RETENTION_UPDATED",
+    "SOS_TRIGGERED",
+    "SOS_ACKNOWLEDGED",
+    "SOS_RESOLVED",
+    "TALKBACK_STARTED",
+    "TALKBACK_STOPPED",
+    "CAMERA_RESTARTED",
+    "ALERT_ESCALATED",
+    "ALERT_RESOLVED",
   ];
 
   const filter: any = { action: { $in: auditActions } };
