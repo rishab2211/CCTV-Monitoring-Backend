@@ -7,7 +7,7 @@ const cameraLocationSchema = z.object({
   street: z.string().max(200).optional(),
   city: z.string().max(100).optional(),
   state: z.string().max(100).optional(),
-  pincode: z.string().regex(/^\d{6}$/, "Pincode must be 6 digits").optional(),
+  pincode: z.union([z.string().regex(/^\d{6}$/, "Pincode must be 6 digits"), z.literal("")]).optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
 }).optional();

@@ -67,11 +67,22 @@ export const deletePlan = async (id: string, user: JwtAccessPayload) => {
 // ─── Subscriptions ───────────────────────────────────────────────────────────
 
 export const createSubscription = async (data: { planId: string, customerId?: string }, user: JwtAccessPayload) => {
-  // If customer creates it, force customerId to their own ID. If admin creates, use provided ID.
-  const customerId = user.role === "customer" ? user.userId : (data.customerId || user.userId);
+  // Strictly require a customer account. Staff accounts cannot hold subscriptions.
+  let customerId: string;
+  if (user.role === "customer") {
+    customerId = user.userId;
+  } else {
+    if (!data.customerId) {
+      throw ApiError.badRequest("customerId is required. Staff accounts cannot hold subscriptions.");
+    }
+    customerId = data.customerId;
+  }
   
   const customer = await User.findById(customerId);
   if (!customer) throw ApiError.notFound("Customer not found");
+  if (customer.role !== "customer") {
+    throw ApiError.badRequest("Subscriptions can only be assigned to Customer accounts. Staff and administrative accounts cannot hold subscriptions.");
+  }
 
   const plan = await Plan.findById(data.planId);
   if (!plan || (!plan.isActive && user.role === "customer")) {
