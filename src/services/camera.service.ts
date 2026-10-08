@@ -19,6 +19,13 @@ import {
   HeartbeatInput,
 } from "../validators/camera.validator";
 import { logger } from "../utils/logger";
+import {
+  listMediaMTXPaths,
+  getMediaMTXPathStatus,
+  getCameraStreamPath,
+  toPathName,
+} from "../config/mediamtx.service";
+import { socketService } from "./socket.service";
 
 // ─── Ownership/Access Helper ──────────────────────────────────────────────────
 
@@ -223,6 +230,25 @@ export const listCameras = async (
     Camera.countDocuments(filter),
   ]);
 
+  // Dynamically reconcile live stream presence from MediaMTX
+  try {
+    const activePaths = await listMediaMTXPaths();
+    if (activePaths && activePaths.length > 0) {
+      const readyPathNames = new Set(
+        activePaths.filter((p) => p.ready).map((p) => p.name.toLowerCase())
+      );
+      for (const cam of data as any[]) {
+        const primaryPath = getCameraStreamPath(cam).toLowerCase();
+        const serialPath = toPathName(cam.serialNumber).toLowerCase();
+        if (readyPathNames.has(primaryPath) || readyPathNames.has(serialPath)) {
+          cam.status = "online";
+        }
+      }
+    }
+  } catch {
+    // Non-fatal fallback to DB stored status
+  }
+
   return {
     data,
     pagination: {
@@ -255,6 +281,17 @@ export const getCameraById = async (
   if (!camera) throw ApiError.notFound("Camera");
 
   await validateCameraAccess(camera, user);
+
+  // Dynamically reconcile live stream presence with MediaMTX
+  try {
+    const pathName = getCameraStreamPath(camera);
+    const pathStatus = await getMediaMTXPathStatus(pathName);
+    if (pathStatus?.ready && camera.status !== "online") {
+      camera.status = "online";
+    }
+  } catch {
+    // Non-fatal
+  }
 
   return camera;
 };
@@ -459,6 +496,19 @@ export const updateCameraStatus = async (
   camera.status = status;
   await camera.save();
 
+  const eventPayload = {
+    cameraId: camera._id.toString(),
+    serialNumber: camera.serialNumber,
+    status,
+    timestamp: new Date().toISOString(),
+  };
+  const eventName = status === "online" ? "camera_online" : "camera_offline";
+  socketService.emitGlobal(eventName, eventPayload);
+  socketService.emitToCamera(camera._id.toString(), eventName, eventPayload);
+  if (camera.franchiseId) {
+    socketService.emitToFranchise(camera.franchiseId.toString(), eventName, eventPayload);
+  }
+
   logger.info(`📶 Camera status set to ${status}: ${camera.name}`);
   return camera;
 };
@@ -496,6 +546,24 @@ export const updateCameraHealth = async (
   if (healthInput.storageUsage !== undefined) camera.health.storageUsage = healthInput.storageUsage;
 
   await camera.save();
+
+  const onlinePayload = {
+    cameraId: camera._id.toString(),
+    serialNumber: camera.serialNumber,
+    status: "online",
+    timestamp: new Date().toISOString(),
+  };
+  socketService.emitGlobal("camera_online", onlinePayload);
+  socketService.emitToCamera(camera._id.toString(), "camera_online", onlinePayload);
+  if (camera.franchiseId) {
+    socketService.emitToFranchise(camera.franchiseId.toString(), "camera_online", onlinePayload);
+  }
+  socketService.emitToCamera(camera._id.toString(), "camera_health", {
+    cameraId: camera._id.toString(),
+    health: camera.health,
+    status: "online",
+  });
+
   return camera;
 };
 
@@ -675,4 +743,88 @@ export const getOperatorCameras = async (
   }).lean();
 
   return cameras;
+};
+
+/**
+ * Synchronizes camera online/offline statuses in real-time with MediaMTX.
+ * Scans active MediaMTX paths, reconciles each registered camera's streaming state,
+ * updates the database, and emits Socket.IO events (`camera_online`, `camera_offline`, `camera_health`)
+ * so connected dashboards and client apps transition smoothly as streams come and go.
+ */
+export const syncLiveCameraStatuses = async (): Promise<void> => {
+  try {
+    const activePaths = await listMediaMTXPaths();
+    const readyPathNames = new Set(
+      (activePaths || []).filter((p) => p.ready).map((p) => p.name.toLowerCase())
+    );
+
+    const cameras = await Camera.find({ isDeleted: false });
+
+    for (const camera of cameras) {
+      const primaryPath = getCameraStreamPath(camera).toLowerCase();
+      const serialPath = toPathName(camera.serialNumber).toLowerCase();
+
+      const isLive = readyPathNames.has(primaryPath) || readyPathNames.has(serialPath);
+      const isMarkedOnline = camera.status === "online";
+
+      if (isLive && !isMarkedOnline) {
+        // Stream just came online!
+        camera.status = "online";
+        camera.health.lastPing = new Date();
+        await camera.save();
+
+        logger.info(`📹 Stream ONLINE: Camera "${camera.name}" (${camera.serialNumber}) [path: ${primaryPath}]`);
+
+        const onlinePayload = {
+          cameraId: camera._id.toString(),
+          serialNumber: camera.serialNumber,
+          status: "online",
+          timestamp: new Date().toISOString(),
+        };
+
+        socketService.emitGlobal("camera_online", onlinePayload);
+        socketService.emitToCamera(camera._id.toString(), "camera_online", onlinePayload);
+        if (camera.franchiseId) {
+          socketService.emitToFranchise(camera.franchiseId.toString(), "camera_online", onlinePayload);
+        }
+        socketService.emitToCamera(camera._id.toString(), "camera_health", {
+          cameraId: camera._id.toString(),
+          status: "online",
+          lastPing: camera.health.lastPing,
+        });
+      } else if (!isLive && isMarkedOnline) {
+        // Stream stopped. Check if an explicit hardware heartbeat was received recently (within 45s)
+        const recentPing =
+          camera.health?.lastPing &&
+          Date.now() - new Date(camera.health.lastPing).getTime() < 45000;
+
+        if (!recentPing) {
+          camera.status = "offline";
+          await camera.save();
+
+          logger.info(`📴 Stream OFFLINE: Camera "${camera.name}" (${camera.serialNumber}) [path: ${primaryPath}]`);
+
+          const offlinePayload = {
+            cameraId: camera._id.toString(),
+            serialNumber: camera.serialNumber,
+            status: "offline",
+            reason: "Stream disconnected",
+            timestamp: new Date().toISOString(),
+          };
+
+          socketService.emitGlobal("camera_offline", offlinePayload);
+          socketService.emitToCamera(camera._id.toString(), "camera_offline", offlinePayload);
+          if (camera.franchiseId) {
+            socketService.emitToFranchise(camera.franchiseId.toString(), "camera_offline", offlinePayload);
+          }
+          socketService.emitToCamera(camera._id.toString(), "camera_health", {
+            cameraId: camera._id.toString(),
+            status: "offline",
+          });
+        }
+      }
+    }
+  } catch (err: any) {
+    logger.debug(`[Presence Sync] Background check error: ${err?.message || err}`);
+  }
 };

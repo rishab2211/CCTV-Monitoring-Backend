@@ -120,28 +120,76 @@ export const toPathName = (serialNumber: string): string =>
   serialNumber.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
 
 /**
- * Startup sync — registers all non-deleted cameras as MediaMTX paths.
- * Called once after DB connect. Gracefully skips if MediaMTX is not running.
+ * Determines if a camera stream is directly published into MediaMTX
+ * (e.g. Larix Broadcaster, OBS, webcam scripts publishing to port 8554)
+ * vs an external camera RTSP source that MediaMTX must pull from.
+ */
+export const isDirectPublishStream = (camera: { rtspUrl?: string }): boolean => {
+  if (!camera.rtspUrl) return true;
+  try {
+    const parsed = new URL(camera.rtspUrl);
+    // Port 8554 is MediaMTX's RTSP ingestion port
+    if (parsed.port === "8554") return true;
+  } catch {
+    // Dynamic match for any host/IP on port 8554
+    if (/^rtsp:\/\/(?:\[[^\]]+\]|[^/:]+):8554\//i.test(camera.rtspUrl)) return true;
+  }
+  return false;
+};
+
+/**
+ * Resolves the MediaMTX stream path for a camera dynamically.
+ * If the camera rtspUrl points to a MediaMTX port (8554), extracts and uses that path
+ * directly without any hardcoded IP addresses.
+ * Otherwise, falls back to the normalized camera serial number.
+ */
+export const getCameraStreamPath = (camera: { serialNumber: string; rtspUrl?: string }): string => {
+  if (camera.rtspUrl) {
+    try {
+      const parsed = new URL(camera.rtspUrl);
+      if (parsed.port === "8554") {
+        const pathPart = parsed.pathname.replace(/^\/+/, "").split("/")[0]?.trim();
+        if (pathPart) return pathPart;
+      }
+    } catch {
+      // Dynamic fallback regex matching any hostname, IPv4, or IPv6 on port 8554
+      const match = camera.rtspUrl.match(/^rtsp:\/\/(?:\[[^\]]+\]|[^/:]+):8554\/([a-zA-Z0-9_.-]+)/i);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+    }
+  }
+  return toPathName(camera.serialNumber);
+};
+
+/**
+ * Startup sync — registers external camera RTSP pull paths in MediaMTX.
+ * Direct publisher cameras (e.g. Larix, OBS) are skipped since MediaMTX
+ * accepts them on-demand via `source: publisher`.
  */
 export const syncMediaMTXPaths = async (): Promise<void> => {
   try {
-    // Import here to avoid circular deps at module load time
     const { Camera } = await import("../models/Camera");
 
     const cameras = await Camera.find({ isDeleted: false }).select(
       "serialNumber rtspUrl"
     );
 
-    logger.info(`📡 MediaMTX sync: registering ${cameras.length} camera paths...`);
+    logger.info(`📡 MediaMTX sync: inspecting ${cameras.length} camera paths...`);
 
     let registered = 0;
     for (const cam of cameras) {
-      const pathName = toPathName(cam.serialNumber);
-      const success = await addMediaMTXPath(pathName, cam.rtspUrl);
-      if (success) registered++;
+      if (isDirectPublishStream(cam)) {
+        continue;
+      }
+      const pathName = getCameraStreamPath(cam);
+      if (cam.rtspUrl) {
+        const success = await addMediaMTXPath(pathName, cam.rtspUrl);
+        if (success) registered++;
+      }
     }
 
-    logger.info(`📡 MediaMTX sync complete — ${registered}/${cameras.length} paths registered`);
+    logger.info(`📡 MediaMTX sync complete — ${registered} external pull path(s) registered`);
   } catch (err) {
     // Non-fatal — server continues even if sync fails
     logger.warn(`[MediaMTX] Startup sync failed (non-fatal): ${(err as Error).message}`);

@@ -17,9 +17,12 @@ import { logger } from "../utils/logger";
 import {
   addMediaMTXPath,
   toPathName,
+  getCameraStreamPath,
   getMediaMTXPathStatus,
   listMediaMTXPaths,
+  isDirectPublishStream,
 } from "../config/mediamtx.service";
+import { socketService } from "./socket.service";
 import { validateCameraAccess } from "./camera.service";
 import { JwtAccessPayload } from "../types";
 import { StartStreamInput, StopStreamInput } from "../validators/stream.validator";
@@ -46,22 +49,6 @@ const signStreamToken = (
     env.ACCESS_TOKEN_SECRET,
     { expiresIn: env.STREAM_TOKEN_EXPIRY as unknown as number }
   );
-};
-
-/**
- * Resolves the MediaMTX stream path for a camera.
- * If the camera rtspUrl points to an internal MediaMTX path (e.g. rtsp://localhost:8554/webcam_01),
- * extracts and uses that path directly ('webcam_01').
- * Otherwise, falls back to the normalized camera serial number.
- */
-export const getCameraStreamPath = (camera: { serialNumber: string; rtspUrl?: string }): string => {
-  if (camera.rtspUrl) {
-    const localMatch = camera.rtspUrl.match(/^rtsp:\/\/(?:localhost|127\.0\.0\.1|200\.141\.12\.143|0\.0\.0\.0):8554\/([a-zA-Z0-9_.-]+)/i);
-    if (localMatch && localMatch[1]) {
-      return localMatch[1].trim();
-    }
-  }
-  return toPathName(camera.serialNumber);
 };
 
 // ─── Service Functions ────────────────────────────────────────────────────────
@@ -101,8 +88,7 @@ export const startStream = async (
 
   // 2. Register path in MediaMTX (only if external RTSP pull is needed)
   const pathName = getCameraStreamPath(camera);
-  const isDirectPublish = pathName !== toPathName(camera.serialNumber);
-  if (!isDirectPublish && camera.rtspUrl) {
+  if (!isDirectPublishStream(camera) && camera.rtspUrl) {
     await addMediaMTXPath(pathName, camera.rtspUrl);
   }
 
@@ -274,10 +260,9 @@ export const getStreamToken = async (
     }
   }
 
-  // Ensure path is registered
+  // Ensure path is registered (only if external RTSP pull is needed)
   const pathName = getCameraStreamPath(camera);
-  const isDirectPublish = pathName !== toPathName(camera.serialNumber);
-  if (!isDirectPublish && camera.rtspUrl) {
+  if (!isDirectPublishStream(camera) && camera.rtspUrl) {
     await addMediaMTXPath(pathName, camera.rtspUrl);
   }
 
@@ -468,6 +453,25 @@ export const relayWebRTCOffer = async (
 
     const answerSdp = await res.text();
     const location = res.headers.get("location");
+
+    // Camera successfully streaming live video: immediately reconcile status in DB and notify sockets
+    if (camera.status !== "online") {
+      camera.status = "online";
+      camera.health.lastPing = new Date();
+      await camera.save().catch(() => {});
+
+      const eventPayload = {
+        cameraId: camera._id.toString(),
+        serialNumber: camera.serialNumber,
+        status: "online",
+        timestamp: new Date().toISOString(),
+      };
+      socketService.emitGlobal("camera_online", eventPayload);
+      socketService.emitToCamera(camera._id.toString(), "camera_online", eventPayload);
+      if (camera.franchiseId) {
+        socketService.emitToFranchise(camera.franchiseId.toString(), "camera_online", eventPayload);
+      }
+    }
 
     return {
       type: "answer",

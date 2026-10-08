@@ -10,6 +10,7 @@ import { env } from "./config/env";
 import { logger } from "./utils/logger";
 import { socketService } from "./services/socket.service";
 import * as streamService from "./services/stream.service";
+import * as cameraService from "./services/camera.service";
 
 const startServer = async (): Promise<void> => {
   const startTime = Date.now();
@@ -76,6 +77,16 @@ const startServer = async (): Promise<void> => {
         }
       }, 60000);
       reaperInterval.unref();
+
+      // ── Background Workers: Real-time Camera Stream Presence Monitor ───
+      const presenceInterval = setInterval(async () => {
+        try {
+          await cameraService.syncLiveCameraStatuses();
+        } catch (err) {
+          logger.error(`Error running camera presence monitor: ${(err as Error).message}`);
+        }
+      }, 3000);
+      presenceInterval.unref();
 
       // ── Print System Banner ──────────────────────────────────────────────
       const banner = [
