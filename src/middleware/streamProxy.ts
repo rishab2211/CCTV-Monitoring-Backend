@@ -51,10 +51,13 @@ export const createMediaProxy = (targetPort: number, serviceName: string) => {
     proxyReq.on("error", (err: Error) => {
       logger.warn(`[StreamProxy] Error proxying to ${serviceName} (port ${targetPort}): ${err.message}`);
       if (!res.headersSent) {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD");
+        res.setHeader("Access-Control-Allow-Headers", "*");
         res.status(502).json({
           success: false,
           statusCode: 502,
-          message: `${serviceName} is not reachable. Ensure MediaMTX is running.`,
+          message: `${serviceName} is not reachable. Ensure MediaMTX is running on port ${targetPort}.`,
           error: err.message,
         });
       }
