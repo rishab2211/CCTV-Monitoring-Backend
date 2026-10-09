@@ -248,12 +248,26 @@ export interface ICameraHealth {
   lastPing?: Date;
 }
 
+export type CameraAudioProtocol = "onvif_backchannel" | "hikvision_isapi" | "dahua_cgi" | "auto";
+export type CameraAudioCodec = "pcm_mulaw" | "pcm_alaw" | "aac";
+
+export interface ICameraAudioSettings {
+  talkbackEnabled: boolean;
+  speakerVolume?: number;
+  protocol?: CameraAudioProtocol;
+  codec?: CameraAudioCodec;
+  sampleRate?: number;
+  backchannelPath?: string;
+  httpAudioPort?: number;
+}
+
 export interface ICameraSettings {
   recordingEnabled: boolean;
   motionDetectionEnabled: boolean;
   aiFeaturesEnabled: boolean;
   recordingRetentionDays: number;
   talkbackEnabled: boolean;
+  audioSettings?: ICameraAudioSettings;
   alertRules?: any; // Generic rules configuration
 }
 

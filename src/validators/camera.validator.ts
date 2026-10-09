@@ -14,11 +14,23 @@ const cameraLocationSchema = z.object({
 
 // ─── Settings Schema ─────────────────────────────────────────────────────────
 
+const cameraAudioSettingsSchema = z.object({
+  talkbackEnabled: z.boolean().optional(),
+  protocol: z.enum(["onvif_backchannel", "hikvision_isapi", "dahua_cgi", "auto"]).optional(),
+  codec: z.enum(["pcm_mulaw", "pcm_alaw", "aac"]).optional(),
+  sampleRate: z.number().int().positive().optional(),
+  speakerVolume: z.number().min(0).max(100).optional(),
+  backchannelPath: z.string().max(200).optional(),
+  httpAudioPort: z.number().int().min(1).max(65535).optional(),
+}).optional();
+
 const cameraSettingsSchema = z.object({
   recordingEnabled: z.boolean().default(false).optional(),
   motionDetectionEnabled: z.boolean().default(false).optional(),
   aiFeaturesEnabled: z.boolean().default(false).optional(),
   recordingRetentionDays: z.number().int().min(1).max(90).default(7).optional(),
+  talkbackEnabled: z.boolean().optional(),
+  audioSettings: cameraAudioSettingsSchema,
 }).optional();
 
 const rtspUrlSchema = z

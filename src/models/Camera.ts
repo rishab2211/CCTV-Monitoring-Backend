@@ -90,6 +90,23 @@ const cameraSchema = new Schema<CameraDocument>(
       aiFeaturesEnabled: { type: Boolean, default: false },
       recordingRetentionDays: { type: Number, default: 30 },
       talkbackEnabled: { type: Boolean, default: false },
+      audioSettings: {
+        talkbackEnabled: { type: Boolean, default: false },
+        protocol: {
+          type: String,
+          enum: ["onvif_backchannel", "hikvision_isapi", "dahua_cgi", "auto"],
+          default: "auto",
+        },
+        codec: {
+          type: String,
+          enum: ["pcm_mulaw", "pcm_alaw", "aac"],
+          default: "pcm_mulaw",
+        },
+        sampleRate: { type: Number, default: 8000 },
+        speakerVolume: { type: Number, default: 100 },
+        backchannelPath: { type: String, default: "" },
+        httpAudioPort: { type: Number, default: 80 },
+      },
       alertRules: { type: Schema.Types.Mixed, default: {} },
     },
     qrCode: {
