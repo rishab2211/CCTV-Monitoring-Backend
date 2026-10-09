@@ -26,7 +26,7 @@ export const createMediaProxy = (targetPort: number, serviceName: string) => {
     const options: http.RequestOptions = {
       hostname: "127.0.0.1",
       port: targetPort,
-      path: req.url,
+      path: req.url.startsWith("/") ? req.url : `/${req.url}`,
       method: req.method,
       headers: {
         ...req.headers,
@@ -35,13 +35,19 @@ export const createMediaProxy = (targetPort: number, serviceName: string) => {
     };
 
     const proxyReq = http.request(options, (proxyRes) => {
-      // Build response headers with permissive CORS for embedding in any dashboard/app
+      // Clean upstream headers to prevent duplicate header rejection in browsers
+      const cleanHeaders = { ...proxyRes.headers };
+      delete cleanHeaders["access-control-allow-origin"];
+      delete cleanHeaders["access-control-allow-methods"];
+      delete cleanHeaders["access-control-allow-headers"];
+      delete cleanHeaders["access-control-expose-headers"];
+
       const responseHeaders: http.OutgoingHttpHeaders = {
-        ...proxyRes.headers,
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD",
-        "Access-Control-Allow-Headers": "*",
-        "Access-Control-Expose-Headers": "Location, Content-Type, Content-Length, Date, Server",
+        ...cleanHeaders,
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD",
+        "access-control-allow-headers": "*",
+        "access-control-expose-headers": "Location, Content-Type, Content-Length, Date, Server",
       };
 
       res.writeHead(proxyRes.statusCode || 200, responseHeaders);

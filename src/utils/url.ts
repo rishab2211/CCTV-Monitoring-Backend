@@ -55,12 +55,12 @@ export const isOriginAllowed = (origin: string | undefined): boolean => {
   }
 
   // Any Vercel preview or production deployment (e.g. cctv-monitoring-admin-panel.vercel.app or branch preview)
-  if (/^https:\/\/[a-zA-Z0-9-_.]+\.vercel\.app$/.test(origin)) {
+  if (origin.startsWith("https://") && (origin.endsWith(".vercel.app") || /^https:\/\/[a-z0-9\-.]+\.vercel\.app$/i.test(origin))) {
     return true;
   }
 
   // Any Cloudflare quick tunnel (e.g. *.trycloudflare.com)
-  if (/^https:\/\/[a-zA-Z0-9-_.]+\.trycloudflare\.com$/.test(origin)) {
+  if (origin.startsWith("https://") && (origin.endsWith(".trycloudflare.com") || /^https:\/\/[a-z0-9\-.]+\.trycloudflare\.com$/i.test(origin))) {
     return true;
   }
 

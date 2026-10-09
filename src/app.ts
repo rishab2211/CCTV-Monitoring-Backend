@@ -33,6 +33,12 @@ app.use(
   })
 );
 
+// ─── Media Streaming Reverse Proxy (Port 10000 -> MediaMTX 8888 & 8889) ──────
+// Mounted BEFORE general CORS and body parsers so video chunks and WebRTC WHIP/WHEP
+// signaling are streamed directly with permissive CORS and never throttled.
+app.use("/hls", createMediaProxy(8888, "MediaMTX HLS"));
+app.use("/webrtc", createMediaProxy(8889, "MediaMTX WebRTC/WHEP"));
+
 // ─── Dynamic Permissive CORS ──────────────────────────────────────────────────
 
 app.use(
@@ -51,12 +57,6 @@ app.use(
     optionsSuccessStatus: 204,
   })
 );
-
-// ─── Media Streaming Reverse Proxy (Port 10000 -> MediaMTX 8888 & 8889) ──────
-// Mounted BEFORE body parsers and rate limiting so high-frequency HLS video chunks
-// and WHEP signaling are streamed directly with zero latency and never throttled.
-app.use("/hls", createMediaProxy(8888, "MediaMTX HLS"));
-app.use("/webrtc", createMediaProxy(8889, "MediaMTX WebRTC/WHEP"));
 
 // ─── Body Parsers ─────────────────────────────────────────────────────────────
 
