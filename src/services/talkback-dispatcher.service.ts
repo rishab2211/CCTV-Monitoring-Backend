@@ -131,6 +131,19 @@ export const startDispatcher = async (
       return;
     }
 
+    // Check if camera is using a local loopback MediaMTX stream (e.g. phone Larix, webcam script, or test stream)
+    const isLocalTestStream =
+      camera.rtspUrl.includes("127.0.0.1:8554") ||
+      camera.rtspUrl.includes("localhost:8554");
+
+    if (isLocalTestStream) {
+      logger.info(
+        `[TalkbackDispatcher] Camera "${camera.name}" is using a local MediaMTX stream (${camera.rtspUrl}). ` +
+        `WebRTC audio is live on MediaMTX at rtsp://127.0.0.1:8554/${pathName}. Skipping RTSP backchannel bridge.`
+      );
+      return;
+    }
+
     const ffmpegArgs = buildFFmpegArgs(camera);
     logger.info(`[TalkbackDispatcher] Spawning audio bridge for camera ${cameraId} (${camera.name}) - MediaMTX ready: ${streamReady}`);
 
