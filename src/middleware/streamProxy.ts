@@ -23,13 +23,19 @@ export const createMediaProxy = (targetPort: number, serviceName: string) => {
       return;
     }
 
+    const proxyHeaders = { ...req.headers };
+    delete proxyHeaders["host"];
+    delete proxyHeaders["connection"];
+    delete proxyHeaders["transfer-encoding"];
+    delete proxyHeaders["keep-alive"];
+
     const options: http.RequestOptions = {
       hostname: "127.0.0.1",
       port: targetPort,
       path: req.url.startsWith("/") ? req.url : `/${req.url}`,
       method: req.method,
       headers: {
-        ...req.headers,
+        ...proxyHeaders,
         host: `127.0.0.1:${targetPort}`,
       },
     };
@@ -41,6 +47,11 @@ export const createMediaProxy = (targetPort: number, serviceName: string) => {
       delete cleanHeaders["access-control-allow-methods"];
       delete cleanHeaders["access-control-allow-headers"];
       delete cleanHeaders["access-control-expose-headers"];
+      
+      // Strip hop-by-hop headers
+      delete cleanHeaders["transfer-encoding"];
+      delete cleanHeaders["connection"];
+      delete cleanHeaders["keep-alive"];
 
       const responseHeaders: http.OutgoingHttpHeaders = {
         ...cleanHeaders,
