@@ -119,8 +119,14 @@ class SocketService {
         logger.debug(`[Socket.IO] User ${user.userId} left room ${roomName}`);
       });
 
-      socket.on("disconnect", () => {
+      socket.on("disconnect", async () => {
         logger.debug(`[Socket.IO] Client disconnected: ${user.userId}`);
+        try {
+          const { handleOperatorDisconnect } = await import("./talkback.service");
+          await handleOperatorDisconnect(user.userId);
+        } catch (err: any) {
+          logger.debug(`[Socket.IO] Disconnect cleanup error: ${err.message}`);
+        }
       });
     });
 

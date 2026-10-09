@@ -8,6 +8,7 @@ import { logActivity } from "../models/ActivityLog";
 import { socketService } from "./socket.service";
 import { env } from "../config/env";
 import { getPublicBaseUrl } from "../utils/url";
+import * as talkbackDispatcher from "./talkback-dispatcher.service";
 
 /**
  * Get Talkback Capabilities
@@ -22,9 +23,14 @@ export const getCapabilities = async (cameraId: string, user: JwtAccessPayload) 
   if (!camera) throw ApiError.notFound("Camera");
   await validateCameraAccess(camera as any, user);
 
+  const audioOutSupported = Boolean(
+    camera.settings?.talkbackEnabled || camera.settings?.audioSettings?.talkbackEnabled
+  );
+
   return {
-    audioIn: true, // Assuming we always support incoming audio (listening)
-    audioOut: camera.settings.talkbackEnabled, // Talkback capability
+    audioIn: true, // Incoming audio listening via RTSP stream
+    audioOut: audioOutSupported,
+    audioSettings: camera.settings?.audioSettings || null,
   };
 };
 
@@ -32,7 +38,8 @@ export const getCapabilities = async (cameraId: string, user: JwtAccessPayload) 
  * Start Talkback Session
  * Initiates a two-way audio session. Ensures that the camera supports talkback 
  * and prevents multiple operators from talking to the same camera concurrently.
- * Returns a MediaMTX WHIP URL for the frontend to publish WebRTC audio.
+ * Returns a MediaMTX WHIP URL for the frontend to publish WebRTC audio and spawns
+ * the audio bridge forwarder to the camera speaker.
  * 
  * @param cameraId - The target camera ID
  * @param user - The operator starting the session
@@ -43,7 +50,11 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload) => 
   if (!camera) throw ApiError.notFound("Camera");
   await validateCameraAccess(camera, user);
 
-  if (!camera.settings.talkbackEnabled) {
+  const isTalkbackAllowed = Boolean(
+    camera.settings?.talkbackEnabled || camera.settings?.audioSettings?.talkbackEnabled
+  );
+
+  if (!isTalkbackAllowed) {
     throw ApiError.badRequest("Talkback is not enabled for this camera");
   }
 
@@ -54,14 +65,19 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload) => 
   });
 
   if (existingSession) {
-    const isStale = (Date.now() - new Date(existingSession.startedAt).getTime()) > 15 * 60 * 1000;
+    // Watchdog check: If previous session is older than 90 seconds, release it as stale
+    const isStale = (Date.now() - new Date(existingSession.startedAt).getTime()) > 90 * 1000;
     if (isStale) {
       existingSession.status = "completed";
-
       existingSession.endedAt = new Date();
+      existingSession.durationSeconds = Math.round((existingSession.endedAt.getTime() - existingSession.startedAt.getTime()) / 1000);
       await existingSession.save();
+      await talkbackDispatcher.stopDispatcher(cameraId);
     } else if (existingSession.operatorId.toString() === user.userId) {
-      // It's the same operator, just return the existing session
+      // It's the same operator, ensure dispatcher bridge is running
+      if (!talkbackDispatcher.isDispatcherRunning(cameraId)) {
+        await talkbackDispatcher.startDispatcher(camera, existingSession._id.toString());
+      }
       const baseUrl = getPublicBaseUrl();
       return {
         session: existingSession,
@@ -72,7 +88,6 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload) => 
     }
   }
 
-
   // Create new session
   const session = await TalkbackSession.create({
     cameraId,
@@ -80,6 +95,9 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload) => 
     operatorId: user.userId,
     status: "active",
   });
+
+  // Spawn live FFmpeg audio bridge from MediaMTX to the camera speaker
+  await talkbackDispatcher.startDispatcher(camera, session._id.toString());
 
   // Emit socket event so frontend knows the camera is busy
   socketService.emitToCamera(cameraId, "talkback_started", {
@@ -105,8 +123,8 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload) => 
 
 /**
  * Stop Talkback Session
- * Ends an active talkback session, calculates its total duration, 
- * and broadcasts the termination event to other dashboards via WebSocket.
+ * Ends an active talkback session, terminates the audio bridge process,
+ * calculates its total duration, and broadcasts the termination event via WebSocket.
  * 
  * @param cameraId - The target camera ID
  * @param user - The operator who started the session
@@ -124,6 +142,9 @@ export const stopSession = async (cameraId: string, user: JwtAccessPayload) => {
   }
 
   const session = await TalkbackSession.findOne(sessionQuery);
+
+  // Stop physical camera audio bridge process immediately
+  await talkbackDispatcher.stopDispatcher(cameraId);
 
   if (!session) {
     throw ApiError.notFound("No active talkback session found on this camera");
@@ -148,6 +169,35 @@ export const stopSession = async (cameraId: string, user: JwtAccessPayload) => {
   });
 
   return session;
+};
+
+/**
+ * Automatically clean up active talkback sessions and terminate audio dispatchers
+ * when an operator's WebSocket disconnects abruptly.
+ */
+export const handleOperatorDisconnect = async (operatorId: string) => {
+  const activeSessions = await TalkbackSession.find({
+    operatorId,
+    status: "active",
+  });
+
+  for (const session of activeSessions) {
+    const cameraId = session.cameraId.toString();
+    await talkbackDispatcher.stopDispatcher(cameraId);
+
+    session.status = "completed";
+    session.endedAt = new Date();
+    session.durationSeconds = Math.round(
+      (session.endedAt.getTime() - session.startedAt.getTime()) / 1000
+    );
+    await session.save();
+
+    socketService.emitToCamera(cameraId, "talkback_stopped", {
+      sessionId: session._id,
+      endedAt: session.endedAt,
+      durationSeconds: session.durationSeconds,
+    });
+  }
 };
 
 /**
