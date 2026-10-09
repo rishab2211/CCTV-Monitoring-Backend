@@ -59,5 +59,10 @@ export const isOriginAllowed = (origin: string | undefined): boolean => {
     return true;
   }
 
+  // Any Cloudflare quick tunnel (e.g. *.trycloudflare.com)
+  if (/^https:\/\/[a-zA-Z0-9-_.]+\.trycloudflare\.com$/.test(origin)) {
+    return true;
+  }
+
   return false;
 };

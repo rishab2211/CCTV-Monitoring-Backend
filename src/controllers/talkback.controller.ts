@@ -12,7 +12,7 @@ export const getCapabilities = catchAsync(async (req: Request, res: Response) =>
 
 export const startSession = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
-  const result = await talkbackService.startSession(req.params.cameraId, req.user);
+  const result = await talkbackService.startSession(req.params.cameraId, req.user, req);
   res.status(201).json(new ApiResponse(201, result, "Talkback session started"));
 });
 

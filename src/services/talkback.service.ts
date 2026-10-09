@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { Request } from "express";
 import { TalkbackSession } from "../models/TalkbackSession";
 import { Camera } from "../models/Camera";
 import { ApiError } from "../utils/ApiError";
@@ -43,9 +44,10 @@ export const getCapabilities = async (cameraId: string, user: JwtAccessPayload) 
  * 
  * @param cameraId - The target camera ID
  * @param user - The operator starting the session
+ * @param req - Optional Express request for base URL resolution
  * @returns The session details and WebRTC WHIP ingestion URL
  */
-export const startSession = async (cameraId: string, user: JwtAccessPayload) => {
+export const startSession = async (cameraId: string, user: JwtAccessPayload, req?: Request) => {
   const camera = await Camera.findOne({ _id: cameraId, isDeleted: false });
   if (!camera) throw ApiError.notFound("Camera");
   await validateCameraAccess(camera, user);
@@ -78,7 +80,7 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload) => 
       if (!talkbackDispatcher.isDispatcherRunning(cameraId)) {
         await talkbackDispatcher.startDispatcher(camera, existingSession._id.toString());
       }
-      const baseUrl = getPublicBaseUrl();
+      const baseUrl = getPublicBaseUrl(req);
       return {
         session: existingSession,
         whipUrl: `${baseUrl}/webrtc/camera_${cameraId}_talkback/whip`,
@@ -114,7 +116,7 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload) => 
   });
 
   // Return the MediaMTX WHIP URL for the frontend to publish WebRTC audio to
-  const baseUrl = getPublicBaseUrl();
+  const baseUrl = getPublicBaseUrl(req);
   return {
     session,
     whipUrl: `${baseUrl}/webrtc/camera_${cameraId}_talkback/whip`,
@@ -147,7 +149,10 @@ export const stopSession = async (cameraId: string, user: JwtAccessPayload) => {
   await talkbackDispatcher.stopDispatcher(cameraId);
 
   if (!session) {
-    throw ApiError.notFound("No active talkback session found on this camera");
+    return {
+      message: "No active talkback session found on this camera",
+      status: "completed",
+    };
   }
 
   session.status = "completed";
