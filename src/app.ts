@@ -6,7 +6,7 @@ import { env } from "./config/env";
 import router from "./routes";
 import healthRoutes from "./routes/v1/health.routes";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
-import { generalLimiter } from "./middleware/rateLimiter";
+import { generalLimiter, whipLimiter } from "./middleware/rateLimiter";
 import { logger } from "./utils/logger";
 
 import { createMediaProxy } from "./middleware/streamProxy";
@@ -24,6 +24,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:", "https:", "blob:"],
         mediaSrc: ["'self'", "data:", "https:", "blob:", "*"],
@@ -35,9 +36,10 @@ app.use(
 
 // ─── Media Streaming Reverse Proxy (Port 10000 -> MediaMTX 8888 & 8889) ──────
 // Mounted BEFORE general CORS and body parsers so video chunks and WebRTC WHIP/WHEP
-// signaling are streamed directly with permissive CORS and never throttled.
+// signaling are streamed directly with permissive CORS.
+// /webrtc is protected with whipLimiter against state-changing connection floods (B8).
 app.use("/hls", createMediaProxy(8888, "MediaMTX HLS"));
-app.use("/webrtc", createMediaProxy(8889, "MediaMTX WebRTC/WHEP"));
+app.use("/webrtc", whipLimiter, createMediaProxy(8889, "MediaMTX WebRTC/WHEP"));
 
 // ─── Dynamic Permissive CORS ──────────────────────────────────────────────────
 
