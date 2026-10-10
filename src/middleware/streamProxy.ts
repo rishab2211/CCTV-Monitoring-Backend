@@ -26,8 +26,10 @@ export const createMediaProxy = (targetPort: number, serviceName: string) => {
     const proxyHeaders = { ...req.headers };
     delete proxyHeaders["host"];
     delete proxyHeaders["connection"];
-    delete proxyHeaders["transfer-encoding"];
     delete proxyHeaders["keep-alive"];
+    if (proxyHeaders["content-length"]) {
+      delete proxyHeaders["transfer-encoding"];
+    }
 
     const options: http.RequestOptions = {
       hostname: "127.0.0.1",
@@ -86,6 +88,10 @@ export const createMediaProxy = (targetPort: number, serviceName: string) => {
       proxyReq.destroy();
     });
 
-    req.pipe(proxyReq);
+    if (req.readableEnded) {
+      proxyReq.end();
+    } else {
+      req.pipe(proxyReq);
+    }
   };
 };

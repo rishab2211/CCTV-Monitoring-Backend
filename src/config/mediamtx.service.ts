@@ -101,13 +101,20 @@ export const removeMediaMTXPath = async (pathName: string): Promise<void> => {
  * Called by talkback.service when a session starts.
  */
 export const addMediaMTXTalkbackPath = async (pathName: string): Promise<boolean> => {
+  // If path matches the mediamtx.yml regex template (~^camera_[a-z0-9]+_talkback$),
+  // MediaMTX automatically handles it as a dynamic publisher without needing API addition.
+  // Adding it via API causes MediaMTX to trigger dynamic config reload which drops port 8889 sockets.
+  if (/^camera_[a-z0-9]+_talkback$/i.test(pathName)) {
+    return true;
+  }
+
   const config = {
     source: "publisher",
     maxReaders: 10,
   };
   const result = await mediamtxFetch("POST", `/config/paths/add/${pathName}`, config);
   if (result === null) {
-    // Path may already exist (e.g., matched by yaml regex) — patch to ensure correct config
+    // Path may already exist — patch to ensure correct config
     await mediamtxFetch("PATCH", `/config/paths/patch/${pathName}`, config);
   }
   logger.info(`[MediaMTX] Talkback path registered: ${pathName}`);
@@ -119,6 +126,9 @@ export const addMediaMTXTalkbackPath = async (pathName: string): Promise<boolean
  * Non-fatal — if the path was matched by the yml regex, removal is a no-op.
  */
 export const removeMediaMTXTalkbackPath = async (pathName: string): Promise<void> => {
+  if (/^camera_[a-z0-9]+_talkback$/i.test(pathName)) {
+    return;
+  }
   await mediamtxFetch("DELETE", `/config/paths/remove/${pathName}`);
   logger.info(`[MediaMTX] Talkback path removed: ${pathName}`);
 };
