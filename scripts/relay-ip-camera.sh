@@ -63,7 +63,10 @@ ffmpeg \
   -loglevel warning \
   -rtsp_transport tcp \
   -i "${LOCAL_RTSP}" \
-  -c copy \
+  -c:v copy \
+  -c:a libopus \
+  -b:a 64k \
+  -async 50 \
   -rtsp_transport tcp \
   -f rtsp \
   "${VPS_RTSP}" &
