@@ -27,6 +27,31 @@ export const authenticate = (
     // ── Check System API Key (bypass JWT for internal hardware/cron requests) ──
     const systemKey = req.headers["x-system-key"];
     if (typeof systemKey === "string" && safeCompare(systemKey, env.SYSTEM_API_KEY)) {
+      // Security guard: Prevent system API key privilege escalation on administrative management routes
+      const normalizedPath = (req.originalUrl || req.baseUrl || req.url || "").split("?")[0];
+      const blockedSegments = [
+        "users",
+        "admins",
+        "roles",
+        "permissions",
+        "settings",
+        "plans",
+        "subscriptions",
+        "payments",
+        "invoices",
+        "franchises",
+        "auth",
+      ];
+      const isBlocked = blockedSegments.some(
+        (segment) =>
+          normalizedPath.includes(`/v1/${segment}`) ||
+          normalizedPath.includes(`/${segment}/`) ||
+          normalizedPath.endsWith(`/${segment}`)
+      );
+      if (isBlocked) {
+        throw ApiError.forbidden("System API key is not authorized for administrative management routes");
+      }
+
       req.user = {
         userId: SYSTEM_USER_ID,
         role: "super_admin",
