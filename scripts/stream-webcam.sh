@@ -97,6 +97,9 @@ ffmpeg \
   -c:v libx264 \
   -preset ultrafast \
   -tune zerolatency \
+  -g "${FRAMERATE}" \
+  -keyint_min "${FRAMERATE}" \
+  -sc_threshold 0 \
   -pix_fmt yuv420p \
   -an \
   -rtsp_transport tcp \
