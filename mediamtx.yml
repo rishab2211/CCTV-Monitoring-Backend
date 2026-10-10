@@ -1,33 +1,30 @@
 # MediaMTX Configuration for CCTV Monitoring Platform
 api: yes
-# Bind API to all interfaces so backend can reach it in --net=host mode
 apiAddress: :9997
 
-# Logging
 logLevel: info
 logDestinations: [stdout]
 
-# RTSP Server (Ingestion for webcams and physical cameras)
 rtsp: yes
 rtspAddress: :8554
 protocols: [tcp, udp]
 
-# ─── WebRTC (WHEP / WHIP Playback) ─────────────────────────────────────
-# CRITICAL: Bind to 0.0.0.0 (":8889"), NOT 127.0.0.1, so UDP ICE candidates
-# are reachable from the internet. 127.0.0.1 forces TCP fallback = FPS fluctuation.
 webrtc: yes
 webrtcAddress: :8889
-webrtcAllowOrigin: '*'
 
-# Advertise public VPS IP so browsers receive a valid internet-reachable UDP candidate
+# ICE/UDP on same port as HTTP signaling to avoid port confusion
+webrtcLocalUDPAddress: :8889
+webrtcLocalTCPAddress: ""
+
+# Only advertise public IP — blocks Docker bridge IP (172.17.0.1) from ICE candidates
+webrtcIPsFromInterfaces: no
 webrtcAdditionalHosts:
   - 200.141.12.143
 
-# STUN for NAT reflexive candidate resolution
+webrtcAllowOrigin: '*'
 webrtcICEServers2:
   - url: stun:stun.l.google.com:19302
 
-# ─── HLS (Low-Latency fallback) ─────────────────────────────────────────
 hls: yes
 hlsAddress: :8888
 hlsAllowOrigin: '*'
@@ -35,7 +32,6 @@ hlsPartDuration: 200ms
 hlsSegmentDuration: 1s
 hlsSegmentCount: 7
 
-# Default path config
 paths:
   all:
     source: publisher
