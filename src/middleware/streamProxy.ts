@@ -23,20 +23,6 @@ export const createMediaProxy = (targetPort: number, serviceName: string) => {
       return;
     }
 
-    if (req.url.includes("talkback/whip") && req.method === "POST") {
-      // DEBUG: intercept the WHIP request to see if 502 is from Cloudflare or MediaMTX
-      res.writeHead(201, {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD",
-        "Access-Control-Allow-Headers": "*",
-        "Access-Control-Expose-Headers": "Location, Content-Type, Content-Length, Date, Server",
-        "Content-Type": "application/sdp",
-        "Location": req.url + "/debug123",
-      });
-      res.end("v=0\r\no=- 0 0 IN IP4 127.0.0.1\r\ns=Talkback\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\na=rtpmap:111 opus/48000/2\r\n");
-      return;
-    }
-
     const proxyHeaders = { ...req.headers };
     delete proxyHeaders["host"];
     delete proxyHeaders["connection"];
