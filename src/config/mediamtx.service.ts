@@ -169,17 +169,21 @@ export const isDirectPublishStream = (camera: { rtspUrl?: string }): boolean => 
     const parsed = new URL(camera.rtspUrl);
     // Port 8554 is MediaMTX's RTSP ingestion port
     if (parsed.port === "8554") return true;
+    // WebRTC WHIP/WHEP or HLS direct endpoints
+    if (parsed.pathname.includes("/webrtc/") || parsed.pathname.includes("/hls/")) return true;
+    if (parsed.pathname.endsWith("/whip") || parsed.pathname.endsWith("/whep")) return true;
   } catch {
-    // Dynamic match for any host/IP on port 8554
+    // Dynamic match for any host/IP on port 8554 or /webrtc/
     if (/^rtsp:\/\/(?:\[[^\]]+\]|[^/:]+):8554\//i.test(camera.rtspUrl)) return true;
+    if (/\/webrtc\/[a-zA-Z0-9_.-]+/i.test(camera.rtspUrl)) return true;
   }
   return false;
 };
 
 /**
  * Resolves the MediaMTX stream path for a camera dynamically.
- * If the camera rtspUrl points to a MediaMTX port (8554), extracts and uses that path
- * directly without any hardcoded IP addresses.
+ * If the camera rtspUrl points to a MediaMTX port (8554) or WebRTC WHIP endpoint,
+ * extracts and uses that path directly without any hardcoded IP addresses.
  * Otherwise, falls back to the normalized camera serial number.
  */
 export const getCameraStreamPath = (camera: { serialNumber: string; rtspUrl?: string }): string => {
@@ -190,11 +194,25 @@ export const getCameraStreamPath = (camera: { serialNumber: string; rtspUrl?: st
         const pathPart = parsed.pathname.replace(/^\/+/, "").split("/")[0]?.trim();
         if (pathPart) return pathPart;
       }
+      // Match /webrtc/<pathName>(/whip|/whep)
+      const webrtcMatch = parsed.pathname.match(/\/webrtc\/([a-zA-Z0-9_.-]+)(?:\/whip|\/whep)?/i);
+      if (webrtcMatch && webrtcMatch[1]) {
+        return webrtcMatch[1].trim();
+      }
+      // Match /<pathName>/(whip|whep)
+      const whipMatch = parsed.pathname.match(/^\/?([a-zA-Z0-9_.-]+)\/(?:whip|whep)$/i);
+      if (whipMatch && whipMatch[1]) {
+        return whipMatch[1].trim();
+      }
     } catch {
       // Dynamic fallback regex matching any hostname, IPv4, or IPv6 on port 8554
       const match = camera.rtspUrl.match(/^rtsp:\/\/(?:\[[^\]]+\]|[^/:]+):8554\/([a-zA-Z0-9_.-]+)/i);
       if (match && match[1]) {
         return match[1].trim();
+      }
+      const webrtcMatch = camera.rtspUrl.match(/\/webrtc\/([a-zA-Z0-9_.-]+)(?:\/whip|\/whep)?/i);
+      if (webrtcMatch && webrtcMatch[1]) {
+        return webrtcMatch[1].trim();
       }
     }
   }
