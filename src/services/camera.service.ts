@@ -4,7 +4,7 @@
  * assignment to operators, and tracking network configurations.
  */
 import mongoose from "mongoose";
-import { Camera, CameraDocument } from "../models/Camera";
+import { Camera, CameraDocument, redactRtspCredentials } from "../models/Camera";
 import { User } from "../models/User";
 import { Franchise } from "../models/Franchise";
 import { logActivity } from "../models/ActivityLog";
@@ -659,7 +659,7 @@ export const getCameraConfig = async (
   const camera = await getCameraById(id, user);
   return {
     serialNumber: camera.serialNumber,
-    rtspUrl: camera.rtspUrl,
+    rtspUrl: redactRtspCredentials(camera.rtspUrl),
     settings: camera.settings,
     location: camera.location,
     status: camera.status,
@@ -782,7 +782,7 @@ export const syncLiveCameraStatuses = async (): Promise<void> => {
           timestamp: new Date().toISOString(),
         };
 
-        socketService.emitGlobal("camera_online", onlinePayload);
+        // Emit to camera-specific and franchise rooms only (not global broadcast to all clients)
         socketService.emitToCamera(camera._id.toString(), "camera_online", onlinePayload);
         if (camera.franchiseId) {
           socketService.emitToFranchise(camera.franchiseId.toString(), "camera_online", onlinePayload);
@@ -812,7 +812,7 @@ export const syncLiveCameraStatuses = async (): Promise<void> => {
             timestamp: new Date().toISOString(),
           };
 
-          socketService.emitGlobal("camera_offline", offlinePayload);
+          // Emit to camera-specific and franchise rooms only (not global broadcast)
           socketService.emitToCamera(camera._id.toString(), "camera_offline", offlinePayload);
           if (camera.franchiseId) {
             socketService.emitToFranchise(camera.franchiseId.toString(), "camera_offline", offlinePayload);
@@ -825,6 +825,6 @@ export const syncLiveCameraStatuses = async (): Promise<void> => {
       }
     }
   } catch (err: any) {
-    logger.debug(`[Presence Sync] Background check error: ${err?.message || err}`);
+    logger.warn(`[Presence Sync] Background check error: ${err?.message || err}`);
   }
 };

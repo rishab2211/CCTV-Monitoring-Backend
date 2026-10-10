@@ -25,6 +25,7 @@ class SocketService {
    */
   public initialize(server: HttpServer) {
     this.io = new Server(server, {
+      path: "/socket.io/",
       cors: {
         origin: (origin, callback) => {
           if (isOriginAllowed(origin)) {
@@ -37,6 +38,9 @@ class SocketService {
         credentials: true,
       },
       transports: ["websocket", "polling"],
+      pingTimeout: 30000,
+      pingInterval: 10000,
+      allowUpgrades: true,
     });
 
     // Authentication Middleware
@@ -121,11 +125,14 @@ class SocketService {
 
       socket.on("disconnect", async () => {
         logger.debug(`[Socket.IO] Client disconnected: ${user.userId}`);
-        try {
-          const { handleOperatorDisconnect } = await import("./talkback.service");
-          await handleOperatorDisconnect(user.userId);
-        } catch (err: any) {
-          logger.debug(`[Socket.IO] Disconnect cleanup error: ${err.message}`);
+        // Only cleanup talkback sessions for roles that can initiate them
+        if (["operator", "admin", "super_admin", "franchise_admin"].includes(user.role)) {
+          try {
+            const { handleOperatorDisconnect } = await import("./talkback.service");
+            await handleOperatorDisconnect(user.userId);
+          } catch (err: any) {
+            logger.debug(`[Socket.IO] Disconnect cleanup error: ${err.message}`);
+          }
         }
       });
     });

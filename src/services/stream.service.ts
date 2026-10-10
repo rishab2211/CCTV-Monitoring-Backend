@@ -27,8 +27,17 @@ import { validateCameraAccess } from "./camera.service";
 import { JwtAccessPayload } from "../types";
 import { StartStreamInput, StopStreamInput } from "../validators/stream.validator";
 import { getPublicBaseUrl } from "../utils/url";
+import { SYSTEM_USER_ID } from "../middleware/auth";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Resolves string userId or 'system' identifier to a valid User ObjectId */
+const resolveUserId = (userId: string): mongoose.Types.ObjectId => {
+  if (userId === "system" || userId === SYSTEM_USER_ID || !mongoose.Types.ObjectId.isValid(userId)) {
+    return new mongoose.Types.ObjectId(SYSTEM_USER_ID);
+  }
+  return new mongoose.Types.ObjectId(userId);
+};
 
 /** Hash a stream token for safe storage (never store raw JWT in DB). */
 const hashToken = (token: string): string =>
@@ -105,7 +114,7 @@ export const startStream = async (
   await StreamSession.create({
     sessionId,
     cameraId: camera._id,
-    userId: user.userId === "system" ? camera._id : new mongoose.Types.ObjectId(user.userId),
+    userId: resolveUserId(user.userId),
     role: user.role,
     startedAt: new Date(),
     isActive: true,
@@ -115,7 +124,7 @@ export const startStream = async (
 
   // 4. Log activity
   logActivity({
-    userId: user.userId === "system" ? camera._id : new mongoose.Types.ObjectId(user.userId),
+    userId: resolveUserId(user.userId),
     action: "STREAM_STARTED",
     description: `Live stream started for camera "${camera.name}"`,
     metadata: { cameraId, sessionId, pathName },
@@ -175,7 +184,7 @@ export const stopStream = async (input: StopStreamInput, user: JwtAccessPayload)
   });
 
   logActivity({
-    userId: user.userId === "system" ? session.cameraId : new mongoose.Types.ObjectId(user.userId),
+    userId: resolveUserId(user.userId),
     action: "STREAM_STOPPED",
     description: `Stream session stopped (${remainingCount} remaining)`,
     metadata: { cameraId, sessionId, remainingActiveSessions: remainingCount },
@@ -273,7 +282,7 @@ export const getStreamToken = async (
   await StreamSession.create({
     sessionId,
     cameraId: camera._id,
-    userId: user.userId === "system" ? camera._id : new mongoose.Types.ObjectId(user.userId),
+    userId: resolveUserId(user.userId),
     role: user.role,
     startedAt: new Date(),
     lastHeartbeat: new Date(),
