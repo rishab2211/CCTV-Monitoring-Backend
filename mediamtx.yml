@@ -12,15 +12,15 @@ rtspTransports: [tcp, udp]
 webrtc: yes
 webrtcAddress: :8889
 
-# ICE/UDP media transmission port (standard MediaMTX port :8189 to avoid :8890 collisions)
-webrtcLocalUDPAddress: :8189
-webrtcLocalTCPAddress: ""
+# ICE/UDP and TCP fallback port on IPv4 to prevent unroutable fe80:: IPv6 link-local candidates
+webrtcLocalUDPAddress: 0.0.0.0:8189
+webrtcLocalTCPAddress: 0.0.0.0:8189
 
 # Only advertise public IP / domain — blocks internal Docker bridge IP from ICE candidates
 webrtcIPsFromInterfaces: no
 webrtcAdditionalHosts:
-  - api-cctv-backend.duckdns.org
   - 200.141.12.143
+  - api-cctv-backend.duckdns.org
 
 webrtcAllowOrigins:
   - '*'
