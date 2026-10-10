@@ -686,21 +686,28 @@ pm2 startup
 **Nginx proxy config snippet:**
 ```nginx
 location /api/ {
-    proxy_pass http://localhost:5000;
+    proxy_pass http://localhost:8080;
     proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection 'upgrade';
     proxy_set_header Host $host;
-    proxy_cache_bypass $http_upgrade;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
 }
 
-# Socket.IO WebSocket upgrade
+# Socket.IO WebSocket upgrade & long-polling
 location /socket.io/ {
-    proxy_pass http://localhost:5000;
+    proxy_pass http://localhost:8080;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "Upgrade";
+    proxy_set_header Connection "upgrade";
     proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 86400s;
+    proxy_send_timeout 86400s;
+    proxy_buffering off;
+    proxy_cache_bypass $http_upgrade;
 }
 ```
 

@@ -164,6 +164,9 @@ STEP 4 — Configure UFW Firewall
   # Allow RTSP (cameras push streams to MediaMTX on this port):
   sudo ufw allow 8554/tcp
 
+  # Allow WebRTC ICE / UDP media traffic for live streaming and talkback:
+  sudo ufw allow 8890/udp
+
   # Enable the firewall (type 'y' when prompted):
   sudo ufw enable
 
@@ -558,6 +561,28 @@ STEP 13 — Write Nginx Config for the API
       # Let's Encrypt HTTP challenge (needed for certificate issuance)
       location /.well-known/acme-challenge/ {
           root /var/www/certbot;
+      }
+
+      # Dedicated Socket.IO WebSocket reverse proxy (Part 2 fix)
+      location /socket.io/ {
+          proxy_pass         http://127.0.0.1:8080;
+          proxy_http_version 1.1;
+
+          # WebSocket upgrade headers
+          proxy_set_header   Upgrade           $http_upgrade;
+          proxy_set_header   Connection        "upgrade";
+
+          # Host and client IP headers
+          proxy_set_header   Host              $host;
+          proxy_set_header   X-Real-IP         $remote_addr;
+          proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+          proxy_set_header   X-Forwarded-Proto $scheme;
+
+          # WebSocket keep-alive timeouts (24 hours) & disable buffering
+          proxy_read_timeout 86400s;
+          proxy_send_timeout 86400s;
+          proxy_buffering    off;
+          proxy_cache_bypass $http_upgrade;
       }
 
       # Proxy all other requests to the Docker container
