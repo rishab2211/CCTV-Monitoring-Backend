@@ -7,13 +7,13 @@ logDestinations: [stdout]
 
 rtsp: yes
 rtspAddress: :8554
-protocols: [tcp, udp]
+rtspTransports: [tcp, udp]
 
 webrtc: yes
 webrtcAddress: :8889
 
-# ICE/UDP media transmission port (separate from HTTP signaling on :8889 to avoid socket collision)
-webrtcLocalUDPAddress: :8890
+# ICE/UDP media transmission port (standard MediaMTX port :8189 to avoid :8890 collisions)
+webrtcLocalUDPAddress: :8189
 webrtcLocalTCPAddress: ""
 
 # Only advertise public IP / domain — blocks internal Docker bridge IP from ICE candidates
@@ -22,13 +22,15 @@ webrtcAdditionalHosts:
   - api-cctv-backend.duckdns.org
   - 200.141.12.143
 
-webrtcAllowOrigin: '*'
+webrtcAllowOrigins:
+  - '*'
 webrtcICEServers2:
   - url: stun:stun.l.google.com:19302
 
 hls: yes
 hlsAddress: :8888
-hlsAllowOrigin: '*'
+hlsAllowOrigins:
+  - '*'
 hlsPartDuration: 200ms
 hlsSegmentDuration: 1s
 hlsSegmentCount: 7

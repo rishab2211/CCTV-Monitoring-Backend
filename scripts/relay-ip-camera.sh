@@ -29,7 +29,8 @@ fi
 
 LOCAL_RTSP="$1"
 PATH_NAME="${2:-ip_camera_01}"
-VPS_RTSP="rtsp://200.141.12.143:8554/${PATH_NAME}"
+RTSP_HOST="${RTSP_HOST:-api-cctv-backend.duckdns.org:8554}"
+VPS_RTSP="rtsp://${RTSP_HOST}/${PATH_NAME}"
 
 echo ""
 echo "=================================================================="
