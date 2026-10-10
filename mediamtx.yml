@@ -40,6 +40,17 @@ paths:
     source: publisher
     maxReaders: 50
 
+  # Auto-transcode incoming phone AAC audio to Opus for instant WebRTC browser playback
+  phone_cam:
+    source: publisher
+    runOnReady: ffmpeg -rtsp_transport tcp -i rtsp://127.0.0.1:8554/phone_cam -c:v copy -c:a libopus -b:a 64k -async 50 -f rtsp rtsp://127.0.0.1:8554/phone_cam_live
+    runOnReadyRestart: yes
+
+  phone_cam_1:
+    source: publisher
+    runOnReady: ffmpeg -rtsp_transport tcp -i rtsp://127.0.0.1:8554/phone_cam_1 -c:v copy -c:a libopus -b:a 64k -async 50 -f rtsp rtsp://127.0.0.1:8554/phone_cam_1_live
+    runOnReadyRestart: yes
+
   # Talkback sessions: browser WHIP publishers
   # Matches any path like camera_<objectid>_talkback
   "~^camera_[a-z0-9]+_talkback$":
