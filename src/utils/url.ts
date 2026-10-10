@@ -49,19 +49,22 @@ export const isOriginAllowed = (origin: string | undefined): boolean => {
   // Explicit match in CORS_ORIGIN
   if (allowedOrigins.includes(origin)) return true;
 
-  // Localhost (any port)
-  if (/^http:\/\/localhost(:\d+)?$/.test(origin) || /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) {
-    return true;
-  }
+  // Development or staging mode: allow localhost and preview tunnels
+  if (env.NODE_ENV !== "production") {
+    // Localhost (any port)
+    if (/^http:\/\/localhost(:\d+)?$/.test(origin) || /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) {
+      return true;
+    }
 
-  // Any Vercel preview or production deployment (e.g. cctv-monitoring-admin-panel.vercel.app or branch preview)
-  if (origin.startsWith("https://") && (origin.endsWith(".vercel.app") || /^https:\/\/[a-z0-9\-.]+\.vercel\.app$/i.test(origin))) {
-    return true;
-  }
+    // Vercel preview or branch deployments
+    if (origin.startsWith("https://") && (origin.endsWith(".vercel.app") || /^https:\/\/[a-z0-9\-.]+\.vercel\.app$/i.test(origin))) {
+      return true;
+    }
 
-  // Any Cloudflare quick tunnel (e.g. *.trycloudflare.com)
-  if (origin.startsWith("https://") && (origin.endsWith(".trycloudflare.com") || /^https:\/\/[a-z0-9\-.]+\.trycloudflare\.com$/i.test(origin))) {
-    return true;
+    // Cloudflare quick tunnels (e.g. *.trycloudflare.com)
+    if (origin.startsWith("https://") && (origin.endsWith(".trycloudflare.com") || /^https:\/\/[a-z0-9\-.]+\.trycloudflare\.com$/i.test(origin))) {
+      return true;
+    }
   }
 
   return false;

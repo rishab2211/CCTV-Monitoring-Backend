@@ -8,7 +8,7 @@ import { Subscription } from "../models/Subscription";
 import { Plan } from "../models/Plan";
 import { BillingInvoice } from "../models/BillingInvoice";
 import { Payment } from "../models/Payment";
-import { Camera } from "../models/Camera";
+import { Camera, redactRtspCredentials } from "../models/Camera";
 
 import { Incident } from "../models/Incident";
 import { SosAlert } from "../models/SosAlert";
@@ -246,7 +246,10 @@ export const getDashboard = async (user: JwtAccessPayload) => {
     },
     subscription: subscription || { status: "none", planName: "Free Tier" },
     cameraStats,
-    cameras, // Include lite details for immediate rendering
+    cameras: cameras.map((c) => ({
+      ...c,
+      rtspUrl: redactRtspCredentials(c.rtspUrl),
+    })), // Include lite details with redacted credentials for immediate rendering
     recentIncidents,
     activeSosAlerts,
   };

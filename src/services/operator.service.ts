@@ -4,7 +4,7 @@
  */
 import mongoose from "mongoose";
 import { User } from "../models/User";
-import { Camera } from "../models/Camera";
+import { Camera, redactRtspCredentials } from "../models/Camera";
 import { OperatorShift } from "../models/OperatorShift";
 import { Incident } from "../models/Incident";
 import { SosAlert } from "../models/SosAlert";
@@ -341,7 +341,10 @@ export const getAssignedCameras = async (user: JwtAccessPayload) => {
     .select("name serialNumber location status rtspUrl")
     .lean();
 
-  return cameras;
+  return cameras.map((cam) => ({
+    ...cam,
+    rtspUrl: redactRtspCredentials(cam.rtspUrl),
+  }));
 };
 
 /**

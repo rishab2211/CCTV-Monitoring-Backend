@@ -126,6 +126,35 @@ const cameraSchema = new Schema<CameraDocument>(
   { timestamps: true }
 );
 
+// ─── RTSP Credential Redaction ───────────────────────────────────────────────
+
+/**
+ * Redacts username/password credentials from RTSP URLs to prevent leaking in API responses (B2)
+ * e.g., rtsp://admin:pass123@192.168.1.10:554/ch0 -> rtsp://admin:***@192.168.1.10:554/ch0
+ */
+export const redactRtspCredentials = (url?: string | null): string => {
+  if (!url || typeof url !== "string") return "";
+  return url.replace(/^(rtsps?:\/\/[^:]+:)[^@]+(@.*)$/i, "$1***$2");
+};
+
+cameraSchema.set("toJSON", {
+  transform: (_doc, ret) => {
+    if (ret.rtspUrl) {
+      ret.rtspUrl = redactRtspCredentials(ret.rtspUrl);
+    }
+    return ret;
+  },
+});
+
+cameraSchema.set("toObject", {
+  transform: (_doc, ret) => {
+    if (ret.rtspUrl) {
+      ret.rtspUrl = redactRtspCredentials(ret.rtspUrl);
+    }
+    return ret;
+  },
+});
+
 // ─── Indexes ──────────────────────────────────────────────────────────────────
 // Optimized for finding cameras by ownership and online status
 
