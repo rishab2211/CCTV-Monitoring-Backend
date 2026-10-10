@@ -95,6 +95,35 @@ export const removeMediaMTXPath = async (pathName: string): Promise<void> => {
 };
 
 /**
+ * Registers an ephemeral WHIP publisher talkback path in MediaMTX.
+ * source: "publisher" means MediaMTX waits for the browser to publish WebRTC audio via WHIP
+ * rather than pulling from an external RTSP source.
+ * Called by talkback.service when a session starts.
+ */
+export const addMediaMTXTalkbackPath = async (pathName: string): Promise<boolean> => {
+  const config = {
+    source: "publisher",
+    maxReaders: 10,
+  };
+  const result = await mediamtxFetch("POST", `/config/paths/add/${pathName}`, config);
+  if (result === null) {
+    // Path may already exist (e.g., matched by yaml regex) — patch to ensure correct config
+    await mediamtxFetch("PATCH", `/config/paths/patch/${pathName}`, config);
+  }
+  logger.info(`[MediaMTX] Talkback path registered: ${pathName}`);
+  return true;
+};
+
+/**
+ * Removes the ephemeral talkback publisher path from MediaMTX when a session ends.
+ * Non-fatal — if the path was matched by the yml regex, removal is a no-op.
+ */
+export const removeMediaMTXTalkbackPath = async (pathName: string): Promise<void> => {
+  await mediamtxFetch("DELETE", `/config/paths/remove/${pathName}`);
+  logger.info(`[MediaMTX] Talkback path removed: ${pathName}`);
+};
+
+/**
  * Get live status of a specific path.
  * Returns null if the path is not found or MediaMTX is unreachable.
  */

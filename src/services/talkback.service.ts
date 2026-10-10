@@ -10,6 +10,7 @@ import { socketService } from "./socket.service";
 import { env } from "../config/env";
 import { getPublicBaseUrl } from "../utils/url";
 import * as talkbackDispatcher from "./talkback-dispatcher.service";
+import { addMediaMTXTalkbackPath, removeMediaMTXTalkbackPath } from "../config/mediamtx.service";
 
 /**
  * Get Talkback Capabilities
@@ -76,6 +77,9 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload, req
       await existingSession.save();
       await talkbackDispatcher.stopDispatcher(cameraId);
     } else if (existingSession.operatorId.toString() === user.userId) {
+      const talkbackPathName = `camera_${cameraId}_talkback`;
+      // Ensure path is registered in MediaMTX even if MediaMTX was restarted
+      await addMediaMTXTalkbackPath(talkbackPathName).catch(() => {});
       // It's the same operator, ensure dispatcher bridge is running
       if (!talkbackDispatcher.isDispatcherRunning(cameraId)) {
         await talkbackDispatcher.startDispatcher(camera, existingSession._id.toString());
@@ -83,23 +87,43 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload, req
       const baseUrl = getPublicBaseUrl(req);
       return {
         session: existingSession,
-        whipUrl: `${baseUrl}/webrtc/camera_${cameraId}_talkback/whip`,
+        whipUrl: `${baseUrl}/webrtc/${talkbackPathName}/whip`,
       };
     } else {
       throw ApiError.conflict("Camera is already in an active talkback session with another operator");
     }
   }
 
-  // Create new session
-  const session = await TalkbackSession.create({
-    cameraId,
-    franchiseId: camera.franchiseId,
-    operatorId: user.userId,
-    status: "active",
-  });
+  // Create new session with duplicate key handling (B4 race condition prevention)
+  let session;
+  try {
+    session = await TalkbackSession.create({
+      cameraId,
+      franchiseId: camera.franchiseId,
+      operatorId: user.userId,
+      status: "active",
+    });
+  } catch (createErr: any) {
+    if (createErr.code === 11000) {
+      throw ApiError.conflict("Camera is already in an active talkback session with another operator");
+    }
+    throw createErr;
+  }
 
-  // Spawn live FFmpeg audio bridge from MediaMTX to the camera speaker
-  await talkbackDispatcher.startDispatcher(camera, session._id.toString());
+  const talkbackPathName = `camera_${cameraId}_talkback`;
+
+  try {
+    // Register the WHIP publisher path in MediaMTX so the browser can push audio to it
+    await addMediaMTXTalkbackPath(talkbackPathName);
+
+    // Spawn live FFmpeg audio bridge from MediaMTX to the camera speaker
+    await talkbackDispatcher.startDispatcher(camera, session._id.toString());
+  } catch (err) {
+    // Rollback: clean up the session and path so the camera doesn't appear permanently locked
+    await TalkbackSession.deleteOne({ _id: session._id }).catch(() => {});
+    await removeMediaMTXTalkbackPath(talkbackPathName).catch(() => {});
+    throw err;
+  }
 
   // Emit socket event so frontend knows the camera is busy
   socketService.emitToCamera(cameraId, "talkback_started", {
@@ -119,7 +143,7 @@ export const startSession = async (cameraId: string, user: JwtAccessPayload, req
   const baseUrl = getPublicBaseUrl(req);
   return {
     session,
-    whipUrl: `${baseUrl}/webrtc/camera_${cameraId}_talkback/whip`,
+    whipUrl: `${baseUrl}/webrtc/${talkbackPathName}/whip`,
   };
 };
 
@@ -145,15 +169,21 @@ export const stopSession = async (cameraId: string, user: JwtAccessPayload) => {
 
   const session = await TalkbackSession.findOne(sessionQuery);
 
-  // Stop physical camera audio bridge process immediately
-  await talkbackDispatcher.stopDispatcher(cameraId);
-
   if (!session) {
+    // Check if another operator owns an active session on this camera (B7 ownership protection)
+    const otherActiveSession = await TalkbackSession.findOne({ cameraId, status: "active" });
+    if (otherActiveSession) {
+      throw ApiError.forbidden("You do not have permission to stop another operator's active talkback session");
+    }
+
     return {
       message: "No active talkback session found on this camera",
       status: "completed",
     };
   }
+
+  // Stop physical camera audio bridge process AFTER verifying ownership
+  await talkbackDispatcher.stopDispatcher(cameraId);
 
   session.status = "completed";
   session.endedAt = new Date();

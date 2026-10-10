@@ -12,13 +12,14 @@ protocols: [tcp, udp]
 webrtc: yes
 webrtcAddress: :8889
 
-# ICE/UDP on same port as HTTP signaling to avoid port confusion
-webrtcLocalUDPAddress: :8889
+# ICE/UDP media transmission port (separate from HTTP signaling on :8889 to avoid socket collision)
+webrtcLocalUDPAddress: :8890
 webrtcLocalTCPAddress: ""
 
-# Only advertise public IP — blocks Docker bridge IP (172.17.0.1) from ICE candidates
+# Only advertise public IP / domain — blocks internal Docker bridge IP from ICE candidates
 webrtcIPsFromInterfaces: no
 webrtcAdditionalHosts:
+  - api-cctv-backend.duckdns.org
   - 200.141.12.143
 
 webrtcAllowOrigin: '*'
@@ -36,3 +37,10 @@ paths:
   all:
     source: publisher
     maxReaders: 50
+
+  # Talkback sessions: browser WHIP publishers
+  # Matches any path like camera_<objectid>_talkback
+  "~^camera_[a-z0-9]+_talkback$":
+    source: publisher
+    maxReaders: 5
+    record: no

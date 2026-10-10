@@ -9,7 +9,7 @@ import { spawn, ChildProcess } from "child_process";
 import { CameraDocument } from "../models/Camera";
 import { logger } from "../utils/logger";
 import { socketService } from "./socket.service";
-import { getMediaMTXPathStatus } from "../config/mediamtx.service";
+import { getMediaMTXPathStatus, removeMediaMTXTalkbackPath } from "../config/mediamtx.service";
 
 interface ActiveDispatcher {
   cameraId: string;
@@ -81,9 +81,18 @@ export const startDispatcher = async (
   }
 
   // Set up 90-second safety watchdog to kill runaway/abandoned sessions
-  const watchdogTimer = setTimeout(() => {
+  const watchdogTimer = setTimeout(async () => {
     logger.warn(`[TalkbackDispatcher] Watchdog limit reached (90s) for camera ${cameraId}. Auto-stopping.`);
-    stopDispatcher(cameraId).catch(() => {});
+    await stopDispatcher(cameraId).catch(() => {});
+    try {
+      const { TalkbackSession } = await import("../models/TalkbackSession");
+      await TalkbackSession.updateOne(
+        { _id: sessionId, status: "active" },
+        { $set: { status: "completed", endedAt: new Date(), durationSeconds: 90 } }
+      );
+    } catch {
+      // non-fatal
+    }
   }, WATCHDOG_TIMEOUT_MS);
 
   const dispatcherState: ActiveDispatcher = {
@@ -131,6 +140,28 @@ export const startDispatcher = async (
       return;
     }
 
+    if (!streamReady) {
+      logger.warn(`[TalkbackDispatcher] WHIP stream was never published for camera ${cameraId} within 4s. Aborting FFmpeg bridge.`);
+      clearTimeout(watchdogTimer);
+      activeDispatchers.delete(cameraId);
+      removeMediaMTXTalkbackPath(pathName).catch(() => {});
+      try {
+        const { TalkbackSession } = await import("../models/TalkbackSession");
+        await TalkbackSession.updateOne(
+          { _id: sessionId, status: "active" },
+          { $set: { status: "failed", endedAt: new Date() } }
+        );
+      } catch {
+        // non-fatal
+      }
+      socketService.emitToCamera(cameraId, "talkback_error", {
+        cameraId,
+        sessionId,
+        message: "Browser did not send audio in time. Hold the button and try again.",
+      });
+      return;
+    }
+
     // Check if camera is using a local loopback MediaMTX stream (e.g. phone Larix, webcam script, or test stream)
     const isLocalTestStream =
       camera.rtspUrl.includes("127.0.0.1:8554") ||
@@ -171,12 +202,22 @@ export const startDispatcher = async (
     ffmpegProc.on("exit", (code, signal) => {
       logger.info(`[TalkbackDispatcher] Process exited for camera ${cameraId} (code=${code}, signal=${signal})`);
       clearTimeout(watchdogTimer);
-      activeDispatchers.delete(cameraId);
+      // Only delete from map if it hasn't already been replaced by a new session
+      const currentDispatcher = activeDispatchers.get(cameraId);
+      if (currentDispatcher && currentDispatcher.sessionId === sessionId) {
+        activeDispatchers.delete(cameraId);
+      }
 
-      // If exited with error unexpectedly within the first 5 seconds, inform the UI
+      // If exited with error unexpectedly within the first 5 seconds, inform the UI and fail the session
       const runDuration = Date.now() - dispatcherState.startedAt.getTime();
       if (code !== 0 && code !== null && signal !== "SIGTERM" && signal !== "SIGKILL" && runDuration < 5000) {
         logger.error(`[TalkbackDispatcher] Bridge failed early: ${stderrBuffer.slice(-200)}`);
+        import("../models/TalkbackSession").then(({ TalkbackSession }) => {
+          TalkbackSession.updateOne(
+            { _id: sessionId, status: "active" },
+            { $set: { status: "failed", endedAt: new Date() } }
+          ).catch(() => {});
+        }).catch(() => {});
         socketService.emitToCamera(cameraId, "talkback_error", {
           cameraId,
           sessionId,
@@ -188,7 +229,16 @@ export const startDispatcher = async (
     ffmpegProc.on("error", (procErr) => {
       logger.error(`[TalkbackDispatcher] Process error on camera ${cameraId}: ${procErr.message}`);
       clearTimeout(watchdogTimer);
-      activeDispatchers.delete(cameraId);
+      const currentDispatcher = activeDispatchers.get(cameraId);
+      if (currentDispatcher && currentDispatcher.sessionId === sessionId) {
+        activeDispatchers.delete(cameraId);
+      }
+      import("../models/TalkbackSession").then(({ TalkbackSession }) => {
+        TalkbackSession.updateOne(
+          { _id: sessionId, status: "active" },
+          { $set: { status: "failed", endedAt: new Date() } }
+        ).catch(() => {});
+      }).catch(() => {});
     });
   })().catch((err) => {
     logger.error(`[TalkbackDispatcher] Background dispatcher runner error: ${(err as Error).message}`);
@@ -202,6 +252,11 @@ export const startDispatcher = async (
  */
 export const stopDispatcher = async (cameraId: string): Promise<void> => {
   const active = activeDispatchers.get(cameraId);
+  const pathName = `camera_${cameraId}_talkback`;
+
+  // Always clean up ephemeral MediaMTX talkback path
+  removeMediaMTXTalkbackPath(pathName).catch(() => {});
+
   if (!active) {
     return;
   }
@@ -209,7 +264,6 @@ export const stopDispatcher = async (cameraId: string): Promise<void> => {
   logger.info(`[TalkbackDispatcher] Stopping audio bridge for camera ${cameraId}`);
   active.isCancelled = true;
   clearTimeout(active.watchdogTimer);
-  activeDispatchers.delete(cameraId);
 
   const proc = active.process;
   if (proc && !proc.killed) {
@@ -225,6 +279,9 @@ export const stopDispatcher = async (cameraId: string): Promise<void> => {
         // ignore
       }
     }, 600);
+  } else {
+    // No active child process running, remove from map immediately
+    activeDispatchers.delete(cameraId);
   }
 };
 

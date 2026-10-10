@@ -25,6 +25,22 @@ const startServer = async (): Promise<void> => {
     await connectDB();
     logger.info(`✅ [1/6] MongoDB Connected (${Date.now() - dbStartTime}ms)`);
 
+    // ── Post-connect: Clear stale talkback sessions from any unclean shutdown ──
+    // In-memory activeDispatchers map is lost on restart but DB sessions may still be "active".
+    // Without this, cameras appear permanently locked in the talkback concurrency check.
+    try {
+      const { TalkbackSession } = await import("./models/TalkbackSession");
+      const staleResult = await TalkbackSession.updateMany(
+        { status: "active" },
+        { $set: { status: "completed", endedAt: new Date() } }
+      );
+      if (staleResult.modifiedCount > 0) {
+        logger.info(`🧹 Cleared ${staleResult.modifiedCount} stale talkback session(s) from previous run`);
+      }
+    } catch (cleanupErr) {
+      logger.warn("⚠️  Failed to clear stale talkback sessions (non-fatal):", cleanupErr);
+    }
+
     // ── Stage 2: Seed Permissions and Roles ─────────────────────────────────
     const seedStartTime = Date.now();
     logger.info("🔐 [2/6] Seeding System Permissions & Roles...");
