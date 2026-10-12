@@ -67,6 +67,20 @@ const envSchema = z.object({
   MEDIAMTX_STREAM_SECRET: z.string().optional(),
   STREAM_TOKEN_EXPIRY: z.string().default("24h"),
 
+  // Object Storage (AWS S3 & Cloudflare R2)
+  AWS_REGION: z.string().default("us-east-1"),
+  AWS_ACCESS_KEY_ID: z.string().optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  AWS_S3_BUCKET: z.string().optional(),
+
+  // Cloudflare R2 overrides (optional)
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_BUCKET_NAME: z.string().default("cctv-recordings"),
+  R2_PUBLIC_DOMAIN: z.string().optional(),
+  STORAGE_ENDPOINT: z.string().optional(),
+
   // Razorpay
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
