@@ -327,6 +327,7 @@ export interface IRecording {
   type: RecordingType;
   status: RecordingStatus;
   url: string;
+  s3Key?: string;
   publicId?: string;
   sizeBytes: number;
   durationSeconds: number;

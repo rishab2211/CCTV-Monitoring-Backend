@@ -43,6 +43,10 @@ const recordingSchema = new Schema<RecordingDocument>(
       type: String,
       required: true,
     },
+    s3Key: {
+      type: String,
+      index: true,
+    },
     publicId: {
       type: String,
     },
@@ -67,8 +71,9 @@ const recordingSchema = new Schema<RecordingDocument>(
 // Optimized for the Recording Module's list filters (time-range, camera, retention)
 
 recordingSchema.index({ cameraId: 1, startTime: -1 });
+recordingSchema.index({ cameraId: 1, startTime: 1, endTime: 1 });
 recordingSchema.index({ status: 1 });
-recordingSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // TTL index for automatic pruning
+recordingSchema.index({ expiresAt: 1 }); // Indexed for programmatic pruner (NOT TTL to avoid orphaned R2 files)
 
 export const Recording: Model<RecordingDocument> = mongoose.model<RecordingDocument>(
   "Recording",
