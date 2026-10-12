@@ -48,7 +48,10 @@ export const createRecordingChunk = async (data: any) => {
  * @param query - Pagination and filtering rules
  * @param user - The requesting user
  */
-export const listRecordings = async (query: ListRecordingsQuery, user: JwtAccessPayload) => {
+export const listRecordings = async (
+  query: ListRecordingsQuery,
+  user: JwtAccessPayload
+): Promise<{ recordings: any[]; total: number; page: number; limit: number; totalPages: number }> => {
   const { page, limit } = parsePaginationParams(query as unknown as Record<string, unknown>);
   const { cameraId, type, status, startDate, endDate } = query as any;
   const filter: Record<string, unknown> = {};
@@ -96,7 +99,26 @@ export const listRecordings = async (query: ListRecordingsQuery, user: JwtAccess
     Recording.countDocuments(filter),
   ]);
 
-  return { recordings, total, page, limit, totalPages: Math.ceil(total / limit) };
+  // Attach pre-signed URLs to recordings list
+  const signedRecordings = await Promise.all(
+    recordings.map(async (rec) => {
+      let playbackUrl = rec.url;
+      if (rec.s3Key && isStorageConfigured()) {
+        try {
+          playbackUrl = await generatePresignedPlaybackUrl(rec.s3Key, 1800);
+        } catch (err) {
+          logger.warn(`Failed to sign URL for recording ${rec._id}: ${(err as Error).message}`);
+        }
+      }
+      return {
+        ...rec,
+        url: playbackUrl,
+        playbackUrl,
+      };
+    })
+  );
+
+  return { recordings: signedRecordings, total, page, limit, totalPages: Math.ceil(total / limit) };
 };
 
 /**
@@ -116,7 +138,18 @@ export const getRecordingDetails = async (id: string, user: JwtAccessPayload) =>
     await validateCameraAccess(camera as any, user);
   }
 
-  return recording;
+  const recObj = recording.toObject();
+  if (recording.s3Key && isStorageConfigured()) {
+    try {
+      const signedUrl = await generatePresignedPlaybackUrl(recording.s3Key, 1800);
+      recObj.url = signedUrl;
+      (recObj as any).playbackUrl = signedUrl;
+    } catch (err) {
+      logger.warn(`Failed to sign URL for recording ${id}: ${(err as Error).message}`);
+    }
+  }
+
+  return recObj;
 };
 
 /**
@@ -177,7 +210,7 @@ export const getPlaybackChunks = async (
     .select("startTime endTime url s3Key durationSeconds sizeBytes type")
     .lean();
 
-  // Attach signed playback URLs if Cloudflare R2 is configured
+  // Attach signed playback URLs if storage is configured
   const resolvedChunks = await Promise.all(
     chunks.map(async (chunk) => {
       let playbackUrl = chunk.url;
@@ -190,6 +223,7 @@ export const getPlaybackChunks = async (
       }
       return {
         ...chunk,
+        url: playbackUrl,
         playbackUrl,
       };
     })

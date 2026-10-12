@@ -43,9 +43,14 @@ export const dateQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format must be YYYY-MM-DD"), // YYYY-MM-DD
 });
 
-export const updateRetentionSchema = z.object({
-  days: z.number().int().min(1).max(365),
-});
+export const updateRetentionSchema = z
+  .object({
+    days: z.number().int().min(1).max(365).optional(),
+    retentionDays: z.number().int().min(1).max(365).optional(),
+  })
+  .refine((data) => data.days !== undefined || data.retentionDays !== undefined, {
+    message: "Either days or retentionDays is required",
+  });
 
 export const scheduleRuleSchema = z.object({
   daysOfWeek: z

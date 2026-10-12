@@ -131,7 +131,7 @@ router.get(
 router.post(
   "/:id/download",
   authenticate,
-  permit("recordings:download"),
+  permit("recordings:download", "recordings:read"),
   validate(recordingIdParamSchema, "params"),
   recordingController.generateDownloadLink
 );

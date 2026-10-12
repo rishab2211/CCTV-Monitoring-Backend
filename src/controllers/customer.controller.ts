@@ -82,7 +82,7 @@ export const getPlayback = catchAsync(async (req: Request, res: Response) => {
     throw ApiError.badRequest("startTime (or start) and endTime (or end) query params are required");
   }
   const result = await recordingService.getPlaybackChunks(req.params.id, start, end, req.user);
-  res.status(200).json(new ApiResponse(200, result, "Playback URL generated"));
+  res.status(200).json(new ApiResponse(200, { chunks: result, count: result.length }, "Playback URL generated"));
 });
 
 export const shareCamera = catchAsync(async (req: Request, res: Response) => {
