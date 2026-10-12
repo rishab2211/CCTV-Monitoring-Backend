@@ -44,6 +44,7 @@ RUN chmod +x entrypoint.sh scripts/*.sh || true
 # ── Non-root user for security ─────────────────────────────
 RUN groupadd --system appgroup \
   && useradd --system --gid appgroup --shell /usr/sbin/nologin appuser \
+  && mkdir -p /app/recordings \
   && chown -R appuser:appgroup /app
 USER appuser
 

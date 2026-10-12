@@ -5,6 +5,7 @@ services:
     network_mode: host
     volumes:
       - ./mediamtx.yml:/mediamtx.yml:ro
+      - ./recordings:/app/recordings
     environment:
       # These environment variables override the default mediamtx.yml settings inside the container
       - MTX_API=yes

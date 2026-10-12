@@ -20,7 +20,7 @@ const BASE_URL = env.MEDIAMTX_API_URL; // default: http://localhost:9997/v3
 
 // ─── HTTP Helper ──────────────────────────────────────────────────────────────
 
-const mediamtxFetch = async <T>(
+export const mediamtxFetch = async <T>(
   method: "GET" | "POST" | "DELETE" | "PATCH",
   path: string,
   body?: unknown
