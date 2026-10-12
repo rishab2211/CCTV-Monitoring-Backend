@@ -9,6 +9,8 @@ import { ApiError } from "../utils/ApiError";
 import * as cameraService from "../services/camera.service";
 import { ListCamerasQuery } from "../validators/camera.validator";
 
+import { getStandardizedCameraEndpoints } from "../config/mediamtx.service";
+
 /**
  * Register Camera Endpoint
  * POST /api/v1/cameras
@@ -17,7 +19,8 @@ import { ListCamerasQuery } from "../validators/camera.validator";
 export const createCamera = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
   const camera = await cameraService.createCamera(req.body, req.user.userId, req.franchiseScope);
-  res.status(201).json(new ApiResponse(201, { camera }, "Camera registered successfully"));
+  const streamEndpoints = getStandardizedCameraEndpoints(camera);
+  res.status(201).json(new ApiResponse(201, { camera, streamEndpoints }, "Camera registered successfully"));
 });
 
 /**
@@ -41,7 +44,8 @@ export const listCameras = catchAsync(async (req: Request, res: Response) => {
 export const getCameraById = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
   const camera = await cameraService.getCameraById(req.params.id, req.user);
-  res.status(200).json(new ApiResponse(200, { camera }));
+  const streamEndpoints = getStandardizedCameraEndpoints(camera);
+  res.status(200).json(new ApiResponse(200, { camera, streamEndpoints }));
 });
 
 /**

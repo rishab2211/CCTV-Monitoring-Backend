@@ -93,13 +93,15 @@ Turn any iPhone or Android phone into a high-definition real-time CCTV security 
 2. **Configure Outgoing RTSP Connection in the App:**
    * Open **Larix Broadcaster** → Settings (gear icon) → **Connections** → **Add Connection**
    * **Name:** `CCTV Platform VPS`
-   * **URL:** `rtsp://200.141.12.143:8554/phone_cam`
+   * **URL:** `rtsp://200.141.12.143:8554/raw_phone_cam` *(or `raw_<any_camera_name>` for any new camera)*
    * **Target Type:** `RTSP`
    * **Video Format:** `H.264`, `1280x720` or `1920x1080` @ `25 fps`
+   * **Audio:** `AAC` (enabled)
    * Click **Save**.
 3. **Start Broadcasting:**
    * Tap the large red **Record / Broadcast** button on your phone.
-   * Your phone's real camera lens is now transmitting live physical video to your VPS!
+   * Your phone's real camera lens and microphone are now transmitting live physical video & audio to your VPS!
+   * *MediaMTX automatically detects `raw_phone_cam`, copies H.264 video with 0ms lag, and transcodes audio to Opus at `live_phone_cam` for instant WebRTC playback in browsers!*
 
 ---
 
@@ -116,19 +118,19 @@ cd "/home/rishab/Personal/WebDev/CCTV Monitoring Backend"
 ./scripts/stream-webcam.sh
 ```
 
-> This captures `/dev/video0` and pushes real-time H.264 video to `rtsp://200.141.12.143:8554/webcam_01`.
+> This captures `/dev/video0` and pushes real-time H.264 video to `rtsp://200.141.12.143:8554/raw_webcam_01`.
 
 ---
 
 ## 3. Registering Your Real Cameras in the Admin Panel
 
-Once you have one or more streams running (e.g., `physical_cam_01`, `phone_cam`, or `webcam_01`), register them in your live dashboard:
+Once you have one or more streams running (e.g., `raw_physical_cam_01`, `raw_phone_cam`, or `raw_webcam_01`), register them in your live dashboard:
 
 1. Open **`http://200.141.12.143`** in your browser and log in as `admin@cctv.com` (`Admin@123`).
 2. Go to **Cameras** (`/cameras`) → click **Add Camera**:
    * **Camera Name:** `Physical Entrance Camera` (or `Mobile Patrol Unit`)
    * **Serial Number:** `REAL-CAM-001` (must be unique)
-   * **RTSP URL:** `rtsp://localhost:8554/physical_cam_01` (or `rtsp://localhost:8554/phone_cam` / `webcam_01`)
+   * **RTSP URL:** `rtsp://localhost:8554/live_phone_cam` *(or `rtsp://localhost:8554/raw_phone_cam` / `phone_cam` — the backend automatically resolves to the live Opus stream!)*
    * **Location:** `Front Office / Living Room`
    * **Franchise:** `Metro Security & Surveillance Services`
    * **Customer:** `Vikram Malhotra`

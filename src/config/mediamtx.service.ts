@@ -59,17 +59,23 @@ const mediamtxFetch = async <T>(
   }
 };
 
+import { getPublicBaseUrl } from "../utils/url";
+
 // ─── API Functions ────────────────────────────────────────────────────────────
 
 /**
  * Register a camera RTSP stream path in MediaMTX.
- * Uses `sourceOnDemand: true` so MediaMTX only pulls RTSP when someone is watching.
+ * Also provisions the raw ingestion path (raw_<name>) so MediaMTX's dynamic
+ * transcode pipeline auto-generates live_<name> with Opus audio for WebRTC.
  */
 export const addMediaMTXPath = async (
   pathName: string,
   rtspUrl: string
 ): Promise<boolean> => {
   const isLocalSource = rtspUrl.includes("localhost") || rtspUrl.includes("127.0.0.1");
+  const baseSlug = pathName.replace(/^(raw_|live_)/, "").replace(/(_raw|_live)$/, "");
+  const rawPath = `raw_${baseSlug}`;
+
   const config: IMediaMTXPathConfig = {
     source: rtspUrl,
     sourceProtocol: "tcp",
@@ -77,12 +83,20 @@ export const addMediaMTXPath = async (
     maxReaders: 50,
   };
 
+  // 1. Register raw path so regex auto-transcodes to live_<slug> with Opus audio
+  await mediamtxFetch("POST", `/config/paths/add/${rawPath}`, config).then(async (res) => {
+    if (res === null) {
+      await mediamtxFetch("PATCH", `/config/paths/patch/${rawPath}`, config);
+    }
+  });
+
+  // 2. Also register direct pathName for backwards compatibility
   const result = await mediamtxFetch("POST", `/config/paths/add/${pathName}`, config);
   if (result === null) {
     // If path already exists, patch it to ensure the source RTSP URL is updated
     await mediamtxFetch("PATCH", `/config/paths/patch/${pathName}`, config);
   }
-  logger.debug(`[MediaMTX] Path registered/updated: ${pathName} (prewarmed: ${isLocalSource})`);
+  logger.debug(`[MediaMTX] Path registered/updated: ${pathName} and ${rawPath} (prewarmed: ${isLocalSource})`);
   return true;
 };
 
@@ -90,7 +104,11 @@ export const addMediaMTXPath = async (
  * Remove a camera stream path from MediaMTX.
  */
 export const removeMediaMTXPath = async (pathName: string): Promise<void> => {
-  await mediamtxFetch("DELETE", `/config/paths/remove/${pathName}`);
+  const baseSlug = pathName.replace(/^(raw_|live_)/, "").replace(/(_raw|_live)$/, "");
+  await Promise.all([
+    mediamtxFetch("DELETE", `/config/paths/remove/${pathName}`),
+    mediamtxFetch("DELETE", `/config/paths/remove/raw_${baseSlug}`),
+  ]);
   logger.debug(`[MediaMTX] Path removed: ${pathName}`);
 };
 
@@ -159,6 +177,56 @@ export const toPathName = (serialNumber: string): string =>
   serialNumber.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
 
 /**
+ * Maps raw camera ingestion paths to their transcoded Opus WebRTC playback counterparts.
+ * Standard patterns:
+ *   - raw_<slug>  -> live_<slug>
+ *   - <slug>_raw  -> <slug>_live
+ *   - raw/<slug>  -> live/<slug>
+ *   - phone_cam   -> phone_cam_live
+ *   - phone_cam_1 -> phone_cam_1_live
+ */
+export const toPlaybackPath = (pathName: string): string => {
+  if (!pathName) return pathName;
+  if (pathName.startsWith("raw_")) {
+    return `live_${pathName.slice(4)}`;
+  }
+  if (pathName.endsWith("_raw")) {
+    return `${pathName.slice(0, -4)}_live`;
+  }
+  if (pathName.startsWith("raw/")) {
+    return `live/${pathName.slice(4)}`;
+  }
+  if (pathName === "phone_cam") {
+    return "phone_cam_live";
+  }
+  if (pathName === "phone_cam_1") {
+    return "phone_cam_1_live";
+  }
+  return pathName;
+};
+
+/**
+ * Returns the standardized raw ingestion path name for a camera slug.
+ * Example: "cam_entrance" -> "raw_cam_entrance"
+ */
+export const toIngestPath = (nameOrSlug: string): string => {
+  const slug = toPathName(nameOrSlug);
+  if (slug.startsWith("raw_") || slug.startsWith("raw/")) {
+    return slug;
+  }
+  if (slug.endsWith("_raw")) {
+    return slug;
+  }
+  if (slug.startsWith("live_")) {
+    return `raw_${slug.slice(5)}`;
+  }
+  if (slug.endsWith("_live")) {
+    return `${slug.slice(0, -5)}_raw`;
+  }
+  return `raw_${slug}`;
+};
+
+/**
  * Determines if a camera stream is directly published into MediaMTX
  * (e.g. Larix Broadcaster, OBS, webcam scripts publishing to port 8554)
  * vs an external camera RTSP source that MediaMTX must pull from.
@@ -217,6 +285,95 @@ export const getCameraStreamPath = (camera: { serialNumber: string; rtspUrl?: st
     }
   }
   return toPathName(camera.serialNumber);
+};
+
+/**
+ * Resolves the active playback path for a camera, checking MediaMTX for
+ * auto-transcoded live feeds (live_<slug> or <slug>_live) if the base feed was specified.
+ * Ensures the client always connects to the Opus audio + H.264 video feed.
+ */
+export const resolveActiveStreamPath = async (camera: { serialNumber: string; rtspUrl?: string }): Promise<string> => {
+  const basePath = getCameraStreamPath(camera);
+  const playbackCandidate = toPlaybackPath(basePath);
+
+  // If already mapped by prefix/suffix rule (e.g. raw_cam -> live_cam), return immediately
+  if (playbackCandidate !== basePath) {
+    return playbackCandidate;
+  }
+
+  // If basePath is not prefixed (e.g. "cam-01" or "entrance"), check if a transcoded live stream exists in MediaMTX
+  try {
+    const livePrefix = `live_${basePath}`;
+    const prefixStatus = await getMediaMTXPathStatus(livePrefix);
+    if (prefixStatus?.ready) {
+      return livePrefix;
+    }
+
+    const liveSuffix = `${basePath}_live`;
+    const suffixStatus = await getMediaMTXPathStatus(liveSuffix);
+    if (suffixStatus?.ready) {
+      return liveSuffix;
+    }
+  } catch {
+    // Non-fatal — MediaMTX unreachable
+  }
+
+  return basePath;
+};
+
+/**
+ * Returns standardized ingestion and playback endpoints for any camera.
+ * Used during camera onboarding so technicians and operators know exactly where
+ * to publish the feed and where it is monitored.
+ */
+export const getStandardizedCameraEndpoints = (camera: { serialNumber: string; rtspUrl?: string }) => {
+  const slug = toPathName(camera.serialNumber);
+  const ingestPath = toIngestPath(slug);
+  const playbackPath = toPlaybackPath(ingestPath);
+  const baseUrl = getPublicBaseUrl();
+
+  let publicDomain = "localhost";
+  try {
+    const parsed = new URL(baseUrl);
+    publicDomain = parsed.hostname;
+  } catch {
+    publicDomain = env.MEDIAMTX_URL.replace(/^https?:\/\//, "").split(":")[0] || "localhost";
+  }
+
+  return {
+    slug,
+    ingestPath,
+    playbackPath,
+    ingestRtspUrl: `rtsp://${publicDomain}:8554/${ingestPath}`,
+    playbackRtspUrl: `rtsp://localhost:8554/${playbackPath}`,
+    webrtcUrl: `${baseUrl}/webrtc/${playbackPath}`,
+    whepUrl: `${baseUrl}/webrtc/${playbackPath}/whep`,
+    hlsUrl: `${baseUrl}/hls/${playbackPath}/index.m3u8`,
+  };
+};
+
+/**
+ * Returns all potential MediaMTX path aliases for a camera (raw, live, base slug).
+ * Ensures camera online state reconciliation catches both raw ingests and live transcode feeds.
+ */
+export const getCameraPathAliases = (camera: { serialNumber: string; rtspUrl?: string }): string[] => {
+  const primaryPath = getCameraStreamPath(camera).toLowerCase();
+  const serialPath = toPathName(camera.serialNumber).toLowerCase();
+  const baseSlug = primaryPath.replace(/^(raw_|live_)/, "").replace(/(_raw|_live)$/, "");
+
+  const aliases = new Set<string>([
+    primaryPath,
+    serialPath,
+    baseSlug,
+    toPlaybackPath(primaryPath).toLowerCase(),
+    toPlaybackPath(serialPath).toLowerCase(),
+    `raw_${baseSlug}`,
+    `live_${baseSlug}`,
+    `${baseSlug}_raw`,
+    `${baseSlug}_live`,
+  ]);
+
+  return Array.from(aliases);
 };
 
 /**

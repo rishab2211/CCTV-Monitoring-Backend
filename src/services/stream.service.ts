@@ -18,6 +18,8 @@ import {
   addMediaMTXPath,
   toPathName,
   getCameraStreamPath,
+  resolveActiveStreamPath,
+  toPlaybackPath,
   getMediaMTXPathStatus,
   listMediaMTXPaths,
   isDirectPublishStream,
@@ -96,9 +98,10 @@ export const startStream = async (
   }
 
   // 2. Register path in MediaMTX (only if external RTSP pull is needed)
-  const pathName = getCameraStreamPath(camera);
+  const baseSlug = getCameraStreamPath(camera);
+  const pathName = await resolveActiveStreamPath(camera);
   if (!isDirectPublishStream(camera) && camera.rtspUrl) {
-    await addMediaMTXPath(pathName, camera.rtspUrl);
+    await addMediaMTXPath(baseSlug, camera.rtspUrl);
   }
 
   // 3. Create session record
@@ -270,9 +273,10 @@ export const getStreamToken = async (
   }
 
   // Ensure path is registered (only if external RTSP pull is needed)
-  const pathName = getCameraStreamPath(camera);
+  const baseSlug = getCameraStreamPath(camera);
+  const pathName = await resolveActiveStreamPath(camera);
   if (!isDirectPublishStream(camera) && camera.rtspUrl) {
-    await addMediaMTXPath(pathName, camera.rtspUrl);
+    await addMediaMTXPath(baseSlug, camera.rtspUrl);
   }
 
   const sessionId = uuidv4();
@@ -319,9 +323,11 @@ export const getStreamStatus = async (
 
   await validateCameraAccess(camera, user);
 
-  const pathName = getCameraStreamPath(camera);
-  const [pathStatus, sessionCount] = await Promise.all([
+  const baseSlug = getCameraStreamPath(camera);
+  const pathName = await resolveActiveStreamPath(camera);
+  const [pathStatus, baseStatus, sessionCount] = await Promise.all([
     getMediaMTXPathStatus(pathName),
+    pathName !== baseSlug ? getMediaMTXPathStatus(baseSlug) : Promise.resolve(null),
     StreamSession.countDocuments({
       cameraId: new mongoose.Types.ObjectId(cameraId),
       isActive: true,
@@ -331,9 +337,9 @@ export const getStreamStatus = async (
   return {
     cameraId,
     pathName,
-    isLive: pathStatus?.ready ?? false,
+    isLive: (pathStatus?.ready || baseStatus?.ready) ?? false,
     activeViewers: sessionCount,
-    mediamtxStatus: pathStatus ?? null,
+    mediamtxStatus: pathStatus ?? baseStatus ?? null,
   };
 };
 
@@ -434,15 +440,16 @@ export const relayWebRTCOffer = async (
     }
   }
 
-  const pathName = getCameraStreamPath(camera);
+  const pathName = await resolveActiveStreamPath(camera);
 
   // Forward the SDP offer to MediaMTX's internal WebRTC endpoint
   try {
     const internalUrl = env.MEDIAMTX_INTERNAL_WEBRTC_URL || "http://127.0.0.1:8889";
+    const sdpPayload = sdp.endsWith("\r\n") ? sdp : `${sdp.trim()}\r\n`;
     const res = await fetch(`${internalUrl}/${pathName}/whep`, {
       method: "POST",
       headers: { "Content-Type": "application/sdp" },
-      body: sdp,
+      body: sdpPayload,
       signal: AbortSignal.timeout(30000) // Give MediaMTX up to 30 seconds to pull the RTSP stream
     });
 
@@ -517,7 +524,7 @@ export const getICECandidates = async (
 
   // ICE candidates in WHEP flow are delivered via the SDP answer — this
   // endpoint returns the stream path info needed by the client.
-  const pathName = getCameraStreamPath(camera);
+  const pathName = await resolveActiveStreamPath(camera);
   const baseUrl = getPublicBaseUrl();
   return {
     pathName,

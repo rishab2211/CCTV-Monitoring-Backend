@@ -23,6 +23,10 @@ import {
   listMediaMTXPaths,
   getMediaMTXPathStatus,
   getCameraStreamPath,
+  resolveActiveStreamPath,
+  getCameraPathAliases,
+  addMediaMTXPath,
+  isDirectPublishStream,
   toPathName,
 } from "../config/mediamtx.service";
 import { socketService } from "./socket.service";
@@ -149,6 +153,14 @@ export const createCamera = async (
     metadata: { cameraId: camera._id, serialNumber: camera.serialNumber },
   });
 
+  // If external RTSP stream, register with MediaMTX immediately for zero-delay onboarding
+  if (!isDirectPublishStream(camera) && camera.rtspUrl) {
+    const slug = toPathName(camera.serialNumber);
+    await addMediaMTXPath(slug, camera.rtspUrl).catch((err) => {
+      logger.warn(`[CameraService] Non-fatal MediaMTX registration failed on create: ${err.message}`);
+    });
+  }
+
   logger.info(`📹 Camera created: ${camera.name} (${camera.serialNumber}) by ${createdBy}`);
   return camera;
 };
@@ -268,9 +280,8 @@ export const listCameras = async (
         activePaths.filter((p) => p.ready).map((p) => p.name.toLowerCase())
       );
       for (const cam of data as any[]) {
-        const primaryPath = getCameraStreamPath(cam).toLowerCase();
-        const serialPath = toPathName(cam.serialNumber).toLowerCase();
-        if (readyPathNames.has(primaryPath) || readyPathNames.has(serialPath)) {
+        const aliases = getCameraPathAliases(cam);
+        if (aliases.some((alias) => readyPathNames.has(alias))) {
           cam.status = "online";
         }
       }
@@ -314,7 +325,7 @@ export const getCameraById = async (
 
   // Dynamically reconcile live stream presence with MediaMTX
   try {
-    const pathName = getCameraStreamPath(camera);
+    const pathName = await resolveActiveStreamPath(camera);
     const pathStatus = await getMediaMTXPathStatus(pathName);
     if (pathStatus?.ready && camera.status !== "online") {
       camera.status = "online";
@@ -838,9 +849,8 @@ export const syncLiveCameraStatuses = async (): Promise<void> => {
 
     for (const camera of cameras) {
       const primaryPath = getCameraStreamPath(camera).toLowerCase();
-      const serialPath = toPathName(camera.serialNumber).toLowerCase();
-
-      const isLive = readyPathNames.has(primaryPath) || readyPathNames.has(serialPath);
+      const aliases = getCameraPathAliases(camera);
+      const isLive = aliases.some((alias) => readyPathNames.has(alias));
       const isMarkedOnline = camera.status === "online";
 
       if (isLive && !isMarkedOnline) {
