@@ -14,6 +14,11 @@ import { IRecordingScheduleRule, JwtAccessPayload, ListRecordingsQuery } from ".
 import { validateCameraAccess } from "./camera.service";
 import { logActivity } from "../models/ActivityLog";
 import { logger } from "../utils/logger";
+import {
+  generatePresignedPlaybackUrl,
+  generatePresignedDownloadUrl,
+  isStorageConfigured,
+} from "../config/storage";
 
 // ─── Recording Chunks (CRUD) ──────────────────────────────────────────────────
 
@@ -148,7 +153,12 @@ export const deleteRecording = async (id: string, user: JwtAccessPayload) => {
 
 // ─── Playback & Timeline ──────────────────────────────────────────────────────
 
-export const getPlaybackChunks = async (cameraId: string, start: string, end: string, user: JwtAccessPayload) => {
+export const getPlaybackChunks = async (
+  cameraId: string,
+  start: string,
+  end: string,
+  user: JwtAccessPayload
+): Promise<any[]> => {
   const camera = await Camera.findOne({ _id: cameraId, isDeleted: false });
   if (!camera) throw ApiError.notFound("Camera");
   await validateCameraAccess(camera, user);
@@ -164,10 +174,123 @@ export const getPlaybackChunks = async (cameraId: string, start: string, end: st
     ],
   })
     .sort({ startTime: 1 })
-    .select("startTime endTime url durationSeconds sizeBytes type")
+    .select("startTime endTime url s3Key durationSeconds sizeBytes type")
     .lean();
 
-  return chunks;
+  // Attach signed playback URLs if Cloudflare R2 is configured
+  const resolvedChunks = await Promise.all(
+    chunks.map(async (chunk) => {
+      let playbackUrl = chunk.url;
+      if (chunk.s3Key && isStorageConfigured()) {
+        try {
+          playbackUrl = await generatePresignedPlaybackUrl(chunk.s3Key, 1800);
+        } catch (err) {
+          logger.warn(`Failed to sign URL for chunk ${chunk._id}: ${(err as Error).message}`);
+        }
+      }
+      return {
+        ...chunk,
+        playbackUrl,
+      };
+    })
+  );
+
+  return resolvedChunks;
+};
+
+/**
+ * Generate Dynamic HLS VOD Playlist (.m3u8)
+ * Stitches together consecutive fMP4 chunks across a requested time range into
+ * an HLS VOD playlist. Allows browsers (Hls.js / Video.js / Safari) to smoothly
+ * scrub through hours of footage without player reloads or black flashes.
+ */
+export const generateVodPlaylist = async (
+  cameraId: string,
+  start: string,
+  end: string,
+  user: JwtAccessPayload
+): Promise<string> => {
+  const camera = await Camera.findOne({ _id: cameraId, isDeleted: false });
+  if (!camera) throw ApiError.notFound("Camera");
+  await validateCameraAccess(camera, user);
+
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+
+  const chunks = await Recording.find({
+    cameraId,
+    status: "completed",
+    $or: [
+      { startTime: { $lte: endDate, $gte: startDate } },
+      { endTime: { $gte: startDate, $lte: endDate } },
+      { startTime: { $lte: startDate }, endTime: { $gte: endDate } },
+    ],
+  })
+    .sort({ startTime: 1 })
+    .select("startTime endTime url s3Key durationSeconds")
+    .lean();
+
+  if (!chunks.length) {
+    return [
+      "#EXTM3U",
+      "#EXT-X-VERSION:7",
+      "#EXT-X-TARGETDURATION:120",
+      "#EXT-X-MEDIA-SEQUENCE:0",
+      "#EXT-X-PLAYLIST-TYPE:VOD",
+      "#EXT-X-ENDLIST",
+    ].join("\n");
+  }
+
+  const maxDuration = Math.max(...chunks.map((c) => c.durationSeconds || 120), 120);
+
+  const lines: string[] = [
+    "#EXTM3U",
+    "#EXT-X-VERSION:7",
+    `#EXT-X-TARGETDURATION:${Math.ceil(maxDuration)}`,
+    "#EXT-X-MEDIA-SEQUENCE:0",
+    "#EXT-X-PLAYLIST-TYPE:VOD",
+  ];
+
+  for (const chunk of chunks) {
+    let chunkUrl = chunk.url;
+    if (chunk.s3Key && isStorageConfigured()) {
+      try {
+        chunkUrl = await generatePresignedPlaybackUrl(chunk.s3Key, 3600);
+      } catch (err) {
+        logger.warn(`Failed to sign URL for chunk ${chunk._id}: ${(err as Error).message}`);
+      }
+    }
+    const duration = (chunk.durationSeconds || 120).toFixed(3);
+    lines.push(`#EXTINF:${duration},`);
+    lines.push(chunkUrl);
+  }
+
+  lines.push("#EXT-X-ENDLIST");
+  return lines.join("\n");
+};
+
+/**
+ * Generate Signed Download Link
+ * Creates a pre-signed URL with Content-Disposition attachment headers.
+ */
+export const generateDownloadUrl = async (id: string, user: JwtAccessPayload): Promise<string> => {
+  const recording = await Recording.findById(id).populate("cameraId", "name serialNumber operatorIds customerId");
+  if (!recording) throw ApiError.notFound("Recording");
+
+  const rawCameraId = (recording.cameraId as any)?._id || recording.cameraId;
+  const camera = await Camera.findById(rawCameraId).lean();
+  if (camera) {
+    await validateCameraAccess(camera as any, user);
+  }
+
+  if (recording.s3Key && isStorageConfigured()) {
+    const camName = (camera?.name || "camera").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const timeStr = recording.startTime.toISOString().replace(/[:.]/g, "-");
+    const downloadName = `${camName}_${timeStr}.mp4`;
+    return generatePresignedDownloadUrl(recording.s3Key, downloadName, 1800);
+  }
+
+  return recording.url;
 };
 
 /**

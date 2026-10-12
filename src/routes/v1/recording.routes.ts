@@ -93,6 +93,15 @@ router.get(
 );
 
 router.get(
+  "/:cameraId/vod.m3u8",
+  authenticate,
+  permit("recordings:read"),
+  validate(cameraIdParamSchema, "params"),
+  validate(timeRangeQuerySchema, "query"),
+  recordingController.getVodPlaylist
+);
+
+router.get(
   "/:cameraId/timeline",
   authenticate,
   permit("recordings:read"),

@@ -11,6 +11,9 @@ import { logger } from "./utils/logger";
 import { socketService } from "./services/socket.service";
 import * as streamService from "./services/stream.service";
 import * as cameraService from "./services/camera.service";
+import { startRecordingSweeper, stopRecordingSweeper } from "./workers/recording-uploader.worker";
+import { startRecordingScheduler, stopRecordingScheduler } from "./services/recording-scheduler.service";
+import { startRetentionPruner, stopRetentionPruner } from "./services/recording-retention.service";
 
 const startServer = async (): Promise<void> => {
   const startTime = Date.now();
@@ -104,6 +107,15 @@ const startServer = async (): Promise<void> => {
       }, 3000);
       presenceInterval.unref();
 
+      // ── Background Workers: Cloudflare R2 Ingestion Sweeper Daemon ────────
+      startRecordingSweeper(10000);
+
+      // ── Background Workers: Dynamic Recording Scheduler Daemon ────────────
+      startRecordingScheduler(60000);
+
+      // ── Background Workers: Daily Storage Retention Pruner ─────────────────
+      startRetentionPruner(86400000);
+
       // ── Print System Banner ──────────────────────────────────────────────
       const banner = [
         "════════════════════════════════════════════════════════════════",
@@ -147,6 +159,11 @@ const startServer = async (): Promise<void> => {
       forceExitTimer.unref();
 
       try {
+        // Step 0: Stop recording background workers
+        stopRecordingSweeper();
+        stopRecordingScheduler();
+        stopRetentionPruner();
+
         // Step 1: Close HTTP server (stops accepting new incoming requests)
         await new Promise<void>((resolve, reject) => {
           server.close((err) => {

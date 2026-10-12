@@ -135,8 +135,25 @@ export const deleteSchedule = catchAsync(async (req: Request, res: Response) => 
 
 export const generateDownloadLink = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
-  // Simplified logic: ensure user has access, then just return the URL. 
-  // In a real app with S3, this would generate a signed presigned URL.
-  const recording = await recordingService.getRecordingDetails(req.params.id, req.user);
-  res.status(200).json(new ApiResponse(200, { downloadUrl: recording.url }, "Download link generated"));
+  const downloadUrl = await recordingService.generateDownloadUrl(req.params.id, req.user);
+  res.status(200).json(new ApiResponse(200, { downloadUrl }, "Download link generated"));
+});
+
+/**
+ * Dynamic HLS VOD Playlist Endpoint
+ * GET /api/v1/recordings/:cameraId/vod.m3u8
+ * Returns an HLS playlist stitching together all fMP4 chunks in the requested time range.
+ */
+export const getVodPlaylist = catchAsync(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const start = (req.query.start || req.query.startTime) as string;
+  const end = (req.query.end || req.query.endTime) as string;
+  if (!start || !end) {
+    throw ApiError.badRequest("start (or startTime) and end (or endTime) query params are required");
+  }
+
+  const playlist = await recordingService.generateVodPlaylist(req.params.cameraId, start, end, req.user);
+  res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.status(200).send(playlist);
 });
