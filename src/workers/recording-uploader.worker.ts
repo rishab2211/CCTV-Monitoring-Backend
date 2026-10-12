@@ -9,6 +9,7 @@ import path from "path";
 import { Camera, CameraDocument } from "../models/Camera";
 import { createRecordingChunk } from "../services/recording.service";
 import { uploadRecordingSegment, isStorageConfigured } from "../config/storage";
+import { getCameraPathAliases } from "../config/mediamtx.service";
 import { logger } from "../utils/logger";
 
 // ─── Locate Spool Directory ───────────────────────────────────────────────────
@@ -51,7 +52,8 @@ export const resolveCameraFromSlug = async (rawSlug: string): Promise<CameraDocu
   const cleanSlug = rawSlug
     .replace(/^(raw_|live_|raw\/|live\/)/i, "")
     .replace(/(_raw|_live)$/i, "")
-    .trim();
+    .trim()
+    .toLowerCase();
 
   // 1. Direct serialNumber match (case-insensitive)
   let camera = await Camera.findOne({
@@ -61,12 +63,37 @@ export const resolveCameraFromSlug = async (rawSlug: string): Promise<CameraDocu
 
   if (camera) return camera;
 
-  // 2. Fallback: match by camera name or slugified name
+  // 2. Fallback: match by MediaMTX path aliases, RTSP URL, serial slug, or camera name
   const allCameras = await Camera.find({ isDeleted: false });
   for (const cam of allCameras) {
+    // Check MediaMTX path aliases
+    const aliases = getCameraPathAliases(cam).map((a) => a.toLowerCase());
+    if (aliases.includes(rawSlug.toLowerCase()) || aliases.includes(cleanSlug)) {
+      return cam;
+    }
+
+    // Check if camera RTSP URL contains stream path or slug
+    if (cam.rtspUrl) {
+      const rtspLower = cam.rtspUrl.toLowerCase();
+      if (
+        rtspLower.includes(rawSlug.toLowerCase()) ||
+        rtspLower.includes(cleanSlug) ||
+        rtspLower.endsWith(`/${cleanSlug}`) ||
+        rtspLower.endsWith(`/${rawSlug.toLowerCase()}`)
+      ) {
+        return cam;
+      }
+    }
+
+    // Match slugified serialNumber or name
     const camSlug = cam.serialNumber.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
     const nameSlug = cam.name.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
-    if (camSlug === cleanSlug.toLowerCase() || nameSlug === cleanSlug.toLowerCase()) {
+    if (
+      camSlug === cleanSlug ||
+      camSlug === rawSlug.toLowerCase() ||
+      nameSlug === cleanSlug ||
+      nameSlug === rawSlug.toLowerCase()
+    ) {
       return cam;
     }
   }
@@ -126,6 +153,11 @@ export const processSingleSegment = async (filePath: string): Promise<boolean> =
 
     const camera = await resolveCameraFromSlug(streamSlug);
     if (!camera) {
+      if (Date.now() - stats.mtimeMs > 15 * 60 * 1000) {
+        logger.warn(`[RecordingSweeper] Purging unmapped orphan segment older than 15m: ${filePath}`);
+        try { fs.unlinkSync(filePath); } catch {}
+        return false;
+      }
       logger.warn(`[RecordingSweeper] Camera not found for stream slug '${streamSlug}' (file: ${fileName}). Will retry.`);
       return false;
     }
@@ -144,10 +176,10 @@ export const processSingleSegment = async (filePath: string): Promise<boolean> =
     let publicUrl = s3Key;
 
     if (isStorageConfigured()) {
-      const fileStream = fs.createReadStream(filePath);
+      const fileBuffer = fs.readFileSync(filePath);
       const uploadRes = await uploadRecordingSegment({
         s3Key,
-        body: fileStream,
+        body: fileBuffer,
         sizeBytes: stats.size,
         contentType: "video/mp4",
         metadata: {
