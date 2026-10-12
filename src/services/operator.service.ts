@@ -178,7 +178,13 @@ export const assignCameras = async (operatorId: string, cameraIds: string[], use
     metadata: { operatorId, cameraIds },
   });
 
-  // Push Notification to the Operator
+  // Push Notification & Socket Event to the Operator
+  socketService.emitToUser(operatorId, "cameras_updated", {
+    count: cameras.length,
+    cameraIds,
+    assigned: true,
+  });
+
   await notificationService.sendNotification(
     operatorId,
     "New Cameras Assigned",
@@ -300,14 +306,28 @@ export const getOperatorDashboard = async (user: JwtAccessPayload) => {
   if (!operator) throw ApiError.notFound("Operator not found");
 
   const assignedCameraIds = operator.operatorDetails?.assignedCameras ?? [];
+  const operatorObjectId = new mongoose.Types.ObjectId(user.userId);
 
   const sosFilter: any = { status: { $in: ["active", "acknowledged"] } };
   if (user.franchiseId) {
     sosFilter.franchiseId = new mongoose.Types.ObjectId(user.franchiseId);
   }
 
+  const validCameraIds = (assignedCameraIds || [])
+    .filter((id: any) => mongoose.Types.ObjectId.isValid(id))
+    .map((id: any) => new mongoose.Types.ObjectId(id));
+
+  const cameraMatchFilter = {
+    $or: [
+      { _id: { $in: validCameraIds } },
+      { operatorIds: operatorObjectId },
+      { operatorIds: user.userId },
+    ],
+    isDeleted: false,
+  };
+
   const [assignedCameras, openIncidents, activeSos, activeShift] = await Promise.all([
-    Camera.countDocuments({ _id: { $in: assignedCameraIds }, isDeleted: false }),
+    Camera.countDocuments(cameraMatchFilter),
     Incident.countDocuments({ assignedTo: user.userId, status: { $in: ["open", "investigating"] } }),
     SosAlert.countDocuments(sosFilter),
     OperatorShift.findOne({ operatorId: user.userId, endTime: { $exists: false } }).lean(),
@@ -323,22 +343,61 @@ export const getOperatorDashboard = async (user: JwtAccessPayload) => {
 };
 
 /**
+ * Helper to resolve all camera IDs assigned to an operator
+ * checks both User.operatorDetails.assignedCameras and Camera.operatorIds.
+ */
+const getOperatorAssignedCameraIds = async (
+  userId: string,
+  assignedCamerasList: any[] = []
+): Promise<mongoose.Types.ObjectId[]> => {
+  const operatorObjectId = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : userId;
+  const validCameraIds = (assignedCamerasList || [])
+    .filter((id: any) => mongoose.Types.ObjectId.isValid(id))
+    .map((id: any) => new mongoose.Types.ObjectId(id));
+
+  const cameras = await Camera.find({
+    $or: [
+      { _id: { $in: validCameraIds } },
+      { operatorIds: operatorObjectId },
+      { operatorIds: userId },
+    ],
+    isDeleted: false,
+  })
+    .select("_id")
+    .lean();
+  return cameras.map((c) => c._id as mongoose.Types.ObjectId);
+};
+
+/**
  * Get Operator's Assigned Cameras
  * Returns the full Camera documents for all cameras assigned to this operator.
  *
  * @param user - The authenticated operator
  * @returns Array of Camera documents
  */
-export const getAssignedCameras = async (user: JwtAccessPayload) => {
+export const getAssignedCameras = async (user: JwtAccessPayload): Promise<any[]> => {
   if (user.role !== "operator") throw ApiError.forbidden("Operators only");
 
   const operator = await User.findById(user.userId).lean();
   if (!operator) throw ApiError.notFound("Operator not found");
 
   const assignedCameraIds = operator.operatorDetails?.assignedCameras ?? [];
+  const operatorObjectId = mongoose.Types.ObjectId.isValid(user.userId)
+    ? new mongoose.Types.ObjectId(user.userId)
+    : user.userId;
+  const validCameraIds = (assignedCameraIds || [])
+    .filter((id: any) => mongoose.Types.ObjectId.isValid(id))
+    .map((id: any) => new mongoose.Types.ObjectId(id));
 
-  const cameras = await Camera.find({ _id: { $in: assignedCameraIds }, isDeleted: false })
-    .select("name serialNumber location status rtspUrl")
+  const cameras = await Camera.find({
+    $or: [
+      { _id: { $in: validCameraIds } },
+      { operatorIds: operatorObjectId },
+      { operatorIds: user.userId },
+    ],
+    isDeleted: false,
+  })
+    .select("name serialNumber location status rtspUrl settings health customerId franchiseId operatorIds")
     .lean();
 
   return cameras.map((cam) => ({
@@ -361,10 +420,11 @@ export const getPendingAlerts = async (user: JwtAccessPayload) => {
   if (!operator) throw ApiError.notFound("Operator not found");
 
   const assignedCameraIds = operator.operatorDetails?.assignedCameras ?? [];
+  const resolvedCameraIds = await getOperatorAssignedCameraIds(user.userId, assignedCameraIds);
 
   // Import Alert dynamically to avoid circular dep; use require-style import from model path
   const { Alert } = await import("../models/Alert");
-  const alerts = await Alert.find({ cameraId: { $in: assignedCameraIds }, status: "new" })
+  const alerts = await Alert.find({ cameraId: { $in: resolvedCameraIds }, status: "new" })
     .populate("cameraId", "name serialNumber location")
     .sort({ createdAt: -1 })
     .lean();
@@ -386,9 +446,10 @@ export const getActiveAlerts = async (user: JwtAccessPayload) => {
   if (!operator) throw ApiError.notFound("Operator not found");
 
   const assignedCameraIds = operator.operatorDetails?.assignedCameras ?? [];
+  const resolvedCameraIds = await getOperatorAssignedCameraIds(user.userId, assignedCameraIds);
 
   const { Alert } = await import("../models/Alert");
-  const alerts = await Alert.find({ cameraId: { $in: assignedCameraIds }, status: "acknowledged" })
+  const alerts = await Alert.find({ cameraId: { $in: resolvedCameraIds }, status: "acknowledged" })
     .populate("cameraId", "name serialNumber location")
     .sort({ updatedAt: -1 })
     .lean();
@@ -410,12 +471,13 @@ export const getOperatorCalls = async (user: JwtAccessPayload) => {
   if (!operator) throw ApiError.notFound("Operator not found");
 
   const assignedCameraIds = operator.operatorDetails?.assignedCameras ?? [];
+  const resolvedCameraIds = await getOperatorAssignedCameraIds(user.userId, assignedCameraIds);
 
   const { TalkbackSession } = await import("../models/TalkbackSession");
   const calls = await TalkbackSession.find({
     $or: [
       { operatorId: new mongoose.Types.ObjectId(user.userId) },
-      { cameraId: { $in: assignedCameraIds } }
+      { cameraId: { $in: resolvedCameraIds } }
     ]
   })
     .populate("cameraId", "name serialNumber location")

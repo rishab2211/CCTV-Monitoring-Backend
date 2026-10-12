@@ -187,7 +187,7 @@ export const listInvoices = async (query: any, user: JwtAccessPayload) => {
  * 
  * @param user - The JWT payload of the customer
  */
-export const getDashboard = async (user: JwtAccessPayload) => {
+export const getDashboard = async (user: JwtAccessPayload): Promise<any> => {
   if (user.role !== "customer") {
     throw ApiError.forbidden("Only customers can access the customer dashboard");
   }

@@ -26,6 +26,7 @@ import {
   toPathName,
 } from "../config/mediamtx.service";
 import { socketService } from "./socket.service";
+import * as notificationService from "./notification.service";
 
 // ─── Ownership/Access Helper ──────────────────────────────────────────────────
 
@@ -68,11 +69,19 @@ export const validateCameraAccess = async (
 
   // Operator access check
   if (role === "operator") {
-    const isAssigned = camera.operatorIds.some((id) => id.equals(userObjectId));
-    if (!isAssigned) {
-      throw ApiError.forbidden("You are not assigned to monitor this camera");
-    }
-    return;
+    const isAssignedByCamera = (camera.operatorIds || []).some((id) =>
+      typeof (id as any).equals === "function" ? (id as any).equals(userObjectId) : id.toString() === user.userId
+    );
+    if (isAssignedByCamera) return;
+
+    // Symmetrical check: User.operatorDetails.assignedCameras
+    const operator = await User.findById(user.userId).select("operatorDetails.assignedCameras").lean();
+    const isAssignedByUser = (operator?.operatorDetails?.assignedCameras || []).some(
+      (camId: any) => camId.toString() === (camera as any)._id.toString()
+    );
+    if (isAssignedByUser) return;
+
+    throw ApiError.forbidden("You are not assigned to monitor this camera");
   }
 
   // Customer access check
@@ -122,6 +131,16 @@ export const createCamera = async (
       lastPing: null,
     },
   });
+
+  // Keep operatorDetails.assignedCameras in sync if operatorIds were provided at creation
+  const rawOperatorIds = (input as any).operatorIds;
+  if (Array.isArray(rawOperatorIds) && rawOperatorIds.length > 0) {
+    const operatorObjIds = rawOperatorIds.map((id: string) => new mongoose.Types.ObjectId(id));
+    await User.updateMany(
+      { _id: { $in: operatorObjIds } },
+      { $addToSet: { "operatorDetails.assignedCameras": camera._id } }
+    );
+  }
 
   logActivity({
     userId: createdBy === "system" ? camera._id : new mongoose.Types.ObjectId(createdBy),
@@ -192,7 +211,18 @@ export const listCameras = async (
       filter.$or = franchiseOr;
     }
   } else if (role === "operator") {
-    filter.operatorIds = userObjectId;
+    const operator = await User.findById(user.userId).select("operatorDetails.assignedCameras").lean();
+    const assignedCameraIds = operator?.operatorDetails?.assignedCameras ?? [];
+    const operatorOr = [
+      { _id: { $in: assignedCameraIds } },
+      { operatorIds: userObjectId },
+    ];
+    if (filter.$or) {
+      filter.$and = [{ $or: filter.$or }, { $or: operatorOr }];
+      delete filter.$or;
+    } else {
+      filter.$or = operatorOr;
+    }
   } else if (role === "customer") {
     const customerOr = [
       { customerId: userObjectId },
@@ -360,6 +390,12 @@ export const softDeleteCamera = async (id: string, deletedBy: string): Promise<v
   camera.status = "offline";
   await camera.save();
 
+  // Symmetrically remove decommissioned camera from all operators' assignedCameras
+  await User.updateMany(
+    { "operatorDetails.assignedCameras": camera._id },
+    { $pull: { "operatorDetails.assignedCameras": camera._id } }
+  );
+
   logActivity({
     userId: deletedBy === "system" ? camera._id : new mongoose.Types.ObjectId(deletedBy),
     action: "CAMERA_DELETED",
@@ -415,7 +451,47 @@ export const assignCamera = async (
     if (operatorsCount !== input.operatorIds.length) {
       throw ApiError.badRequest("One or more assigned operators do not exist or are invalid");
     }
-    camera.operatorIds = input.operatorIds.map((id) => new mongoose.Types.ObjectId(id));
+
+    const previousOperatorIds = (camera.operatorIds || []).map((opId) => opId.toString());
+    const newOperatorObjectIds = input.operatorIds.map((id) => new mongoose.Types.ObjectId(id));
+    camera.operatorIds = newOperatorObjectIds;
+
+    // Symmetrically keep operatorDetails.assignedCameras in sync on User records
+    // 1. Remove this camera from operators that were unassigned
+    await User.updateMany(
+      { _id: { $nin: newOperatorObjectIds }, "operatorDetails.assignedCameras": camera._id },
+      { $pull: { "operatorDetails.assignedCameras": camera._id } }
+    );
+    // 2. Add this camera to operators currently assigned
+    await User.updateMany(
+      { _id: { $in: newOperatorObjectIds } },
+      { $addToSet: { "operatorDetails.assignedCameras": camera._id } }
+    );
+
+    // Emit real-time events and notifications to affected operators
+    const allAffectedIds = Array.from(new Set([...previousOperatorIds, ...input.operatorIds]));
+    for (const opId of allAffectedIds) {
+      const isAssigned = input.operatorIds.includes(opId);
+      socketService.emitToUser(opId, "cameras_updated", {
+        cameraId: camera._id.toString(),
+        cameraName: camera.name,
+        assigned: isAssigned,
+      });
+
+      if (isAssigned) {
+        notificationService
+          .sendNotification(
+            opId,
+            "New Camera Assigned",
+            `Camera "${camera.name}" has been assigned to your station.`,
+            "system",
+            camera._id.toString()
+          )
+          .catch((err) =>
+            logger.warn(`Failed to send assignment notification to operator ${opId}:`, err)
+          );
+      }
+    }
   }
 
   await camera.save();

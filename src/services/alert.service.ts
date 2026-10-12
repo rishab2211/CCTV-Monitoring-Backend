@@ -235,8 +235,9 @@ export const escalateAlert = async (id: string, user: JwtAccessPayload) => {
 
   // Map alert type to formal incident classification
   let incidentType: "theft" | "vandalism" | "technical_issue" | "other" = "other";
-  if (alert.type === "tampering") incidentType = "vandalism";
-  else if (alert.type === "offline") incidentType = "technical_issue";
+  const rawType = alert.type as string;
+  if (rawType === "tampering") incidentType = "vandalism";
+  else if (rawType === "offline") incidentType = "technical_issue";
 
   const incident = await Incident.create({
     title: `Escalated Alert: ${alert.type.toUpperCase()} - ${camera.name}`,
