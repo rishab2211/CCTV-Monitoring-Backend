@@ -67,16 +67,16 @@ stream_loop() {
   done
 }
 
-# Launch the 3 synthetic cameras in background loops
-stream_loop "CAM-01" "cam_entrance" "testsrc=size=1280x720:rate=25" "CAM-01 | MAIN ENTRANCE & RECEPTION" &
-stream_loop "CAM-02" "cam_warehouse" "smptebars=size=1280x720:rate=25" "CAM-02 | WAREHOUSE LOADING BAY" &
-stream_loop "CAM-03" "cam_parking" "testsrc2=size=1280x720:rate=25" "CAM-03 | PERIMETER PARKING AREA" &
+# Launch the 3 synthetic cameras in background loops (using raw_* paths to trigger recording + WebRTC transcoding)
+stream_loop "CAM-01" "raw_cam_entrance" "testsrc=size=1280x720:rate=25" "CAM-01 | MAIN ENTRANCE & RECEPTION" &
+stream_loop "CAM-02" "raw_cam_warehouse" "smptebars=size=1280x720:rate=25" "CAM-02 | WAREHOUSE LOADING BAY" &
+stream_loop "CAM-03" "raw_cam_parking" "testsrc2=size=1280x720:rate=25" "CAM-03 | PERIMETER PARKING AREA" &
 
 echo ""
 echo "✅ All 3 Synthetic RTSP Feeds are running in background loops!"
-echo "   1. rtsp://${RTSP_HOST}/cam_entrance"
-echo "   2. rtsp://${RTSP_HOST}/cam_warehouse"
-echo "   3. rtsp://${RTSP_HOST}/cam_parking"
+echo "   1. rtsp://${RTSP_HOST}/raw_cam_entrance  -> Live: live_cam_entrance  | Recording: YES"
+echo "   2. rtsp://${RTSP_HOST}/raw_cam_warehouse -> Live: live_cam_warehouse | Recording: YES"
+echo "   3. rtsp://${RTSP_HOST}/raw_cam_parking   -> Live: live_cam_parking   | Recording: YES"
 echo ""
 
 wait
