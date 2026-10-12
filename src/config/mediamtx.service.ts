@@ -294,6 +294,12 @@ export const getCameraStreamPath = (camera: { serialNumber: string; rtspUrl?: st
  */
 export const resolveActiveStreamPath = async (camera: { serialNumber: string; rtspUrl?: string }): Promise<string> => {
   const basePath = getCameraStreamPath(camera);
+
+  // If basePath is already a live playback path, return it directly
+  if (basePath.startsWith("live_") || basePath.endsWith("_live") || basePath.startsWith("live/")) {
+    return basePath;
+  }
+
   const playbackCandidate = toPlaybackPath(basePath);
 
   // If already mapped by prefix/suffix rule (e.g. raw_cam -> live_cam), return immediately
