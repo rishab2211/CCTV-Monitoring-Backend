@@ -16,6 +16,7 @@ const activeRecordingStates = new Map<string, boolean>();
 /**
  * Checks whether a given set of schedule rules is currently active.
  * Handles overnight schedules (e.g. 22:00 -> 06:00).
+ * Supports both daysOfWeek and days arrays.
  */
 export const isScheduleRuleActive = (
   rules: IRecordingScheduleRule[],
@@ -30,7 +31,8 @@ export const isScheduleRuleActive = (
   const currentHHMM = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
   for (const rule of rules) {
-    if (!rule.daysOfWeek.includes(currentDay)) {
+    const days = rule.daysOfWeek || (rule as any).days || [];
+    if (!days.includes(currentDay)) {
       continue;
     }
 
@@ -39,7 +41,7 @@ export const isScheduleRuleActive = (
         return true;
       }
     } else {
-      // Overnight rule crossing midnight
+      // Overnight rule crossing midnight (e.g. 22:00 to 06:00)
       if (currentHHMM >= rule.startTime || currentHHMM <= rule.endTime) {
         return true;
       }
@@ -77,10 +79,22 @@ export const syncRecordingSchedules = async (): Promise<void> => {
       if (currentState !== shouldRecord) {
         activeRecordingStates.set(rawPath, shouldRecord);
 
-        // Patch MediaMTX path config dynamically
-        await mediamtxFetch("PATCH", `/config/paths/patch/${rawPath}`, {
-          record: shouldRecord,
-        });
+        if (shouldRecord) {
+          // Patch MediaMTX path config with recording enabled & standardized segment rules
+          await mediamtxFetch("PATCH", `/config/paths/patch/${rawPath}`, {
+            record: true,
+            recordPath: "./recordings/%path/%Y-%m-%d_%H-%M-%S",
+            recordFormat: "fmp4",
+            recordPartDuration: "1s",
+            recordSegmentDuration: "120s",
+            recordDeleteAfter: "2h",
+          });
+        } else {
+          // Disable recording for this path
+          await mediamtxFetch("PATCH", `/config/paths/patch/${rawPath}`, {
+            record: false,
+          });
+        }
 
         logger.info(
           `📹 [RecordingScheduler] State transition for '${camera.name}' (${rawPath}): record = ${shouldRecord}`
@@ -89,6 +103,26 @@ export const syncRecordingSchedules = async (): Promise<void> => {
     }
   } catch (err) {
     logger.error(`[RecordingScheduler] Error evaluating schedules: ${(err as Error).message}`);
+  }
+};
+
+/**
+ * Force an immediate re-evaluation of recording schedules, bypassing wait interval.
+ */
+export const triggerImmediateScheduleSync = async (cameraId?: string): Promise<void> => {
+  try {
+    if (cameraId) {
+      for (const [key] of activeRecordingStates.entries()) {
+        if (key.includes(cameraId)) {
+          activeRecordingStates.delete(key);
+        }
+      }
+    } else {
+      activeRecordingStates.clear();
+    }
+    await syncRecordingSchedules();
+  } catch (err) {
+    logger.warn(`[RecordingScheduler] Immediate sync warning: ${(err as Error).message}`);
   }
 };
 

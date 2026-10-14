@@ -1,28 +1,30 @@
 /**
  * @file recording-retention.service.ts
  * @description Storage retention pruning daemon.
- * Periodically identifies expired video recording chunks, purges the files from Cloudflare R2,
- * and updates database metadata to prevent orphaned object storage costs.
+ * Periodically identifies expired video recording chunks, purges cloud objects from
+ * Cloudflare R2 / AWS S3, unlinks local archive files from disk, and updates database metadata
+ * to prevent orphaned storage costs and disk exhaustion.
  */
+import fs from "fs";
 import { Recording } from "../models/Recording";
 import { deleteRecordingObjects, isStorageConfigured } from "../config/storage";
 import { logger } from "../utils/logger";
 
 /**
  * Runs a single retention pruning pass.
- * Deletes expired R2 objects in batches of up to 500 per pass.
+ * Deletes expired R2 objects in batches of up to 500 per pass and purges local files.
  */
 export const pruneExpiredRecordings = async (): Promise<number> => {
   try {
     const now = new Date();
 
-    // Query expired chunks that have not yet been deleted
+    // Query expired chunks that have not yet been marked deleted
     const expiredChunks = await Recording.find({
       expiresAt: { $lte: now },
       status: { $ne: "deleted" },
     })
       .limit(500)
-      .select("_id s3Key url");
+      .select("_id s3Key url localPath");
 
     if (!expiredChunks.length) {
       logger.debug("[RetentionPruner] No expired recordings to prune");
@@ -31,16 +33,39 @@ export const pruneExpiredRecordings = async (): Promise<number> => {
 
     logger.info(`🧹 [RetentionPruner] Found ${expiredChunks.length} expired recording(s) to prune`);
 
-    // Extract s3Keys that need to be deleted from Cloudflare R2
+    // 1. Delete objects from Cloudflare R2 / AWS S3
     const s3KeysToDelete = expiredChunks
       .map((c) => c.s3Key)
       .filter((k): k is string => Boolean(k));
 
     if (s3KeysToDelete.length > 0 && isStorageConfigured()) {
-      await deleteRecordingObjects(s3KeysToDelete);
+      try {
+        await deleteRecordingObjects(s3KeysToDelete);
+      } catch (cloudErr) {
+        logger.error(`[RetentionPruner] Cloud storage deletion error: ${(cloudErr as Error).message}`);
+      }
     }
 
-    // Mark the documents as deleted in MongoDB
+    // 2. Delete local files from server disk (critical for local archive storage mode)
+    let localDeletedCount = 0;
+    for (const chunk of expiredChunks) {
+      if (chunk.localPath && fs.existsSync(chunk.localPath)) {
+        try {
+          fs.unlinkSync(chunk.localPath);
+          localDeletedCount++;
+        } catch (unlinkErr) {
+          logger.warn(
+            `[RetentionPruner] Failed to delete local file ${chunk.localPath}: ${(unlinkErr as Error).message}`
+          );
+        }
+      }
+    }
+
+    if (localDeletedCount > 0) {
+      logger.info(`[RetentionPruner] Cleaned up ${localDeletedCount} local expired recording file(s) from disk`);
+    }
+
+    // 3. Mark documents as deleted in MongoDB
     const chunkIds = expiredChunks.map((c) => c._id);
     const updateResult = await Recording.updateMany(
       { _id: { $in: chunkIds } },
