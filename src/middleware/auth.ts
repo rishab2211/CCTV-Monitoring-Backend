@@ -62,12 +62,15 @@ export const authenticate = (
     }
 
     const authHeader = req.headers.authorization;
+    let token: string | undefined;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      throw ApiError.unauthorized("No authentication token provided");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.split(" ")[1];
+    } else if (typeof req.query.token === "string" && req.query.token) {
+      token = req.query.token;
+    } else if (typeof req.query.accessToken === "string" && req.query.accessToken) {
+      token = req.query.accessToken;
     }
-
-    const token = authHeader.split(" ")[1];
 
     if (!token) {
       throw ApiError.unauthorized("No authentication token provided");

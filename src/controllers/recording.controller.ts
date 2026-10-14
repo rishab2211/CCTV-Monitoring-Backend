@@ -1,6 +1,6 @@
 /**
  * @file recording.controller.ts
- * @description Express request handlers for VOD recording chunks and schedules.
+ * @description Express request handlers for VOD recording chunks, schedules, and byte-range streaming.
  */
 import { Request, Response } from "express";
 import { catchAsync } from "../utils/catchAsync";
@@ -14,7 +14,6 @@ import * as recordingService from "../services/recording.service";
  * Called by external FFmpeg processes to log a new recording chunk in the DB.
  */
 export const createRecordingChunk = catchAsync(async (req: Request, res: Response) => {
-  // Only accessible via system token (handled by middleware)
   const recording = await recordingService.createRecordingChunk(req.body);
   res.status(201).json(new ApiResponse(201, recording, "Recording chunk logged"));
 });
@@ -42,9 +41,19 @@ export const getRecordingDetails = catchAsync(async (req: Request, res: Response
 });
 
 /**
+ * Stream Video Recording
+ * GET /api/v1/recordings/:id/stream
+ * Handles HTTP 206 Range requests for HTML5 video players or redirects to cloud storage.
+ */
+export const streamRecording = catchAsync(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  await recordingService.streamRecording(req.params.id, req, res, req.user);
+});
+
+/**
  * Delete Recording Endpoint
  * DELETE /api/v1/recordings/:id
- * Soft deletes a recording chunk.
+ * Soft deletes a recording chunk and removes local archive files.
  */
 export const deleteRecording = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -105,7 +114,7 @@ export const getStorageStats = catchAsync(async (req: Request, res: Response) =>
 
 /**
  * Update Schedule Endpoint
- * PUT /api/v1/recordings/schedule/:cameraId
+ * PUT /api/v1/recordings/:cameraId/schedule
  * Overwrites the recording schedule rules for a camera.
  */
 export const updateSchedule = catchAsync(async (req: Request, res: Response) => {
@@ -125,13 +134,13 @@ export const getSchedule = catchAsync(async (req: Request, res: Response) => {
 
 /**
  * Delete Schedule Endpoint
- * DELETE /api/v1/recordings/schedule/:cameraId
- * Stops all automated recordings for the camera.
+ * DELETE /api/v1/recordings/:cameraId/schedule
+ * Stops all automated recordings for the camera (resets to 24/7 continuous default).
  */
 export const deleteSchedule = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
   const result = await recordingService.deleteSchedule(req.params.cameraId, req.user);
-  res.status(200).json(new ApiResponse(200, result, "Schedule deleted"));
+  res.status(200).json(new ApiResponse(200, result, "Schedule reset to default"));
 });
 
 export const generateDownloadLink = catchAsync(async (req: Request, res: Response) => {

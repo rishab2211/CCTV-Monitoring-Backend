@@ -10,9 +10,10 @@ import {
   dateQuerySchema,
   updateRetentionSchema,
   setScheduleSchema,
+  updateScheduleBodySchema,
   recordingIdParamSchema,
 } from "../../validators/recording.validator";
-import { cameraIdParamSchema } from "../../validators/stream.validator"; // Reuse camera ID param validator
+import { cameraIdParamSchema } from "../../validators/stream.validator";
 
 const router = Router();
 
@@ -24,8 +25,8 @@ const router = Router();
  */
 router.post(
   "/",
-  authenticate, // System key handles the auth for this
-  permit("recordings:manage"), // Or check for system role specifically
+  authenticate,
+  permit("recordings:manage"),
   validate(createRecordingChunkSchema),
   recordingController.createRecordingChunk
 );
@@ -52,7 +53,7 @@ router.put(
 router.post(
   "/schedule",
   authenticate,
-  permit("cameras:configure"), // Admin/franchise_admin, or owners managing their own
+  permit("cameras:configure"),
   validate(setScheduleSchema),
   recordingController.updateSchedule
 );
@@ -62,6 +63,7 @@ router.put(
   authenticate,
   permit("cameras:configure"),
   validate(cameraIdParamSchema, "params"),
+  validate(updateScheduleBodySchema),
   recordingController.updateSchedule
 );
 
@@ -110,7 +112,7 @@ router.get(
   recordingController.getTimeline
 );
 
-// ─── Individual Recording Management ──────────────────────────────────────────
+// ─── Individual Recording Management & Streaming ──────────────────────────────
 
 router.get(
   "/",
@@ -118,6 +120,27 @@ router.get(
   permit("recordings:read"),
   validate(listRecordingsQuerySchema, "query"),
   recordingController.listRecordings
+);
+
+/**
+ * GET /api/v1/recordings/:id/stream
+ * Direct video streaming endpoint supporting HTTP 206 Partial Content (Range requests)
+ * and S3 redirect fallback. Supports auth via header or ?token= query param.
+ */
+router.get(
+  "/:id/stream",
+  authenticate,
+  permit("recordings:read"),
+  validate(recordingIdParamSchema, "params"),
+  recordingController.streamRecording
+);
+
+router.get(
+  "/:id/play",
+  authenticate,
+  permit("recordings:read"),
+  validate(recordingIdParamSchema, "params"),
+  recordingController.streamRecording
 );
 
 router.get(
@@ -129,6 +152,14 @@ router.get(
 );
 
 router.post(
+  "/:id/download",
+  authenticate,
+  permit("recordings:download", "recordings:read"),
+  validate(recordingIdParamSchema, "params"),
+  recordingController.generateDownloadLink
+);
+
+router.get(
   "/:id/download",
   authenticate,
   permit("recordings:download", "recordings:read"),
