@@ -47,6 +47,16 @@ const recordingSchema = new Schema<RecordingDocument>(
       type: String,
       index: true,
     },
+    localPath: {
+      type: String,
+      index: true,
+    },
+    resolution: {
+      type: String,
+    },
+    videoCodec: {
+      type: String,
+    },
     publicId: {
       type: String,
     },

@@ -327,17 +327,23 @@ export interface IRecording {
   type: RecordingType;
   status: RecordingStatus;
   url: string;
+  playbackUrl?: string;
   s3Key?: string;
+  localPath?: string;
+  resolution?: string;
+  videoCodec?: string;
   publicId?: string;
   sizeBytes: number;
   durationSeconds: number;
   expiresAt?: Date;
+  cameraName?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface IRecordingScheduleRule {
   daysOfWeek: number[]; // 0=Sunday, 6=Saturday
+  days?: number[];
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   type: RecordingType;
