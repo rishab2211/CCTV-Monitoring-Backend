@@ -51,7 +51,7 @@ paths:
     runOnAvailable: ffmpeg -rtsp_transport tcp -i rtsp://127.0.0.1:8554/raw_$G1 -c:v copy -c:a libopus -b:a 64k -async 50 -f rtsp rtsp://127.0.0.1:8554/live_$G1
     runOnAvailableRestart: yes
     record: yes
-    recordPath: /app/recordings/%path/%Y-%m-%d_%H-%M-%S
+    recordPath: ./recordings/%path/%Y-%m-%d_%H-%M-%S
     recordFormat: fmp4
     recordPartDuration: 1s
     recordSegmentDuration: 120s
@@ -63,7 +63,7 @@ paths:
     runOnAvailable: ffmpeg -rtsp_transport tcp -i rtsp://127.0.0.1:8554/$G1_raw -c:v copy -c:a libopus -b:a 64k -async 50 -f rtsp rtsp://127.0.0.1:8554/$G1_live
     runOnAvailableRestart: yes
     record: yes
-    recordPath: /app/recordings/%path/%Y-%m-%d_%H-%M-%S
+    recordPath: ./recordings/%path/%Y-%m-%d_%H-%M-%S
     recordFormat: fmp4
     recordPartDuration: 1s
     recordSegmentDuration: 120s
@@ -75,7 +75,7 @@ paths:
     runOnAvailable: ffmpeg -rtsp_transport tcp -i rtsp://127.0.0.1:8554/raw/$G1 -c:v copy -c:a libopus -b:a 64k -async 50 -f rtsp rtsp://127.0.0.1:8554/live/$G1
     runOnAvailableRestart: yes
     record: yes
-    recordPath: /app/recordings/%path/%Y-%m-%d_%H-%M-%S
+    recordPath: ./recordings/%path/%Y-%m-%d_%H-%M-%S
     recordFormat: fmp4
     recordPartDuration: 1s
     recordSegmentDuration: 120s
@@ -87,7 +87,7 @@ paths:
     runOnAvailable: ffmpeg -rtsp_transport tcp -i rtsp://127.0.0.1:8554/phone_cam -c:v copy -c:a libopus -b:a 64k -async 50 -f rtsp rtsp://127.0.0.1:8554/phone_cam_live
     runOnAvailableRestart: yes
     record: yes
-    recordPath: /app/recordings/%path/%Y-%m-%d_%H-%M-%S
+    recordPath: ./recordings/%path/%Y-%m-%d_%H-%M-%S
     recordFormat: fmp4
     recordPartDuration: 1s
     recordSegmentDuration: 120s
@@ -98,7 +98,7 @@ paths:
     runOnAvailable: ffmpeg -rtsp_transport tcp -i rtsp://127.0.0.1:8554/phone_cam_1 -c:v copy -c:a libopus -b:a 64k -async 50 -f rtsp rtsp://127.0.0.1:8554/phone_cam_1_live
     runOnAvailableRestart: yes
     record: yes
-    recordPath: /app/recordings/%path/%Y-%m-%d_%H-%M-%S
+    recordPath: ./recordings/%path/%Y-%m-%d_%H-%M-%S
     recordFormat: fmp4
     recordPartDuration: 1s
     recordSegmentDuration: 120s
