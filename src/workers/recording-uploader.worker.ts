@@ -17,18 +17,24 @@ import { logger } from "../utils/logger";
 
 const execFileAsync = util.promisify(execFile);
 
-// ─── Locate Spool Directory ───────────────────────────────────────────────────
-export const resolveSpoolDirectory = (): string => {
-  const containerDir = "/app/recordings";
-  const localDir = path.resolve(process.cwd(), "recordings");
+// ─── Locate Spool Directories ────────────────────────────────────────────────
+export const getSpoolDirectories = (): string[] => {
+  const dirs = [
+    "/app/recordings",
+    path.resolve(process.cwd(), "recordings"),
+    "/recordings",
+  ];
+  return Array.from(new Set(dirs)).filter((d) => fs.existsSync(d));
+};
 
-  if (fs.existsSync(containerDir)) {
-    return containerDir;
+export const resolveSpoolDirectory = (): string => {
+  const dirs = getSpoolDirectories();
+  if (dirs.length > 0) return dirs[0];
+  const defaultDir = path.resolve(process.cwd(), "recordings");
+  if (!fs.existsSync(defaultDir)) {
+    fs.mkdirSync(defaultDir, { recursive: true });
   }
-  if (!fs.existsSync(localDir)) {
-    fs.mkdirSync(localDir, { recursive: true });
-  }
-  return localDir;
+  return defaultDir;
 };
 
 // ─── Parse Segment Filename Timestamps ─────────────────────────────────────────
@@ -136,15 +142,25 @@ export const resolveCameraFromSlug = async (rawSlug: string): Promise<CameraDocu
 
     const camSlug = cam.serialNumber.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
     const nameSlug = cam.name.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
+    const camSlugClean = cam.serialNumber.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const nameSlugClean = cam.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const rawClean = rawSlug.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const cleanClean = cleanSlug.replace(/[^a-z0-9]/g, "");
+
     if (
-      camSlug === cleanSlug ||
-      camSlug === rawSlug.toLowerCase() ||
-      nameSlug === cleanSlug ||
-      nameSlug === rawSlug.toLowerCase()
+      camSlugClean === cleanClean ||
+      camSlugClean === rawClean ||
+      nameSlugClean === cleanClean ||
+      nameSlugClean === rawClean
     ) {
       return cam;
     }
   }
+
+  const available = allCameras.map((c) => `'${c.name}' (serial: ${c.serialNumber}, id: ${c._id})`).join(", ");
+  logger.warn(
+    `[RecordingSweeper] No camera matched stream slug '${rawSlug}' (cleaned: '${cleanSlug}'). Registered cameras in DB: [${available || "none"}]`
+  );
 
   return null;
 };
@@ -342,11 +358,16 @@ export const sweepRecordingSpool = async (): Promise<void> => {
   isSweeping = true;
 
   try {
-    const spoolDir = resolveSpoolDirectory();
-    const files = getSegmentFiles(spoolDir);
+    const spoolDirs = getSpoolDirectories();
+    const files: string[] = [];
+    for (const dir of spoolDirs) {
+      files.push(...getSegmentFiles(dir));
+    }
 
     if (files.length > 0) {
-      logger.debug(`[RecordingSweeper] Found ${files.length} segment file(s) in spool`);
+      logger.debug(
+        `[RecordingSweeper] Found ${files.length} segment file(s) across spool directories: ${spoolDirs.join(", ")}`
+      );
     }
 
     // Process up to 10 files per sweep tick to prevent event-loop congestion

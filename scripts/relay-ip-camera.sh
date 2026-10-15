@@ -28,17 +28,24 @@ if [ "$#" -lt 1 ]; then
 fi
 
 LOCAL_RTSP="$1"
-PATH_NAME="${2:-ip_camera_01}"
+RAW_INPUT="${2:-cam_01}"
+
+# Strip existing raw_/live_ prefixes and normalize to lowercase slug
+CLEAN_SLUG=$(echo "${RAW_INPUT}" | sed -E 's/^(raw_|live_)//' | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_-' '-')
+INGEST_PATH="raw_${CLEAN_SLUG}"
+PLAYBACK_PATH="live_${CLEAN_SLUG}"
 RTSP_HOST="${RTSP_HOST:-api-cctv-backend.duckdns.org:8554}"
-VPS_RTSP="rtsp://${RTSP_HOST}/${PATH_NAME}"
+VPS_RTSP="rtsp://${RTSP_HOST}/${INGEST_PATH}"
 
 echo ""
 echo "=================================================================="
 echo "📹 CCTV Platform — Physical IP Camera Bridge"
 echo "=================================================================="
-echo "  Physical Camera : ${LOCAL_RTSP}"
-echo "  Relaying to VPS : ${VPS_RTSP}"
-echo "  Admin Stream ID : ${PATH_NAME}"
+echo "  Physical Camera  : ${LOCAL_RTSP}"
+echo "  Relaying to VPS  : ${VPS_RTSP}"
+echo "  Camera Slug (DB) : ${CLEAN_SLUG}"
+echo "  Live Playback ID : ${PLAYBACK_PATH}"
+echo "  Recording Engine : AUTO-ENABLED (MediaMTX raw_ pattern)"
 echo "=================================================================="
 echo ""
 
@@ -82,7 +89,9 @@ if ! kill -0 "${FFMPEG_PID}" 2>/dev/null; then
 fi
 
 echo "✅ Camera is streaming live to VPS!"
-echo "   Watch in Admin Panel → Live Grid → Camera: ${PATH_NAME}"
+echo "   Live WebRTC Stream: ${PLAYBACK_PATH}"
+echo "   Admin Panel Camera: match Serial Number or Name with '${CLEAN_SLUG}'"
+echo "   Recording: fMP4 chunks are saving under /app/recordings/${INGEST_PATH}/"
 echo ""
 
 wait "${FFMPEG_PID}"
