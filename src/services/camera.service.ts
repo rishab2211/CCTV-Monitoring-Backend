@@ -265,9 +265,9 @@ export const listCameras = async (
       .sort({ [sortBy]: sortDir })
       .skip(skip)
       .limit(limit)
-      .populate("customerId", "name email phone")
+      .populate("customerId", "name email phone address")
       .populate("operatorIds", "name email phone")
-      .populate("franchiseId", "name email phone")
+      .populate("franchiseId", "name email phone territory address")
       .lean(),
     Camera.countDocuments(filter),
   ]);
@@ -288,6 +288,35 @@ export const listCameras = async (
     }
   } catch {
     // Non-fatal fallback to DB stored status
+  }
+
+  // Normalize client fields: top-level lastPing, customerName, franchiseName, and address fallback
+  for (const cam of data as any[]) {
+    cam.lastPing = cam.health?.lastPing || cam.lastPing || null;
+    cam.customerName = (cam.customerId as any)?.name || cam.customerName || null;
+    cam.franchiseName = (cam.franchiseId as any)?.name || cam.franchiseName || null;
+
+    const hasStreet = Boolean(cam.location?.street?.trim());
+    const hasCity = Boolean(cam.location?.city?.trim());
+    if (!hasStreet && !hasCity) {
+      if ((cam.customerId as any)?.address) {
+        const custAddr = (cam.customerId as any).address;
+        cam.location = {
+          ...cam.location,
+          street: custAddr.street || "",
+          city: custAddr.city || "",
+          state: custAddr.state || "",
+          pincode: custAddr.pincode || "",
+        };
+      } else if ((cam.franchiseId as any)?.territory) {
+        const terr = (cam.franchiseId as any).territory;
+        cam.location = {
+          ...cam.location,
+          city: terr.city || "",
+          state: terr.state || "",
+        };
+      }
+    }
   }
 
   return {
@@ -318,7 +347,10 @@ export const getCameraById = async (
     throw ApiError.badRequest("Invalid camera ID format");
   }
 
-  const camera = await Camera.findOne({ _id: id, isDeleted: false });
+  const camera = await Camera.findOne({ _id: id, isDeleted: false })
+    .populate("customerId", "name email phone address")
+    .populate("operatorIds", "name email phone")
+    .populate("franchiseId", "name email phone territory address");
   if (!camera) throw ApiError.notFound("Camera");
 
   await validateCameraAccess(camera, user);
