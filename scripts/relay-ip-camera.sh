@@ -54,6 +54,19 @@ if ! command -v ffmpeg > /dev/null 2>&1; then
   exit 1
 fi
 
+# Auto-detect video codec
+echo "🔍 Probing camera stream codecs..."
+CODEC=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 -rtsp_transport tcp "${LOCAL_RTSP}" 2>/dev/null || echo "h264")
+
+if [ "${CODEC}" = "hevc" ] || [ "${CODEC}" = "h265" ]; then
+  echo "⚠️  Camera video is HEVC (H.265). Web browsers require H.264 for WebRTC."
+  echo "   Enabling ultra-fast zero-latency H.264 transcode (-c:v libx264)..."
+  V_ENCODER=(-c:v libx264 -preset ultrafast -tune zerolatency)
+else
+  echo "✅ Camera video is ${CODEC}. Using stream copy (-c:v copy)."
+  V_ENCODER=(-c:v copy)
+fi
+
 cleanup() {
   echo ""
   echo "🛑 Stopping camera relay..."
@@ -70,7 +83,7 @@ ffmpeg \
   -loglevel warning \
   -rtsp_transport tcp \
   -i "${LOCAL_RTSP}" \
-  -c:v copy \
+  "${V_ENCODER[@]}" \
   -c:a libopus \
   -b:a 64k \
   -async 50 \
