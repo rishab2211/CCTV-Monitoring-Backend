@@ -23,6 +23,7 @@ import { auditRouter, activityRouter } from "./audit.routes";
 import ticketRoutes from "./ticket.routes";
 import settingRoutes from "./setting.routes";
 import healthRoutes from "./health.routes";
+import gb28181Routes from "./gb28181.routes";
 
 const router = Router();
 
@@ -51,6 +52,7 @@ router.use("/", roleRoutes);
 
 // ─── Module 4: Camera Management ─────────────────────────────────────────────
 router.use("/cameras", cameraRoutes);
+router.use("/gb28181", gb28181Routes);
 
 // ─── Module 5: Streaming ─────────────────────────────────────────────────────────
 // streamRoutes handles: /streams/start, /streams/stop, /streams/auth, /streams/:cameraId/...

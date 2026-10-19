@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  # ZLMediaKit: Ultra-High-Performance GB28181 SIP & RTP PS Demuxer Gateway
+  zlmediakit:
+    image: panjjo/zlmediakit:latest
+    container_name: cctv_gb28181_gateway
+    restart: always
+    network_mode: host
+    environment:
+      - DOCKER_RESTART=always
+    volumes:
+      - ./zlmediakit.ini:/opt/media/conf/config.ini
+    # Using network_mode: host gives maximum kernel performance for dynamic RTP port range (10000-20000 UDP)
+    # and binds SIP :5060, MediaMTX RTSP :8554, WebRTC :8889 directly to the host network stack.
+
+  # MediaMTX: WebRTC WHEP / HLS Fanout & 24/7 S3 fMP4 Recording Node
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: cctv_mediamtx
+    restart: always
+    network_mode: host
+    volumes:
+      - ../mediamtx.yml:/mediamtx.yml
+      - ../recordings:/recordings

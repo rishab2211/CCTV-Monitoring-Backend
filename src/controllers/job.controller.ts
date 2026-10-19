@@ -121,11 +121,14 @@ export const submitChecklist = catchAsync(async (req: Request, res: Response) =>
 export const uploadJobPhotos = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
 
-  const filePaths = req.files
-    ? (req.files as Express.Multer.File[]).map((f) => `/uploads/${f.filename}`)
-    : [];
+  let filePaths: string[] = [];
+  if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+    filePaths = (req.files as Express.Multer.File[]).map((f) => `/uploads/${f.filename}`);
+  } else if (req.body.photos && Array.isArray(req.body.photos)) {
+    filePaths = req.body.photos;
+  }
 
-  if (filePaths.length === 0) throw ApiError.badRequest("No photo files provided");
+  if (filePaths.length === 0) throw ApiError.badRequest("No photo files or URLs provided");
 
   const job = await jobService.uploadJobPhotos(req.params.id, filePaths, req.user);
   res.status(200).json(new ApiResponse(200, { job }, `${filePaths.length} photo(s) uploaded`));
@@ -139,10 +142,16 @@ export const uploadJobPhotos = catchAsync(async (req: Request, res: Response) =>
 export const uploadCustomerSignature = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
 
+  let signaturePath = "";
   const files = req.files as Express.Multer.File[];
-  if (!files || files.length === 0) throw ApiError.badRequest("No signature file provided");
+  if (files && files.length > 0) {
+    signaturePath = `/uploads/${files[0].filename}`;
+  } else if (req.body.signature) {
+    signaturePath = req.body.signature;
+  }
 
-  const signaturePath = `/uploads/${files[0].filename}`;
+  if (!signaturePath) throw ApiError.badRequest("No signature file or data provided");
+
   const job = await jobService.uploadCustomerSignature(req.params.id, signaturePath, req.user);
   res.status(200).json(new ApiResponse(200, { job }, "Customer signature uploaded"));
 });

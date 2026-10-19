@@ -34,7 +34,7 @@ RAW_INPUT="${2:-cam_01}"
 CLEAN_SLUG=$(printf "%s" "${RAW_INPUT}" | sed -E 's/^(raw_|live_)//' | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_-]/-/g' | sed -E 's/^-+|-+$//g')
 INGEST_PATH="live_${CLEAN_SLUG}"
 PLAYBACK_PATH="live_${CLEAN_SLUG}"
-RTSP_HOST="${RTSP_HOST:-200.141.12.143:8554}"
+RTSP_HOST="${RTSP_HOST:-api-cctv-backend.duckdns.org:8554}"
 VPS_RTSP="rtsp://${RTSP_HOST}/${INGEST_PATH}"
 
 echo ""

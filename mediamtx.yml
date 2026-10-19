@@ -40,6 +40,18 @@ paths:
     source: publisher
     maxReaders: 50
 
+  # ── Direct Live Feeds with Auto-Recording (Pre-transcoded on-prem) ───────────
+  # For streams pre-transcoded on customer premises (e.g. relay-ip-camera.sh or on-prem relay agent)
+  # Records fMP4 segments directly while serving low-latency WebRTC readers.
+  "~^live_([a-zA-Z0-9_-]+)$":
+    source: publisher
+    record: yes
+    recordPath: ./recordings/%path/%Y-%m-%d_%H-%M-%S
+    recordFormat: fmp4
+    recordPartDuration: 1s
+    recordSegmentDuration: 120s
+    recordDeleteAfter: 2h
+
   # ── Standardized Dynamic Camera Ingestion & Audio Transcoding ─────────────────
   # Automatically transcodes incoming camera audio (AAC/PCM) to Opus for instant WebRTC browser playback.
   # Video (H.264) is stream-copied (-c:v copy) for sub-millisecond latency and zero CPU re-encoding.
