@@ -57,6 +57,7 @@ fi
 # Auto-detect video codec
 echo "🔍 Probing camera stream codecs..."
 CODEC=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 -rtsp_transport tcp "${LOCAL_RTSP}" 2>/dev/null || echo "h264")
+sleep 1
 
 if [ "${CODEC}" = "hevc" ] || [ "${CODEC}" = "h265" ]; then
   echo "⚠️  Camera video is HEVC (H.265). Web browsers require H.264 for WebRTC."
@@ -67,45 +68,44 @@ else
   V_ENCODER=(-c:v copy)
 fi
 
+RUNNING=1
 cleanup() {
   echo ""
   echo "🛑 Stopping camera relay..."
+  RUNNING=0
   kill "${FFMPEG_PID}" 2>/dev/null || true
   exit 0
 }
 trap cleanup INT TERM
 
 echo "🚀 Connecting to physical camera and relaying to VPS..."
-echo "   Press Ctrl+C to stop."
-echo ""
-
-ffmpeg \
-  -loglevel warning \
-  -fflags +genpts \
-  -rtsp_transport tcp \
-  -i "${LOCAL_RTSP}" \
-  "${V_ENCODER[@]}" \
-  -c:a libopus \
-  -b:a 64k \
-  -af "aresample=async=1000" \
-  -rtsp_transport tcp \
-  -f rtsp \
-  "${VPS_RTSP}" &
-
-FFMPEG_PID=$!
-
-sleep 3
-
-if ! kill -0 "${FFMPEG_PID}" 2>/dev/null; then
-  echo "❌ Failed to connect to local camera."
-  echo "   Check: 1) Camera IP address, 2) Username/Password, 3) RTSP port 554."
-  exit 1
-fi
-
-echo "✅ Camera is streaming live to VPS!"
 echo "   Live WebRTC Stream: ${PLAYBACK_PATH}"
 echo "   Admin Panel Camera: match Serial Number or Name with '${CLEAN_SLUG}'"
 echo "   Recording: fMP4 chunks are saving under /app/recordings/${INGEST_PATH}/"
+echo "   Press Ctrl+C to stop."
 echo ""
 
-wait "${FFMPEG_PID}"
+while [ "${RUNNING}" -eq 1 ]; do
+  ffmpeg \
+    -loglevel warning \
+    -timeout 5000000 \
+    -fflags +genpts+discardcorrupt \
+    -rtsp_transport tcp \
+    -i "${LOCAL_RTSP}" \
+    "${V_ENCODER[@]}" \
+    -avoid_negative_ts make_zero \
+    -c:a libopus \
+    -b:a 64k \
+    -af "aresample=async=1:first_pts=0" \
+    -rtsp_transport tcp \
+    -f rtsp \
+    "${VPS_RTSP}" &
+
+  FFMPEG_PID=$!
+  wait "${FFMPEG_PID}" || true
+
+  if [ "${RUNNING}" -eq 1 ]; then
+    echo "⚠️ Camera stream disconnected or Wi-Fi packet dropped. Reconnecting in 2 seconds..."
+    sleep 2
+  fi
+done
