@@ -34,6 +34,16 @@ const cameraSchema = new Schema<CameraDocument>(
       trim: true,
       maxlength: 100,
     },
+    brand: {
+      type: String,
+      enum: ["icsee", "hikvision", "dahua", "tapo", "reolink", "generic"],
+      default: "generic",
+    },
+    ip: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     rtspUrl: {
       type: String,
       required: [true, "RTSP URL is required"],
@@ -113,6 +123,23 @@ const cameraSchema = new Schema<CameraDocument>(
       type: String,
       default: null,
     },
+    gb28181: {
+      deviceId: { type: String, trim: true, default: null },
+      serverId: { type: String, default: "34020000002000000001" },
+      serverDomain: { type: String, default: "3402000000" },
+      sipPassword: { type: String, default: "cctv_secret_pass" },
+      sipPort: { type: Number, default: 5060 },
+      heartbeatInterval: { type: Number, default: 60 },
+      lastKeepalive: { type: Date, default: null },
+      natIp: { type: String, default: "" },
+      natPort: { type: Number, default: 0 },
+      channelId: { type: String, default: null },
+      streamMode: {
+        type: String,
+        enum: ["gb28181", "rtsp_relay"],
+        default: "gb28181",
+      },
+    },
     isDeleted: {
       type: Boolean,
       default: false,
@@ -164,6 +191,7 @@ cameraSchema.index({ franchiseId: 1, isDeleted: 1 });
 cameraSchema.index({ status: 1 });
 cameraSchema.index({ "settings.talkbackEnabled": 1 });
 cameraSchema.index({ serialNumber: 1, isDeleted: 1 });
+cameraSchema.index({ "gb28181.deviceId": 1 });
 
 // ─── Model ───────────────────────────────────────────────────────────────────
 

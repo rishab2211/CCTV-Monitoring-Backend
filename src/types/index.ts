@@ -215,6 +215,8 @@ export interface ICamera {
   _id: Types.ObjectId;
   name: string;
   serialNumber: string;
+  brand?: string;
+  ip?: string;
   rtspUrl: string;
   status: CameraStatus;
   customerId?: Types.ObjectId;
@@ -224,11 +226,46 @@ export interface ICamera {
   location?: ICameraLocation;
   health: ICameraHealth;
   settings: ICameraSettings;
+  gb28181?: IGB28181Config;
   qrCode?: string;
   isDeleted: boolean;
   deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export type StreamMode = "gb28181" | "rtsp_relay";
+
+export interface IGB28181Config {
+  deviceId: string;
+  serverId?: string;
+  serverDomain?: string;
+  sipPassword?: string;
+  sipPort?: number;
+  heartbeatInterval?: number;
+  lastKeepalive?: Date | null;
+  natIp?: string;
+  natPort?: number;
+  channelId?: string;
+  streamMode?: StreamMode;
+}
+
+export type PTZDirection =
+  | "left"
+  | "right"
+  | "up"
+  | "down"
+  | "upleft"
+  | "upright"
+  | "downleft"
+  | "downright"
+  | "zoomin"
+  | "zoomout"
+  | "stop";
+
+export interface IPTZCommand {
+  direction: PTZDirection;
+  speed?: number; // 1 to 255 (default 32)
 }
 
 export interface ICameraLocation {

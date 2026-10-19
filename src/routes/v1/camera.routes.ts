@@ -5,6 +5,8 @@ import { permit } from "../../middleware/permit";
 import { validate } from "../../middleware/validate";
 import {
   createCameraSchema,
+  provisionCameraSchema,
+  buildRtspUrlSchema,
   updateCameraSchema,
   assignCameraSchema,
   transferCameraSchema,
@@ -14,6 +16,7 @@ import {
   cameraIdParamSchema,
   customerIdParamSchema,
   operatorIdParamSchema,
+  ptzCommandSchema,
 } from "../../validators/camera.validator";
 
 const router = Router();
@@ -59,6 +62,42 @@ router.post(
   tenantScope,
   validate(createCameraSchema),
   cameraController.createCamera
+);
+
+/** POST /api/v1/cameras/build-rtsp-url - Deterministically build brand RTSP URL */
+router.post(
+  "/build-rtsp-url",
+  permit("cameras:write"),
+  validate(buildRtspUrlSchema),
+  cameraController.buildRtspUrl
+);
+
+/** POST /api/v1/cameras/provision - Atomically provision camera with stream & relay config */
+router.post(
+  "/provision",
+  permit("cameras:write"),
+  tenantScope,
+  validate(provisionCameraSchema),
+  cameraController.provisionCamera
+);
+
+/** GET /api/v1/cameras/:id/stream-status - Live MediaMTX stream telemetry & reader count */
+router.get(
+  "/:id/stream-status",
+  permit("cameras:read"),
+  tenantScope,
+  validate(cameraIdParamSchema, "params"),
+  cameraController.getCameraStreamStatus
+);
+
+/** POST /api/v1/cameras/:id/ptz - Move camera PTZ motor via GB28181 MANSCDP */
+router.post(
+  "/:id/ptz",
+  permit("cameras:configure", "cameras:read"),
+  tenantScope,
+  validate(cameraIdParamSchema, "params"),
+  validate(ptzCommandSchema),
+  cameraController.sendPtzCommand
 );
 
 /** GET /api/v1/cameras/:id - Fetch details of single camera */

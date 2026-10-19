@@ -38,11 +38,30 @@ const rtspUrlSchema = z
   .trim()
   .regex(/^(rtsp|rtsps|http|https):\/\/[^\s]+$/, "Must be a valid RTSP or HTTP(S) stream URL");
 
+export const cameraBrandEnum = z.enum(["icsee", "hikvision", "dahua", "tapo", "reolink", "generic"]);
+export type CameraBrand = z.infer<typeof cameraBrandEnum>;
+
+// ─── Build RTSP URL Validator ──────────────────────────────────────────────────
+
+export const buildRtspUrlSchema = z.object({
+  brand: cameraBrandEnum.default("generic"),
+  ip: z.string().trim().min(1, "IP address is required"),
+  port: z.coerce.number().int().min(1).max(65535).default(554).optional(),
+  username: z.string().trim().min(1, "Username is required"),
+  password: z.string().default("").optional(),
+  channel: z.coerce.number().int().min(1).default(1).optional(),
+  stream: z.enum(["main", "sub"]).default("main").optional(),
+});
+
+export type BuildRtspUrlInput = z.infer<typeof buildRtspUrlSchema>;
+
 // ─── Create Camera Validator ──────────────────────────────────────────────────
 
 export const createCameraSchema = z.object({
   name: z.string().min(2).max(100).trim(),
   serialNumber: z.string().min(2).max(100).trim(),
+  brand: cameraBrandEnum.optional(),
+  ip: z.string().trim().optional(),
   rtspUrl: rtspUrlSchema,
   location: cameraLocationSchema,
   settings: cameraSettingsSchema,
@@ -51,10 +70,62 @@ export const createCameraSchema = z.object({
 
 export type CreateCameraInput = z.infer<typeof createCameraSchema>;
 
+// ─── Provision Camera Validator ───────────────────────────────────────────────
+
+export const provisionCameraSchema = z.object({
+  name: z.string().min(2).max(100).trim(),
+  serialNumber: z.string().min(2).max(100).trim(),
+  brand: cameraBrandEnum.default("generic").optional(),
+  ip: z.string().trim().optional(),
+  port: z.coerce.number().int().min(1).max(65535).default(554).optional(),
+  username: z.string().trim().optional(),
+  password: z.string().optional(),
+  channel: z.coerce.number().int().min(1).default(1).optional(),
+  stream: z.enum(["main", "sub"]).default("main").optional(),
+  rtspUrl: rtspUrlSchema.or(z.literal("")).optional(),
+  customerId: objectIdSchema.or(z.literal("")).nullable().optional(),
+  franchiseId: objectIdSchema.or(z.literal("")).nullable().optional(),
+  jobId: objectIdSchema.or(z.literal("")).nullable().optional(),
+  streamMode: z.enum(["gb28181", "rtsp_relay"]).default("gb28181").optional(),
+  gb28181: z
+    .object({
+      deviceId: z.string().trim().optional(),
+      sipPassword: z.string().optional(),
+    })
+    .optional(),
+  location: cameraLocationSchema,
+  settings: cameraSettingsSchema,
+});
+
+export type ProvisionCameraInput = z.infer<typeof provisionCameraSchema>;
+
+// ─── PTZ Command Validator ───────────────────────────────────────────────────
+
+export const ptzCommandSchema = z.object({
+  direction: z.enum([
+    "left",
+    "right",
+    "up",
+    "down",
+    "upleft",
+    "upright",
+    "downleft",
+    "downright",
+    "zoomin",
+    "zoomout",
+    "stop",
+  ]),
+  speed: z.coerce.number().int().min(1).max(255).default(32).optional(),
+});
+
+export type PTZCommandInput = z.infer<typeof ptzCommandSchema>;
+
 // ─── Update Camera Validator ──────────────────────────────────────────────────
 
 export const updateCameraSchema = z.object({
   name: z.string().min(2).max(100).trim().optional(),
+  brand: cameraBrandEnum.optional(),
+  ip: z.string().trim().optional(),
   rtspUrl: rtspUrlSchema.optional(),
   location: cameraLocationSchema,
   settings: cameraSettingsSchema,

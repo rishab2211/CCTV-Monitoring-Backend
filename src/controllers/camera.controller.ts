@@ -218,3 +218,56 @@ export const getCameraConfig = catchAsync(async (req: Request, res: Response) =>
   const config = await cameraService.getCameraConfig(req.params.id, req.user);
   res.status(200).json(new ApiResponse(200, { config }));
 });
+
+/**
+ * Build Brand RTSP URL Endpoint
+ * POST /api/v1/cameras/build-rtsp-url
+ */
+export const buildRtspUrl = catchAsync(async (req: Request, res: Response) => {
+  const rtspUrl = cameraService.buildBrandRtspUrl(req.body);
+  res.status(200).json(new ApiResponse(200, { rtspUrl }));
+});
+
+/**
+ * Provision Camera Endpoint
+ * POST /api/v1/cameras/provision
+ * Complete onboarding: creates camera, builds stream paths, assigns QR code,
+ * links installation job, and returns relay commands.
+ */
+export const provisionCamera = catchAsync(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const result = await cameraService.provisionCamera(
+    req.body,
+    req.user.userId,
+    req.franchiseScope
+  );
+  res.status(201).json(new ApiResponse(201, result, "Camera provisioned successfully"));
+});
+
+/**
+ * Get Camera Stream Status Endpoint
+ * GET /api/v1/cameras/:id/stream-status
+ * Inspects live stream status and readers directly from MediaMTX.
+ */
+export const getCameraStreamStatus = catchAsync(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const status = await cameraService.getCameraStreamStatus(req.params.id, req.user);
+  res.status(200).json(new ApiResponse(200, status));
+});
+
+/**
+ * Send PTZ Command Endpoint
+ * POST /api/v1/cameras/:id/ptz
+ * Dispatches directional PTZ movement or stop to physical camera via GB28181 MANSCDP.
+ */
+export const sendPtzCommand = catchAsync(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const result = await cameraService.sendCameraPtzCommand(
+    req.params.id,
+    req.body,
+    req.user
+  );
+  res.status(200).json(new ApiResponse(200, result, "PTZ command dispatched successfully"));
+});
+
+

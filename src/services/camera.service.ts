@@ -17,7 +17,14 @@ import {
   AssignCameraInput,
   ListCamerasQuery,
   HeartbeatInput,
+  BuildRtspUrlInput,
+  ProvisionCameraInput,
+  PTZCommandInput,
 } from "../validators/camera.validator";
+import crypto from "crypto";
+import { generateGb28181DeviceId } from "../utils/gb28181";
+import { dispatchPtzCommand } from "./gb28181/ptz.service";
+import { env } from "../config/env";
 import { logger } from "../utils/logger";
 import {
   listMediaMTXPaths,
@@ -122,6 +129,9 @@ export const createCamera = async (
   if (exists) {
     throw ApiError.conflict(`A camera with serial number "${input.serialNumber}" already exists`);
   }
+
+  // Purge any stale soft-deleted document with identical serial to prevent unique index collision
+  await Camera.deleteMany({ serialNumber: input.serialNumber, isDeleted: true });
 
   const camera = await Camera.create({
     ...input,
@@ -945,4 +955,260 @@ export const syncLiveCameraStatuses = async (): Promise<void> => {
   } catch (err: any) {
     logger.warn(`[Presence Sync] Background check error: ${err?.message || err}`);
   }
+};
+
+// ─── Automated Camera Provisioning & Stream Status ─────────────────────────────
+
+export interface BrandRtspOptions {
+  brand: "icsee" | "hikvision" | "dahua" | "tapo" | "reolink" | "generic";
+  ip: string;
+  port?: number;
+  username: string;
+  password?: string;
+  channel?: number;
+  stream?: "main" | "sub";
+}
+
+/**
+ * Deterministically constructs brand-specific RTSP URLs.
+ */
+export const buildBrandRtspUrl = (opts: BrandRtspOptions): string => {
+  const port = opts.port || 554;
+  const ch = opts.channel || 1;
+  const s = opts.stream === "sub" ? 1 : 0;
+  const auth = opts.password
+    ? `${opts.username}:${opts.password}@`
+    : `${opts.username}@`;
+
+  switch (opts.brand) {
+    case "icsee":
+      // Xiongmai / iCSee standard format (must include credentials in query params)
+      return `rtsp://${opts.username}:${opts.password || ""}@${opts.ip}:${port}/user=${opts.username}&password=${opts.password || ""}&channel=${ch}&stream=${s}.sdp?real_stream`;
+    case "hikvision":
+      return `rtsp://${auth}${opts.ip}:${port}/Streaming/Channels/${ch}0${s + 1}`;
+    case "dahua":
+      return `rtsp://${auth}${opts.ip}:${port}/cam/realmonitor?channel=${ch}&subtype=${s}`;
+    case "tapo":
+      return `rtsp://${auth}${opts.ip}:${port}/stream${s + 1}`;
+    case "reolink":
+      return `rtsp://${auth}${opts.ip}:${port}/h264Preview_0${ch}_${s === 0 ? "main" : "sub"}`;
+    default:
+      return `rtsp://${auth}${opts.ip}:${port}/live`;
+  }
+};
+
+/**
+ * Atomically provisions a camera entity, builds stream configuration,
+ * creates pairing QR secret, links optional installation jobs, and returns
+ * ready-to-use relay commands for on-prem bridges.
+ */
+export const provisionCamera = async (
+  input: ProvisionCameraInput,
+  createdBy: string,
+  franchiseScope?: string | null
+) => {
+  // 1. Resolve RTSP URL
+  let resolvedRtspUrl = input.rtspUrl?.trim();
+  if (!resolvedRtspUrl) {
+    if (!input.ip || !input.username) {
+      throw ApiError.badRequest("Either a valid rtspUrl or IP address and username must be provided");
+    }
+    resolvedRtspUrl = buildBrandRtspUrl({
+      brand: input.brand || "generic",
+      ip: input.ip,
+      port: input.port,
+      username: input.username,
+      password: input.password,
+      channel: input.channel,
+      stream: input.stream,
+    });
+  }
+
+  // 2. Check unique serial number
+  const exists = await Camera.findOne({ serialNumber: input.serialNumber, isDeleted: false });
+  if (exists) {
+    throw ApiError.conflict(`A camera with serial number "${input.serialNumber}" already exists`);
+  }
+
+  // Purge any stale soft-deleted document with identical serial to prevent unique index collision
+  await Camera.deleteMany({ serialNumber: input.serialNumber, isDeleted: true });
+
+  // 3. Create camera in DB
+  const cameraCount = await Camera.countDocuments();
+  const gbDeviceId = input.gb28181?.deviceId || generateGb28181DeviceId(cameraCount + 1);
+  const gbPassword = input.gb28181?.sipPassword || crypto.randomBytes(4).toString("hex");
+
+  const camera = await Camera.create({
+    name: input.name,
+    serialNumber: input.serialNumber,
+    brand: input.brand || "generic",
+    ip: input.ip || "",
+    rtspUrl: resolvedRtspUrl,
+    customerId: input.customerId && input.customerId.trim() ? input.customerId.trim() : undefined,
+    franchiseId: franchiseScope || (input.franchiseId && input.franchiseId.trim() ? input.franchiseId.trim() : undefined),
+    location: input.location,
+    settings: input.settings,
+    gb28181: {
+      deviceId: gbDeviceId,
+      serverId: "34020000002000000001",
+      serverDomain: "3402000000",
+      sipPassword: gbPassword,
+      sipPort: 5060,
+      heartbeatInterval: 60,
+      streamMode: input.streamMode || "gb28181",
+    },
+    status: "offline",
+    health: {
+      cpuUsage: 0,
+      memoryUsage: 0,
+      temperature: 0,
+      storageUsage: 0,
+      lastPing: null,
+    },
+  });
+
+  // Assign permanent QR code identifier if not set
+  if (!camera.qrCode) {
+    camera.qrCode = `CAM-${camera._id}`;
+    await camera.save();
+  }
+
+  // 4. If jobId provided, link camera to InstallationJob
+  if (input.jobId && input.jobId.trim()) {
+    const { InstallationJob } = await import("../models/InstallationJob");
+    await InstallationJob.findByIdAndUpdate(input.jobId.trim(), {
+      $set: { cameraId: camera._id },
+    }).catch((err) => {
+      logger.warn(`[CameraProvision] Failed to associate camera with job ${input.jobId}: ${err.message}`);
+    });
+  }
+
+  // 5. Derive stream slugs and configs
+  const cleanSlug = toPathName(camera.serialNumber);
+  const livePath = `live_${cleanSlug}`;
+  const rawPath = `raw_${cleanSlug}`;
+
+  let vpsHost = "api-cctv-backend.duckdns.org";
+  if (env.PUBLIC_BASE_URL) {
+    try {
+      vpsHost = new URL(env.PUBLIC_BASE_URL).hostname;
+    } catch {
+      // fallback
+    }
+  }
+
+  const vpsIngestUrl = `rtsp://${vpsHost}:8554/${livePath}`;
+  const webrtcPlaybackUrl = `https://${vpsHost}/webrtc/${livePath}/whep`;
+
+  const relayCommand = `docker run -d --restart=always --name cctv_relay_${cleanSlug} -e LOCAL_RTSP="${resolvedRtspUrl}" -e VPS_RTSP="${vpsIngestUrl}" cctv-relay`;
+  const bashRelayCommand = `./scripts/relay-ip-camera.sh "${resolvedRtspUrl}" "${cleanSlug}"`;
+
+  const gb28181Config = {
+    sipServer: vpsHost,
+    sipPort: 5060,
+    serverDomain: "3402000000",
+    serverId: "34020000002000000001",
+    deviceId: gbDeviceId,
+    password: gbPassword,
+    qrPayload: JSON.stringify({
+      type: "GB28181_CONFIG",
+      sipServer: vpsHost,
+      sipPort: 5060,
+      serverDomain: "3402000000",
+      serverId: "34020000002000000001",
+      deviceId: gbDeviceId,
+      password: gbPassword,
+      serialNumber: camera.serialNumber,
+    }),
+  };
+
+  logActivity({
+    userId: createdBy === "system" ? camera._id : new mongoose.Types.ObjectId(createdBy),
+    action: "CAMERA_CREATED",
+    description: `Camera "${camera.name}" provisioned successfully via setup wizard`,
+    metadata: { cameraId: camera._id, serialNumber: camera.serialNumber, brand: input.brand },
+  });
+
+  logger.info(`✨ Camera provisioned: ${camera.name} (${camera.serialNumber}) with stream ${livePath}`);
+
+  return {
+    camera,
+    streamConfig: {
+      streamSlug: cleanSlug,
+      ingestPath: livePath,
+      rawPath,
+      vpsIngestUrl,
+      webrtcPlaybackUrl,
+    },
+    gb28181Config,
+    relayCommand,
+    bashRelayCommand,
+  };
+};
+
+/**
+ * Issues PTZ directional command to physical IP camera via GB28181 MANSCDP.
+ */
+export const sendCameraPtzCommand = async (
+  id: string,
+  input: PTZCommandInput,
+  user: JwtAccessPayload
+) => {
+  const camera = await Camera.findOne({ _id: id, isDeleted: false });
+  if (!camera) throw ApiError.notFound("Camera");
+  await validateCameraAccess(camera, user);
+
+  return dispatchPtzCommand({
+    cameraId: camera._id.toString(),
+    direction: input.direction,
+    speed: input.speed,
+  });
+};
+
+/**
+ * Live stream telemetry and path readiness inspection from MediaMTX.
+ */
+export const getCameraStreamStatus = async (
+  id: string,
+  user: JwtAccessPayload
+) => {
+  const camera = await Camera.findOne({ _id: id, isDeleted: false });
+  if (!camera) throw ApiError.notFound("Camera");
+  await validateCameraAccess(camera, user);
+
+  const cleanSlug = toPathName(camera.serialNumber);
+  const livePath = `live_${cleanSlug}`;
+  const rawPath = `raw_${cleanSlug}`;
+
+  // Check both direct live and raw paths in MediaMTX
+  const liveStatus = await getMediaMTXPathStatus(livePath);
+  let rawStatus = null;
+  if (!liveStatus) {
+    rawStatus = await getMediaMTXPathStatus(rawPath);
+  }
+
+  const activeStatus = liveStatus || rawStatus;
+  const isPublishing = Boolean(activeStatus && (activeStatus as any).ready);
+
+  // If status is ready in MediaMTX but offline in DB, update DB status
+  if (isPublishing && camera.status === "offline") {
+    camera.status = "online";
+    camera.health.lastPing = new Date();
+    await camera.save();
+    socketService.emitToCamera(camera._id.toString(), "camera_online", { cameraId: camera._id });
+  }
+
+  return {
+    cameraId: camera._id,
+    serialNumber: camera.serialNumber,
+    streamSlug: cleanSlug,
+    activePath: liveStatus ? livePath : rawStatus ? rawPath : livePath,
+    isLive: isPublishing,
+    ready: isPublishing,
+    tracks: activeStatus?.tracks || [],
+    bytesReceived: (activeStatus as any)?.bytesReceived || 0,
+    readersCount: (activeStatus as any)?.readers?.length || 0,
+    dbStatus: camera.status,
+    lastPing: camera.health?.lastPing || null,
+  };
 };
