@@ -49,12 +49,13 @@ export const isOriginAllowed = (origin: string | undefined): boolean => {
   // Explicit match in CORS_ORIGIN
   if (allowedOrigins.includes(origin)) return true;
 
-  // Development or staging mode: allow localhost and preview tunnels
+  // Localhost (any port) — always allow local frontend development & admin panel access
+  if (/^https?:\/\/localhost(:\d+)?$/.test(origin) || /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) {
+    return true;
+  }
+
+  // Staging / preview mode: allow preview tunnels
   if (env.NODE_ENV !== "production") {
-    // Localhost (any port)
-    if (/^http:\/\/localhost(:\d+)?$/.test(origin) || /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) {
-      return true;
-    }
 
     // Vercel preview or branch deployments
     if (origin.startsWith("https://") && (origin.endsWith(".vercel.app") || /^https:\/\/[a-z0-9\-.]+\.vercel\.app$/i.test(origin))) {
