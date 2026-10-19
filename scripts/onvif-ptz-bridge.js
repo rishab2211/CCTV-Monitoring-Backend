@@ -120,13 +120,34 @@ async function sendOnvifCommand(xml) {
   }
 }
 
+let lastMoveTime = 0;
+let pendingStopTimer = null;
+
 async function handlePtzDirection(direction, speed = 32) {
-  const normSpeed = Math.min(Math.max(speed / 64, 0.2), 1.0);
+  const normSpeed = Math.min(Math.max(speed / 64, 0.4), 1.0);
 
   if (direction === "stop") {
+    if (pendingStopTimer) clearTimeout(pendingStopTimer);
+    const elapsed = Date.now() - lastMoveTime;
+    const minStepMs = 600; // Allow physical motor to complete a clear visible step
+
+    if (elapsed < minStepMs) {
+      pendingStopTimer = setTimeout(async () => {
+        console.log("🛑 Motor STOP (step completed)");
+        await sendOnvifCommand(buildStopXml());
+      }, minStepMs - elapsed);
+      return true;
+    }
+
     console.log("🛑 Motor STOP");
     return await sendOnvifCommand(buildStopXml());
   }
+
+  if (pendingStopTimer) {
+    clearTimeout(pendingStopTimer);
+    pendingStopTimer = null;
+  }
+  lastMoveTime = Date.now();
 
   let x = 0.0;
   let y = 0.0;
