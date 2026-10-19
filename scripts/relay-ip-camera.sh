@@ -68,15 +68,30 @@ else
   V_ENCODER=(-c:v copy)
 fi
 
+CAMERA_IP=$(printf "%s" "${LOCAL_RTSP}" | sed -E 's|.*@([^:/]+).*|\1|')
+PTZ_PID=""
+
 RUNNING=1
 cleanup() {
   echo ""
-  echo "🛑 Stopping camera relay..."
+  echo "🛑 Stopping camera relay and PTZ bridge..."
   RUNNING=0
-  kill "${FFMPEG_PID}" 2>/dev/null || true
+  kill "${FFMPEG_PID:-}" 2>/dev/null || true
+  if [ -n "${PTZ_PID}" ]; then
+    kill "${PTZ_PID}" 2>/dev/null || true
+  fi
   exit 0
 }
 trap cleanup INT TERM
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PTZ_BRIDGE_SCRIPT="${SCRIPT_DIR}/onvif-ptz-bridge.js"
+
+if [ -f "${PTZ_BRIDGE_SCRIPT}" ] && command -v node > /dev/null 2>&1; then
+  echo "🎮 Starting background ONVIF PTZ Bridge for ${CAMERA_IP}..."
+  node "${PTZ_BRIDGE_SCRIPT}" "${CAMERA_IP}" "${CLEAN_SLUG}" &
+  PTZ_PID=$!
+fi
 
 echo "🚀 Connecting to physical camera and relaying to VPS..."
 echo "   Live WebRTC Stream: ${PLAYBACK_PATH}"
