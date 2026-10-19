@@ -11,6 +11,7 @@ import { buildPTZCmd } from "../../utils/gb28181";
 import { sipServerService } from "./sipServer.service";
 import { socketService } from "../socket.service";
 import { PTZDirection } from "../../types";
+import { toPathName } from "../../config/mediamtx.service";
 
 export interface SendPtzInput {
   cameraId: string;
@@ -41,14 +42,20 @@ export const dispatchPtzCommand = async (input: SendPtzInput): Promise<{
   const sent = await sipServerService.sendPTZCommand(camera, ptzCmdHex);
 
   // Emit real-time feedback over Socket.IO so all dashboard observers see the motor state
-  socketService.emitToCamera(cameraId, "camera_ptz_moved", {
+  const payload = {
     cameraId,
     direction,
     speed,
     ptzCmdHex,
     success: sent,
     timestamp: new Date(),
-  });
+  };
+
+  socketService.emitToCamera(cameraId, "camera_ptz_moved", payload);
+  const slug = toPathName(camera.serialNumber);
+  if (slug && slug !== cameraId) {
+    socketService.emitToCamera(slug, "camera_ptz_moved", payload);
+  }
 
   logger.info(`🎮 PTZ Command [${direction}] issued to camera "${camera.name}" (Result: ${sent ? "OK" : "QUEUED"})`);
 

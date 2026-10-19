@@ -30,17 +30,45 @@ console.log(`  Target Camera ID   : ${CAMERA_ID}`);
 console.log(`  Cloud Backend URL  : ${BACKEND_URL}`);
 console.log("==================================================================");
 
+const fs = require("fs");
+const path = require("path");
+const TOKEN_CACHE_FILE = path.join("/tmp", ".cctv_bridge_token.json");
+
 async function login() {
+  if (fs.existsSync(TOKEN_CACHE_FILE)) {
+    try {
+      const cached = JSON.parse(fs.readFileSync(TOKEN_CACHE_FILE, "utf-8"));
+      if (cached.token && cached.expiresAt && Date.now() < cached.expiresAt) {
+        return cached.token;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   const res = await fetch(`${BACKEND_URL}/api/v1/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
   });
   if (!res.ok) {
+    if (fs.existsSync(TOKEN_CACHE_FILE)) {
+      try {
+        const cached = JSON.parse(fs.readFileSync(TOKEN_CACHE_FILE, "utf-8"));
+        if (cached.token) return cached.token;
+      } catch {}
+    }
     throw new Error(`Login failed (${res.status}): ${await res.text()}`);
   }
   const data = await res.json();
-  return data.data.tokens.accessToken;
+  const token = data.data.tokens.accessToken;
+  try {
+    fs.writeFileSync(
+      TOKEN_CACHE_FILE,
+      JSON.stringify({ token, expiresAt: Date.now() + 6 * 3600 * 1000 })
+    );
+  } catch {}
+  return token;
 }
 
 function buildContinuousMoveXml(x, y, zoom = null) {
@@ -157,7 +185,7 @@ async function resolveCameraId(token, identifier) {
     });
     if (!res.ok) return identifier;
     const data = await res.json();
-    const cameras = data.data.cameras || [];
+    const cameras = data.data?.data || data.data?.cameras || (Array.isArray(data.data) ? data.data : []);
     const words = identifier.toLowerCase().split(/[_-]+/).filter(Boolean);
     const match = cameras.find(c => {
       const haystack = `${c.name} ${c.serialNumber} ${c.rtspUrl} ${c._id}`.toLowerCase();
