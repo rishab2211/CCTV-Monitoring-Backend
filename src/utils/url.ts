@@ -11,11 +11,11 @@ import { env } from "../config/env";
  */
 export const getPublicBaseUrl = (req?: Request): string => {
   if (env.PUBLIC_BASE_URL) {
-    return env.PUBLIC_BASE_URL.replace(/\/$/, "");
+    return env.PUBLIC_BASE_URL.replace(/^["']|["']$/g, "").replace(/\/$/, "");
   }
 
   if (env.RENDER_EXTERNAL_URL) {
-    return env.RENDER_EXTERNAL_URL.replace(/\/$/, "");
+    return env.RENDER_EXTERNAL_URL.replace(/^["']|["']$/g, "").replace(/\/$/, "");
   }
 
   if (req) {

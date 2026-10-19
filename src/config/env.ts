@@ -51,19 +51,19 @@ const envSchema = z.object({
   // Public URLs & Deployment
   // PUBLIC_BASE_URL: primary URL for this service (e.g. https://api.yourdomain.com).
   // On AWS ECS, set this via SSM Parameter Store / task definition environment.
-  PUBLIC_BASE_URL: z.string().optional(),
+  PUBLIC_BASE_URL: z.string().optional().transform((v) => (v ? v.replace(/^["']|["']$/g, "").trim() : v)),
   // RENDER_EXTERNAL_URL: kept for backwards-compat with local dev on Render; ignored on AWS.
-  RENDER_EXTERNAL_URL: z.string().optional(),
+  RENDER_EXTERNAL_URL: z.string().optional().transform((v) => (v ? v.replace(/^["']|["']$/g, "").trim() : v)),
   ENABLE_DEMO_FEEDS: z
     .string()
     .default("false")
     .transform((v) => v === "true"),
 
   // MediaMTX Internal & External
-  MEDIAMTX_URL: z.string().default("http://127.0.0.1:8889"),
-  MEDIAMTX_INTERNAL_HLS_URL: z.string().default("http://127.0.0.1:8888"),
-  MEDIAMTX_INTERNAL_WEBRTC_URL: z.string().default("http://127.0.0.1:8889"),
-  MEDIAMTX_API_URL: z.string().default("http://127.0.0.1:9997/v3"),
+  MEDIAMTX_URL: z.string().default("http://127.0.0.1:8889").transform((v) => v.replace(/^["']|["']$/g, "").trim()),
+  MEDIAMTX_INTERNAL_HLS_URL: z.string().default("http://127.0.0.1:8888").transform((v) => v.replace(/^["']|["']$/g, "").trim()),
+  MEDIAMTX_INTERNAL_WEBRTC_URL: z.string().default("http://127.0.0.1:8889").transform((v) => v.replace(/^["']|["']$/g, "").trim()),
+  MEDIAMTX_API_URL: z.string().default("http://127.0.0.1:9997/v3").transform((v) => v.replace(/^["']|["']$/g, "").trim()),
   MEDIAMTX_STREAM_SECRET: z.string().optional(),
   STREAM_TOKEN_EXPIRY: z.string().default("24h"),
 
