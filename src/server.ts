@@ -11,6 +11,7 @@ import { logger } from "./utils/logger";
 import { socketService } from "./services/socket.service";
 import * as streamService from "./services/stream.service";
 import * as cameraService from "./services/camera.service";
+import { sipServerService } from "./services/gb28181/sipServer.service";
 import { startRecordingSweeper, stopRecordingSweeper } from "./workers/recording-uploader.worker";
 import { startRecordingScheduler, stopRecordingScheduler } from "./services/recording-scheduler.service";
 import { startRetentionPruner, stopRetentionPruner } from "./services/recording-retention.service";
@@ -87,6 +88,9 @@ const startServer = async (): Promise<void> => {
       socketService.initialize(server);
       logger.info(`✅ [6/6] WebSocket Engine Ready (${Date.now() - socketStartTime}ms)`);
 
+      // ── Stage 7: Start Sovereign GB28181 SIP Signaling Server ────────────
+      sipServerService.start();
+
       // ── Background Workers: Ghost Stream Session Reaper ──────────────────
       const reaperInterval = setInterval(async () => {
         try {
@@ -159,10 +163,11 @@ const startServer = async (): Promise<void> => {
       forceExitTimer.unref();
 
       try {
-        // Step 0: Stop recording background workers
+        // Step 0: Stop recording background workers and SIP server
         stopRecordingSweeper();
         stopRecordingScheduler();
         stopRetentionPruner();
+        sipServerService.stop();
 
         // Step 1: Close HTTP server (stops accepting new incoming requests)
         await new Promise<void>((resolve, reject) => {
