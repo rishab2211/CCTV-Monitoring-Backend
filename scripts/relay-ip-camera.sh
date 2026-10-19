@@ -31,10 +31,10 @@ LOCAL_RTSP="$1"
 RAW_INPUT="${2:-cam_01}"
 
 # Strip existing raw_/live_ prefixes and normalize to lowercase slug
-CLEAN_SLUG=$(echo "${RAW_INPUT}" | sed -E 's/^(raw_|live_)//' | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_-' '-')
-INGEST_PATH="raw_${CLEAN_SLUG}"
+CLEAN_SLUG=$(printf "%s" "${RAW_INPUT}" | sed -E 's/^(raw_|live_)//' | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_-]/-/g' | sed -E 's/^-+|-+$//g')
+INGEST_PATH="live_${CLEAN_SLUG}"
 PLAYBACK_PATH="live_${CLEAN_SLUG}"
-RTSP_HOST="${RTSP_HOST:-api-cctv-backend.duckdns.org:8554}"
+RTSP_HOST="${RTSP_HOST:-200.141.12.143:8554}"
 VPS_RTSP="rtsp://${RTSP_HOST}/${INGEST_PATH}"
 
 echo ""
@@ -81,12 +81,13 @@ echo ""
 
 ffmpeg \
   -loglevel warning \
+  -fflags +genpts \
   -rtsp_transport tcp \
   -i "${LOCAL_RTSP}" \
   "${V_ENCODER[@]}" \
   -c:a libopus \
   -b:a 64k \
-  -async 50 \
+  -af "aresample=async=1000" \
   -rtsp_transport tcp \
   -f rtsp \
   "${VPS_RTSP}" &
