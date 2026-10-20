@@ -40,8 +40,24 @@ fi
 
 INGEST_PATH="live_${CLEAN_SLUG}"
 PLAYBACK_PATH="live_${CLEAN_SLUG}"
-RTSP_HOST="${RTSP_HOST:-api-cctv-backend.duckdns.org:8554}"
-VPS_RTSP="rtsp://${RTSP_HOST}/${INGEST_PATH}"
+
+# Resolve IPv4 address to avoid ISP IPv6 Path MTU blackholes (1460 > 1440 drop)
+DEFAULT_HOST="api-cctv-backend.duckdns.org:8554"
+RTSP_HOST="${RTSP_HOST:-$DEFAULT_HOST}"
+
+TARGET_HOST=$(printf "%s" "${RTSP_HOST}" | cut -d':' -f1)
+TARGET_PORT=$(printf "%s" "${RTSP_HOST}" | cut -s -d':' -f2)
+TARGET_PORT="${TARGET_PORT:-8554}"
+
+# Prefer IPv4 resolution for the RTSP gateway
+IPV4_ADDR=$(getent ahostsv4 "${TARGET_HOST}" 2>/dev/null | awk '{print $1; exit}' || echo "")
+if [ -n "${IPV4_ADDR}" ]; then
+  PUBLISH_TARGET="${IPV4_ADDR}:${TARGET_PORT}"
+else
+  PUBLISH_TARGET="${RTSP_HOST}"
+fi
+
+VPS_RTSP="rtsp://${PUBLISH_TARGET}/${INGEST_PATH}"
 
 # Default admin platform credentials for the PTZ bridge
 export ADMIN_EMAIL="${ADMIN_EMAIL:-admin@cctv.com}"
@@ -52,7 +68,7 @@ echo "=================================================================="
 echo "📹 CCTV Platform — Physical IP Camera Bridge"
 echo "=================================================================="
 echo "  Physical Camera  : ${LOCAL_RTSP}"
-echo "  Relaying to VPS  : ${VPS_RTSP}"
+echo "  Relaying to VPS  : ${VPS_RTSP} (${TARGET_HOST})"
 echo "  Camera Slug (DB) : ${CLEAN_SLUG}"
 echo "  Live Playback ID : ${PLAYBACK_PATH}"
 echo "  Recording Engine : AUTO-ENABLED (MediaMTX raw_ pattern)"
@@ -73,7 +89,7 @@ sleep 2
 if [ "${CODEC}" = "hevc" ] || [ "${CODEC}" = "h265" ]; then
   echo "⚠️  Camera video is HEVC (H.265). Web browsers require H.264 for WebRTC."
   echo "   Enabling ultra-fast zero-latency H.264 transcode (-c:v libx264)..."
-  V_ENCODER=(-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 25 -threads 4)
+  V_ENCODER=(-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 25 -threads 4 -b:v 2000k -maxrate 2500k -bufsize 4000k)
 else
   echo "✅ Camera video is ${CODEC}. Using stream copy (-c:v copy)."
   V_ENCODER=(-c:v copy)
@@ -115,15 +131,18 @@ while [ "${RUNNING}" -eq 1 ]; do
   ffmpeg \
     -loglevel warning \
     -timeout 15000000 \
-    -buffer_size 2048000 \
+    -buffer_size 4194304 \
+    -reorder_queue_size 100 \
     -fflags +genpts+discardcorrupt \
     -rtsp_transport tcp \
     -i "${LOCAL_RTSP}" \
     "${V_ENCODER[@]}" \
     -c:a libopus \
     -b:a 64k \
-    -af "aresample=async=1:first_pts=0" \
-    -buffer_size 2048000 \
+    -ar 48000 \
+    -af "aresample=async=1000" \
+    -buffer_size 4194304 \
+    -pkt_size 1200 \
     -rtsp_transport tcp \
     -f rtsp \
     "${VPS_RTSP}" &
@@ -132,7 +151,7 @@ while [ "${RUNNING}" -eq 1 ]; do
   wait "${FFMPEG_PID}" || true
 
   if [ "${RUNNING}" -eq 1 ]; then
-    echo "⚠️ Camera stream disconnected or Wi-Fi packet dropped. Reconnecting in 2 seconds..."
-    sleep 2
+    echo "⚠️ Camera stream disconnected or Wi-Fi packet dropped. Reconnecting in 4 seconds..."
+    sleep 4
   fi
 done

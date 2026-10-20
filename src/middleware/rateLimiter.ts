@@ -34,6 +34,11 @@ export const generalLimiter = rateLimit({
       return true;
     }
 
+    // Whitelist real-time PTZ commands and WebRTC signaling from aggressive IP rate limiting
+    if (req.path.includes("/ptz") || req.path.includes("/webrtc/offer") || req.path.includes("/streams")) {
+      return true;
+    }
+
     // Whitelist internal hardware and automated system requests
     const key = req.headers["x-system-key"];
     return typeof key === "string" && safeCompare(key, env.SYSTEM_API_KEY);

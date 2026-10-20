@@ -99,22 +99,34 @@ function buildStopXml(stopZoom = false) {
 </soap:Envelope>`;
 }
 
+// Mutex lock to guarantee strictly sequential SOAP execution on embedded camera CPU
+let onvifLock = Promise.resolve();
+
 async function sendOnvifCommand(xml) {
-  try {
-    const res = await fetch(ONVIF_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/soap+xml; charset=utf-8" },
-      body: xml,
-      signal: AbortSignal.timeout(6000),
-    });
-    return res.status === 200;
-  } catch (err) {
-    console.error(`❌ ONVIF Dispatch Error: ${err.message}`);
-    return false;
-  }
+  // Chain through sequential lock
+  const run = async () => {
+    try {
+      const res = await fetch(ONVIF_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/soap+xml; charset=utf-8" },
+        body: xml,
+        signal: AbortSignal.timeout(2500),
+      });
+      // 50ms cooling pause to prevent overwhelming the single-core camera CPU
+      await new Promise((r) => setTimeout(r, 50));
+      return res.status === 200;
+    } catch (err) {
+      console.error(`❌ ONVIF Dispatch Error: ${err.message}`);
+      return false;
+    }
+  };
+
+  onvifLock = onvifLock.then(run, run);
+  return onvifLock;
 }
 
-let lastMoveTime = 0;
+let currentDirection = null;
+let movementStartTime = 0;
 let pendingStopTimer = null;
 let lastWasZoom = false;
 
@@ -122,29 +134,46 @@ async function handlePtzDirection(direction, speed = 32) {
   const normSpeed = Math.min(Math.max(speed / 64, 0.4), 1.0);
 
   if (direction === "stop") {
-    if (pendingStopTimer) clearTimeout(pendingStopTimer);
-    const elapsed = Date.now() - lastMoveTime;
-    const minStepMs = 600; // Allow physical motor to complete a clear visible step
-    const stopZoom = lastWasZoom;
-    lastWasZoom = false;
-
-    if (elapsed < minStepMs) {
-      pendingStopTimer = setTimeout(async () => {
-        console.log("🛑 Motor STOP (step completed)");
-        await sendOnvifCommand(buildStopXml(stopZoom));
-      }, minStepMs - elapsed);
+    if (pendingStopTimer) {
+      clearTimeout(pendingStopTimer);
+      pendingStopTimer = null;
+    }
+    // If motor is not currently reported moving, do nothing
+    if (!currentDirection) {
       return true;
     }
 
-    console.log("🛑 Motor STOP");
-    return await sendOnvifCommand(buildStopXml(stopZoom));
+    const elapsed = Date.now() - movementStartTime;
+    const minStepMs = 350; // Allow motor to complete at least a visible step
+    const stopZoom = lastWasZoom;
+
+    const executeStop = async () => {
+      console.log("🛑 Motor STOP");
+      currentDirection = null;
+      lastWasZoom = false;
+      return await sendOnvifCommand(buildStopXml(stopZoom));
+    };
+
+    if (elapsed < minStepMs) {
+      pendingStopTimer = setTimeout(executeStop, minStepMs - elapsed);
+      return true;
+    }
+
+    return await executeStop();
+  }
+
+  // Deduplicate: If user sends the same direction that is already actively moving, ignore
+  if (currentDirection === direction) {
+    return true;
   }
 
   if (pendingStopTimer) {
     clearTimeout(pendingStopTimer);
     pendingStopTimer = null;
   }
-  lastMoveTime = Date.now();
+
+  currentDirection = direction;
+  movementStartTime = Date.now();
   lastWasZoom = (direction === "zoomin" || direction === "zoomout");
 
   let x = 0.0;
