@@ -132,20 +132,17 @@ while [ "${RUNNING}" -eq 1 ]; do
   ffmpeg \
     -loglevel warning \
     -rtsp_transport tcp \
-    -stimeout 5000000 \
+    -timeout 10000000 \
     -buffer_size 2097152 \
     -fflags +genpts+discardcorrupt+nobuffer \
-    -flags low_delay \
     -err_detect ignore_err \
     -i "${LOCAL_RTSP}" \
-    -map 0:v:0 \
     "${V_ENCODER[@]}" \
-    -map 0:a? \
     -c:a libopus \
     -b:a 48k \
     -ar 48000 \
     -ac 1 \
-    -af "aresample=async=1:first_pts=0" \
+    -af "aresample=async=1000" \
     -rtsp_transport tcp \
     -f rtsp \
     "${VPS_RTSP}" &
