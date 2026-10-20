@@ -19,8 +19,16 @@ const BACKEND_URL = process.env.BACKEND_URL || "https://api-cctv-backend.duckdns
 const ONVIF_PORT = process.env.ONVIF_PORT || 8899;
 const ONVIF_ENDPOINT = `http://${CAMERA_IP}:${ONVIF_PORT}/onvif/ptz_service`;
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@cctv.com";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin@123";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+  console.error("❌ Fatal Configuration Error: ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required.");
+  console.error("   Example: ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=SecretPassword node scripts/onvif-ptz-bridge.js <IP> <CAMERA_ID>");
+  process.exit(1);
+}
+
+let ONVIF_PROFILE_TOKEN = process.env.ONVIF_PROFILE_TOKEN || "000";
 
 console.log("==================================================================");
 console.log("🎮 CCTV Platform — Local ONVIF PTZ Bridge");
@@ -28,22 +36,17 @@ console.log("=================================================================="
 console.log(`  Local Camera ONVIF : ${ONVIF_ENDPOINT}`);
 console.log(`  Target Camera ID   : ${CAMERA_ID}`);
 console.log(`  Cloud Backend URL  : ${BACKEND_URL}`);
+console.log(`  ONVIF Profile Token: ${ONVIF_PROFILE_TOKEN}`);
 console.log("==================================================================");
 
-const fs = require("fs");
-const path = require("path");
-const TOKEN_CACHE_FILE = path.join("/tmp", ".cctv_bridge_token.json");
+let inMemoryTokenCache = {
+  token: null,
+  expiresAt: 0,
+};
 
 async function login() {
-  if (fs.existsSync(TOKEN_CACHE_FILE)) {
-    try {
-      const cached = JSON.parse(fs.readFileSync(TOKEN_CACHE_FILE, "utf-8"));
-      if (cached.token && cached.expiresAt && Date.now() < cached.expiresAt) {
-        return cached.token;
-      }
-    } catch {
-      // ignore
-    }
+  if (inMemoryTokenCache.token && Date.now() < inMemoryTokenCache.expiresAt) {
+    return inMemoryTokenCache.token;
   }
 
   const res = await fetch(`${BACKEND_URL}/api/v1/auth/login`, {
@@ -52,22 +55,18 @@ async function login() {
     body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
   });
   if (!res.ok) {
-    if (fs.existsSync(TOKEN_CACHE_FILE)) {
-      try {
-        const cached = JSON.parse(fs.readFileSync(TOKEN_CACHE_FILE, "utf-8"));
-        if (cached.token) return cached.token;
-      } catch {}
-    }
     throw new Error(`Login failed (${res.status}): ${await res.text()}`);
   }
   const data = await res.json();
-  const token = data.data.tokens.accessToken;
-  try {
-    fs.writeFileSync(
-      TOKEN_CACHE_FILE,
-      JSON.stringify({ token, expiresAt: Date.now() + 6 * 3600 * 1000 })
-    );
-  } catch {}
+  const token = data.data?.tokens?.accessToken || data.data?.token;
+  if (!token) {
+    throw new Error("Login succeeded but returned no valid access token");
+  }
+
+  inMemoryTokenCache = {
+    token,
+    expiresAt: Date.now() + 6 * 3600 * 1000,
+  };
   return token;
 }
 
@@ -83,7 +82,7 @@ function buildContinuousMoveXml(x, y, zoom = null) {
 <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl" xmlns:tt="http://www.onvif.org/ver10/schema">
   <soap:Body>
     <tptz:ContinuousMove>
-      <tptz:ProfileToken>000</tptz:ProfileToken>
+      <tptz:ProfileToken>${ONVIF_PROFILE_TOKEN}</tptz:ProfileToken>
       <tptz:Velocity>
         ${velocityContent}
       </tptz:Velocity>
@@ -97,7 +96,7 @@ function buildStopXml() {
 <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl">
   <soap:Body>
     <tptz:Stop>
-      <tptz:ProfileToken>000</tptz:ProfileToken>
+      <tptz:ProfileToken>${ONVIF_PROFILE_TOKEN}</tptz:ProfileToken>
       <tptz:PanTilt>true</tptz:PanTilt>
       <tptz:Zoom>true</tptz:Zoom>
     </tptz:Stop>
