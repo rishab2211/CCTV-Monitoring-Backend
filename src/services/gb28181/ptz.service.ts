@@ -19,6 +19,9 @@ export interface SendPtzInput {
   speed?: number;
 }
 
+const lastCmdTimeMap = new Map<string, number>();
+const PTZ_MIN_INTERVAL_MS = 120;
+
 /**
  * Dispatches a directional PTZ movement command to a camera.
  */
@@ -37,6 +40,23 @@ export const dispatchPtzCommand = async (input: SendPtzInput): Promise<{
 
   // Calculate 8-byte GB28181 hex code
   const ptzCmdHex = buildPTZCmd(direction, speed);
+
+  // Throttle rapid non-stop movement commands to avoid overflowing camera SIP stack
+  if (direction !== "stop") {
+    const lastTime = lastCmdTimeMap.get(cameraId) || 0;
+    const now = Date.now();
+    if (now - lastTime < PTZ_MIN_INTERVAL_MS) {
+      return {
+        success: true,
+        cameraId,
+        direction,
+        ptzCmdHex,
+      };
+    }
+    lastCmdTimeMap.set(cameraId, now);
+  } else {
+    lastCmdTimeMap.set(cameraId, 0);
+  }
 
   // Send via GB28181 SIP Server
   const sent = await sipServerService.sendPTZCommand(camera, ptzCmdHex);
