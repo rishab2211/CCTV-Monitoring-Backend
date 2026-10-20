@@ -64,47 +64,38 @@ const signStreamToken = (
 
 // ─── Service Functions ────────────────────────────────────────────────────────
 
+// ─── Stream Session Factory ───────────────────────────────────────────────────
+
+const MAX_CONCURRENT_VIEWERS = Number(process.env.MAX_CONCURRENT_VIEWERS || 50);
+
 /**
- * Start a live stream session.
- *  1. Validate caller has access to the camera.
- *  2. Register/ensure the RTSP path exists in MediaMTX.
- *  3. Create a StreamSession document.
- *  4. Issue a signed stream token.
- *  5. Return connection URLs for the client.
+ * Internal factory to ensure path registration, enforce concurrent viewer limit,
+ * create a stream session document, and sign access tokens.
  */
-export const startStream = async (
-  input: StartStreamInput,
+const createStreamSessionInternal = async (
+  camera: any,
   user: JwtAccessPayload,
   ipAddress?: string
 ) => {
-  const { cameraId } = input;
+  // Enforce concurrent viewer limits per camera
+  const activeCount = await StreamSession.countDocuments({
+    cameraId: camera._id,
+    isActive: true,
+  });
 
-  if (!mongoose.Types.ObjectId.isValid(cameraId)) {
-    throw ApiError.badRequest("Invalid camera ID format");
+  if (activeCount >= MAX_CONCURRENT_VIEWERS) {
+    throw ApiError.tooManyRequests(
+      `Viewer limit (${MAX_CONCURRENT_VIEWERS}) reached for camera "${camera.name}". Please try again later.`
+    );
   }
 
-  // 1. Load camera and validate access
-  const camera = await Camera.findOne({ _id: cameraId, isDeleted: false });
-  if (!camera) throw ApiError.notFound("Camera");
-
-  await validateCameraAccess(camera, user);
-
-  // Enforce Subscription Check for Customers
-  if (user.role === "customer") {
-    const activeSub = await Subscription.findOne({ customerId: user.userId, status: "active" });
-    if (!activeSub) {
-      throw ApiError.forbidden("Active subscription required to start live streams");
-    }
-  }
-
-  // 2. Register path in MediaMTX (only if external RTSP pull is needed)
+  // Ensure path in MediaMTX (only if external RTSP pull is needed)
   const baseSlug = getCameraStreamPath(camera);
   const pathName = await resolveActiveStreamPath(camera);
   if (!isDirectPublishStream(camera) && camera.rtspUrl) {
     await addMediaMTXPath(baseSlug, camera.rtspUrl);
   }
 
-  // 3. Create session record
   const sessionId = uuidv4();
   const token = signStreamToken(
     camera._id.toString(),
@@ -120,22 +111,12 @@ export const startStream = async (
     userId: resolveUserId(user.userId),
     role: user.role,
     startedAt: new Date(),
+    lastHeartbeat: new Date(),
     isActive: true,
     tokenHash,
     ipAddress,
   });
 
-  // 4. Log activity
-  logActivity({
-    userId: resolveUserId(user.userId),
-    action: "STREAM_STARTED",
-    description: `Live stream started for camera "${camera.name}"`,
-    metadata: { cameraId, sessionId, pathName },
-  });
-
-  logger.info(`📹 Stream started: ${camera.name} (session: ${sessionId}) by user ${user.userId}`);
-
-  // 5. Build response URLs using public base URL
   const baseUrl = getPublicBaseUrl();
   return {
     sessionId,
@@ -146,6 +127,53 @@ export const startStream = async (
     hlsUrl: `${baseUrl}/hls/${pathName}/index.m3u8`,
     tokenExpiresIn: "24h",
   };
+};
+
+// ─── Service Functions ────────────────────────────────────────────────────────
+
+/**
+ * Start a live stream session.
+ *  1. Validate caller has access to the camera.
+ *  2. Check viewer capacity & register path in MediaMTX.
+ *  3. Create StreamSession document & issue signed token.
+ *  4. Log activity and return connection URLs.
+ */
+export const startStream = async (
+  input: StartStreamInput,
+  user: JwtAccessPayload,
+  ipAddress?: string
+) => {
+  const { cameraId } = input;
+
+  if (!mongoose.Types.ObjectId.isValid(cameraId)) {
+    throw ApiError.badRequest("Invalid camera ID format");
+  }
+
+  const camera = await Camera.findOne({ _id: cameraId, isDeleted: false });
+  if (!camera) throw ApiError.notFound("Camera");
+
+  await validateCameraAccess(camera, user);
+
+  // Enforce Subscription Check for Customers
+  if (user.role === "customer") {
+    const activeSub = await Subscription.findOne({ customerId: user.userId, status: "active" });
+    if (!activeSub) {
+      throw ApiError.forbidden("Active subscription required to start live streams");
+    }
+  }
+
+  const session = await createStreamSessionInternal(camera, user, ipAddress);
+
+  logActivity({
+    userId: resolveUserId(user.userId),
+    action: "STREAM_STARTED",
+    description: `Live stream started for camera "${camera.name}"`,
+    metadata: { cameraId, sessionId: session.sessionId, pathName: session.pathName },
+  });
+
+  logger.info(`📹 Stream started: ${camera.name} (session: ${session.sessionId}) by user ${user.userId}`);
+
+  return session;
 };
 
 /**
@@ -247,13 +275,28 @@ export const reapStaleSessions = async () => {
 };
 
 /**
+ * Reaps all active stream sessions belonging to a specific user.
+ * Triggered immediately on WebSocket disconnect to eliminate phantom viewers.
+ */
+export const reapUserStreamSessions = async (userId: string) => {
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) return;
+  const userObjectId = new mongoose.Types.ObjectId(userId);
+  const result = await StreamSession.updateMany(
+    { userId: userObjectId, isActive: true },
+    { $set: { isActive: false, endedAt: new Date() } }
+  );
+  if (result.modifiedCount > 0) {
+    logger.debug(`[StreamSession] Closed ${result.modifiedCount} active stream session(s) on disconnect for user ${userId}`);
+  }
+};
 
- * Get a fresh stream token for a camera the user already has access to.
- * Does NOT create a new StreamSession (user is already watching).
+/**
+ * Get a fresh stream token and session for a camera the user already has access to.
  */
 export const getStreamToken = async (
   cameraId: string,
-  user: JwtAccessPayload
+  user: JwtAccessPayload,
+  ipAddress?: string
 ) => {
   if (!mongoose.Types.ObjectId.isValid(cameraId)) {
     throw ApiError.badRequest("Invalid camera ID format");
@@ -272,38 +315,7 @@ export const getStreamToken = async (
     }
   }
 
-  // Ensure path is registered (only if external RTSP pull is needed)
-  const baseSlug = getCameraStreamPath(camera);
-  const pathName = await resolveActiveStreamPath(camera);
-  if (!isDirectPublishStream(camera) && camera.rtspUrl) {
-    await addMediaMTXPath(baseSlug, camera.rtspUrl);
-  }
-
-  const sessionId = uuidv4();
-  const token = signStreamToken(camera._id.toString(), user.userId, sessionId, pathName);
-  const tokenHash = hashToken(token);
-
-  await StreamSession.create({
-    sessionId,
-    cameraId: camera._id,
-    userId: resolveUserId(user.userId),
-    role: user.role,
-    startedAt: new Date(),
-    lastHeartbeat: new Date(),
-    isActive: true,
-    tokenHash,
-  });
-
-  const baseUrl = getPublicBaseUrl();
-  return {
-    sessionId,
-    streamToken: token,
-    pathName,
-    webrtcUrl: `${baseUrl}/webrtc/${pathName}`,
-    whepUrl: `${baseUrl}/webrtc/${pathName}/whep`,
-    hlsUrl: `${baseUrl}/hls/${pathName}/index.m3u8`,
-    tokenExpiresIn: "24h",
-  };
+  return await createStreamSessionInternal(camera, user, ipAddress);
 };
 
 /**
@@ -482,10 +494,12 @@ export const relayWebRTCOffer = async (
         status: "online",
         timestamp: new Date().toISOString(),
       };
-      socketService.emitGlobal("camera_online", eventPayload);
       socketService.emitToCamera(camera._id.toString(), "camera_online", eventPayload);
       if (camera.franchiseId) {
         socketService.emitToFranchise(camera.franchiseId.toString(), "camera_online", eventPayload);
+      }
+      if (camera.customerId) {
+        socketService.emitToUser(camera.customerId.toString(), "camera_online", eventPayload);
       }
     }
 

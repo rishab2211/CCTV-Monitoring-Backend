@@ -91,9 +91,25 @@ class SocketService {
         logger.debug(`[Socket.IO] User ${user.userId} joined room sos_monitors`);
       }
 
+      // Per-socket rate limiting for join_camera requests (max 30 requests per 10s window)
+      let joinRequestsCount = 0;
+      let windowResetTime = Date.now() + 10000;
+
       // Client can request to join specific camera rooms to receive alerts for them
       socket.on("join_camera", async (cameraId: string) => {
         try {
+          const now = Date.now();
+          if (now > windowResetTime) {
+            joinRequestsCount = 0;
+            windowResetTime = now + 10000;
+          }
+          joinRequestsCount++;
+          if (joinRequestsCount > 30) {
+            logger.warn(`[Socket.IO] join_camera rate limit exceeded by user ${user.userId}`);
+            socket.emit("error", { message: "Too many join requests. Please slow down." });
+            return;
+          }
+
           if (!cameraId || !mongoose.Types.ObjectId.isValid(cameraId)) {
             socket.emit("error", { message: "Invalid camera ID format" });
             return;
@@ -125,6 +141,15 @@ class SocketService {
 
       socket.on("disconnect", async () => {
         logger.debug(`[Socket.IO] Client disconnected: ${user.userId}`);
+
+        // Immediately close active stream sessions for this user to eliminate phantom viewer counts
+        try {
+          const { reapUserStreamSessions } = await import("./stream.service");
+          await reapUserStreamSessions(user.userId);
+        } catch (err: any) {
+          logger.debug(`[Socket.IO] Stream session disconnect cleanup error: ${err.message}`);
+        }
+
         // Only cleanup talkback sessions for roles that can initiate them
         if (["operator", "admin", "super_admin", "franchise_admin"].includes(user.role)) {
           try {
