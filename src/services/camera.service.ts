@@ -674,6 +674,7 @@ export const updateCameraStatus = async (
   };
   const eventName = status === "online" ? "camera_online" : "camera_offline";
   socketService.emitToCamera(camera._id.toString(), eventName, eventPayload);
+  socketService.emitToStaff(eventName, eventPayload);
   if (camera.franchiseId) {
     socketService.emitToFranchise(camera.franchiseId.toString(), eventName, eventPayload);
   }
@@ -726,6 +727,7 @@ export const updateCameraHealth = async (
     timestamp: new Date().toISOString(),
   };
   socketService.emitToCamera(camera._id.toString(), "camera_online", onlinePayload);
+  socketService.emitToStaff("camera_online", onlinePayload);
   if (camera.franchiseId) {
     socketService.emitToFranchise(camera.franchiseId.toString(), "camera_online", onlinePayload);
   }
@@ -955,8 +957,9 @@ export const syncLiveCameraStatuses = async (): Promise<void> => {
           timestamp: new Date().toISOString(),
         };
 
-        // Emit to camera-specific and franchise rooms only (not global broadcast to all clients)
+        // Emit to camera-specific, franchise, and staff fleet rooms
         socketService.emitToCamera(camera._id.toString(), "camera_online", onlinePayload);
+        socketService.emitToStaff("camera_online", onlinePayload);
         if (camera.franchiseId) {
           socketService.emitToFranchise(camera.franchiseId.toString(), "camera_online", onlinePayload);
         }
@@ -985,8 +988,9 @@ export const syncLiveCameraStatuses = async (): Promise<void> => {
             timestamp: new Date().toISOString(),
           };
 
-          // Emit to camera-specific and franchise rooms only (not global broadcast)
+          // Emit to camera-specific, franchise, and staff fleet rooms
           socketService.emitToCamera(camera._id.toString(), "camera_offline", offlinePayload);
+          socketService.emitToStaff("camera_offline", offlinePayload);
           if (camera.franchiseId) {
             socketService.emitToFranchise(camera.franchiseId.toString(), "camera_offline", offlinePayload);
           }

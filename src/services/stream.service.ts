@@ -495,6 +495,7 @@ export const relayWebRTCOffer = async (
         timestamp: new Date().toISOString(),
       };
       socketService.emitToCamera(camera._id.toString(), "camera_online", eventPayload);
+      socketService.emitToStaff("camera_online", eventPayload);
       if (camera.franchiseId) {
         socketService.emitToFranchise(camera.franchiseId.toString(), "camera_online", eventPayload);
       }

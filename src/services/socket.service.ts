@@ -85,10 +85,11 @@ class SocketService {
         logger.debug(`[Socket.IO] User ${user.userId} joined room ${franchiseRoom}`);
       }
 
-      // Staff roles join emergency monitors room for SOS panic boards
-      if (["super_admin", "admin", "operator"].includes(user.role)) {
+      // Staff roles join emergency monitors room for SOS panic boards & staff fleet dashboard
+      if (["super_admin", "admin", "operator", "franchise_admin"].includes(user.role)) {
         socket.join("sos_monitors");
-        logger.debug(`[Socket.IO] User ${user.userId} joined room sos_monitors`);
+        socket.join("staff_dashboard");
+        logger.debug(`[Socket.IO] User ${user.userId} joined staff_dashboard`);
       }
 
       // Per-socket rate limiting for join_camera requests (max 30 requests per 10s window)
@@ -193,6 +194,16 @@ class SocketService {
     const roomName = `franchise_${franchiseId}`;
     this.io.to(roomName).emit(event, data);
     logger.debug(`[Socket.IO] Emitted '${event}' to ${roomName}`);
+  }
+
+  /**
+   * Emit Event to Staff Room
+   * Broadcasts to all connected staff (super_admin, admin, franchise_admin, operator)
+   * for fleet-wide dashboard synchronization without leaking to regular customers.
+   */
+  public emitToStaff(event: string, data: any) {
+    if (!this.io) return;
+    this.io.to("staff_dashboard").emit(event, data);
   }
 
   /**
