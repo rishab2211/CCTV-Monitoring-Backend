@@ -19,14 +19,8 @@ const BACKEND_URL = process.env.BACKEND_URL || "https://api-cctv-backend.duckdns
 const ONVIF_PORT = process.env.ONVIF_PORT || 8899;
 const ONVIF_ENDPOINT = `http://${CAMERA_IP}:${ONVIF_PORT}/onvif/ptz_service`;
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-
-if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
-  console.error("❌ Fatal Configuration Error: ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required.");
-  console.error("   Example: ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=SecretPassword node scripts/onvif-ptz-bridge.js <IP> <CAMERA_ID>");
-  process.exit(1);
-}
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@cctv.com";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin@123";
 
 let ONVIF_PROFILE_TOKEN = process.env.ONVIF_PROFILE_TOKEN || "000";
 
@@ -37,6 +31,7 @@ console.log(`  Local Camera ONVIF : ${ONVIF_ENDPOINT}`);
 console.log(`  Target Camera ID   : ${CAMERA_ID}`);
 console.log(`  Cloud Backend URL  : ${BACKEND_URL}`);
 console.log(`  ONVIF Profile Token: ${ONVIF_PROFILE_TOKEN}`);
+console.log(`  Admin Auth User    : ${ADMIN_EMAIL}`);
 console.log("==================================================================");
 
 let inMemoryTokenCache = {
@@ -44,8 +39,8 @@ let inMemoryTokenCache = {
   expiresAt: 0,
 };
 
-async function login() {
-  if (inMemoryTokenCache.token && Date.now() < inMemoryTokenCache.expiresAt) {
+async function login(force = false) {
+  if (!force && inMemoryTokenCache.token && Date.now() < inMemoryTokenCache.expiresAt) {
     return inMemoryTokenCache.token;
   }
 
@@ -65,7 +60,7 @@ async function login() {
 
   inMemoryTokenCache = {
     token,
-    expiresAt: Date.now() + 6 * 3600 * 1000,
+    expiresAt: Date.now() + 10 * 60 * 1000,
   };
   return token;
 }
@@ -91,14 +86,14 @@ function buildContinuousMoveXml(x, y, zoom = null) {
 </soap:Envelope>`;
 }
 
-function buildStopXml() {
+function buildStopXml(stopZoom = false) {
   return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl">
   <soap:Body>
     <tptz:Stop>
       <tptz:ProfileToken>${ONVIF_PROFILE_TOKEN}</tptz:ProfileToken>
       <tptz:PanTilt>true</tptz:PanTilt>
-      <tptz:Zoom>true</tptz:Zoom>
+      ${stopZoom ? "<tptz:Zoom>true</tptz:Zoom>" : ""}
     </tptz:Stop>
   </soap:Body>
 </soap:Envelope>`;
@@ -110,7 +105,7 @@ async function sendOnvifCommand(xml) {
       method: "POST",
       headers: { "Content-Type": "application/soap+xml; charset=utf-8" },
       body: xml,
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(6000),
     });
     return res.status === 200;
   } catch (err) {
@@ -121,6 +116,7 @@ async function sendOnvifCommand(xml) {
 
 let lastMoveTime = 0;
 let pendingStopTimer = null;
+let lastWasZoom = false;
 
 async function handlePtzDirection(direction, speed = 32) {
   const normSpeed = Math.min(Math.max(speed / 64, 0.4), 1.0);
@@ -129,17 +125,19 @@ async function handlePtzDirection(direction, speed = 32) {
     if (pendingStopTimer) clearTimeout(pendingStopTimer);
     const elapsed = Date.now() - lastMoveTime;
     const minStepMs = 600; // Allow physical motor to complete a clear visible step
+    const stopZoom = lastWasZoom;
+    lastWasZoom = false;
 
     if (elapsed < minStepMs) {
       pendingStopTimer = setTimeout(async () => {
         console.log("🛑 Motor STOP (step completed)");
-        await sendOnvifCommand(buildStopXml());
+        await sendOnvifCommand(buildStopXml(stopZoom));
       }, minStepMs - elapsed);
       return true;
     }
 
     console.log("🛑 Motor STOP");
-    return await sendOnvifCommand(buildStopXml());
+    return await sendOnvifCommand(buildStopXml(stopZoom));
   }
 
   if (pendingStopTimer) {
@@ -147,6 +145,7 @@ async function handlePtzDirection(direction, speed = 32) {
     pendingStopTimer = null;
   }
   lastMoveTime = Date.now();
+  lastWasZoom = (direction === "zoomin" || direction === "zoomout");
 
   let x = 0.0;
   let y = 0.0;
@@ -223,7 +222,7 @@ async function resolveCameraId(token, identifier) {
 
 async function main() {
   console.log("🔐 Authenticating with platform API...");
-  const token = await login();
+  let token = await login();
   console.log("✅ Authenticated successfully");
 
   const resolvedCameraId = await resolveCameraId(token, CAMERA_ID);
@@ -239,7 +238,7 @@ async function main() {
     console.log("⚡ Connected to Cloud Socket.IO!");
     console.log(`📡 Joining camera control room: camera_${resolvedCameraId}`);
     socket.emit("join_camera", resolvedCameraId);
-    if (resolvedCameraId !== CAMERA_ID) {
+    if (resolvedCameraId !== CAMERA_ID && /^[0-9a-fA-F]{24}$/.test(CAMERA_ID)) {
       socket.emit("join_camera", CAMERA_ID);
     }
   });
@@ -255,8 +254,20 @@ async function main() {
     console.warn(`⚠️ Disconnected from Cloud Gateway: ${reason}. Auto-reconnecting...`);
   });
 
-  socket.on("connect_error", (err) => {
+  socket.on("connect_error", async (err) => {
     console.error(`❌ Connection Error: ${err.message}`);
+    const msg = (err.message || "").toLowerCase();
+    if (msg.includes("token") || msg.includes("auth") || msg.includes("jwt") || msg.includes("unauthorized")) {
+      console.log("🔄 Access token expired. Fetching fresh credentials...");
+      try {
+        const freshToken = await login(true);
+        socket.auth = { token: freshToken };
+        console.log("🔄 Reconnecting with fresh token...");
+        socket.connect();
+      } catch (authErr) {
+        console.error(`❌ Re-auth failed: ${authErr.message}`);
+      }
+    }
   });
 }
 

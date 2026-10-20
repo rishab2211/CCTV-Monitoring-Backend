@@ -377,6 +377,14 @@ export const getCameraPathAliases = (camera: { serialNumber: string; rtspUrl?: s
     `live_${baseSlug}`,
     `${baseSlug}_raw`,
     `${baseSlug}_live`,
+    primaryPath.replace(/_/g, "-"),
+    primaryPath.replace(/-/g, "_"),
+    baseSlug.replace(/_/g, "-"),
+    baseSlug.replace(/-/g, "_"),
+    `live_${baseSlug.replace(/_/g, "-")}`,
+    `live_${baseSlug.replace(/-/g, "_")}`,
+    `raw_${baseSlug.replace(/_/g, "-")}`,
+    `raw_${baseSlug.replace(/-/g, "_")}`,
   ]);
 
   return Array.from(aliases);

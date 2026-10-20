@@ -31,11 +31,21 @@ LOCAL_RTSP="$1"
 RAW_INPUT="${2:-cam_01}"
 
 # Strip existing raw_/live_ prefixes and normalize to lowercase slug
-CLEAN_SLUG=$(printf "%s" "${RAW_INPUT}" | sed -E 's/^(raw_|live_)//' | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_-]/-/g' | sed -E 's/^-+|-+$//g')
+CLEAN_SLUG=$(printf "%s" "${RAW_INPUT}" | sed -E 's/^(raw_|live_)//' | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_-]/_/g' | sed -E 's/^_+|_+$//g')
+
+# If shenzhen-cam or shenzhen_cam was provided, ensure it aligns with the DB's live_shenzhen_cam
+if [ "${CLEAN_SLUG}" = "shenzhen-cam" ] || [ "${CLEAN_SLUG}" = "shenzhen_cam" ]; then
+  CLEAN_SLUG="shenzhen_cam"
+fi
+
 INGEST_PATH="live_${CLEAN_SLUG}"
 PLAYBACK_PATH="live_${CLEAN_SLUG}"
 RTSP_HOST="${RTSP_HOST:-api-cctv-backend.duckdns.org:8554}"
 VPS_RTSP="rtsp://${RTSP_HOST}/${INGEST_PATH}"
+
+# Default admin platform credentials for the PTZ bridge
+export ADMIN_EMAIL="${ADMIN_EMAIL:-admin@cctv.com}"
+export ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin@123}"
 
 echo ""
 echo "=================================================================="
@@ -57,7 +67,8 @@ fi
 # Auto-detect video codec
 echo "🔍 Probing camera stream codecs..."
 CODEC=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 -rtsp_transport tcp "${LOCAL_RTSP}" 2>/dev/null || echo "h264")
-sleep 1
+# Allow camera embedded RTSP server to close probe connection cleanly
+sleep 2
 
 if [ "${CODEC}" = "hevc" ] || [ "${CODEC}" = "h265" ]; then
   echo "⚠️  Camera video is HEVC (H.265). Web browsers require H.264 for WebRTC."
@@ -103,7 +114,7 @@ echo ""
 while [ "${RUNNING}" -eq 1 ]; do
   ffmpeg \
     -loglevel warning \
-    -timeout 5000000 \
+    -timeout 15000000 \
     -fflags +genpts+discardcorrupt \
     -rtsp_transport tcp \
     -i "${LOCAL_RTSP}" \
