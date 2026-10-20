@@ -2,6 +2,7 @@ import rateLimit from "express-rate-limit";
 import { ApiError } from "../utils/ApiError";
 import { env } from "../config/env";
 import { safeCompare } from "../utils/helpers";
+import { createRateLimitStore } from "../config/redis";
 
 /**
  * General API rate limiter — 100 requests per 15 minutes per IP.
@@ -12,6 +13,8 @@ export const generalLimiter = rateLimit({
   max: env.RATE_LIMIT_MAX,
   standardHeaders: true, // Return rate limit info in RateLimit-* headers
   legacyHeaders: false,
+  passOnStoreError: true, // If Redis errors or disconnects, proceed gracefully
+  store: createRateLimitStore("general"),
   skip: (req) => {
     // Whitelist health check endpoints and root probes
     if (
@@ -36,7 +39,6 @@ export const generalLimiter = rateLimit({
     return typeof key === "string" && safeCompare(key, env.SYSTEM_API_KEY);
   },
   handler: (_req, _res, next) => {
-
     next(
       new ApiError(
         429,
@@ -56,6 +58,8 @@ export const authLimiter = rateLimit({
   max: env.AUTH_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
+  passOnStoreError: true,
+  store: createRateLimitStore("auth"),
   handler: (_req, _res, next) => {
     next(
       new ApiError(
@@ -77,6 +81,8 @@ export const otpLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  passOnStoreError: true,
+  store: createRateLimitStore("otp"),
   handler: (_req, _res, next) => {
     next(
       new ApiError(
@@ -97,6 +103,8 @@ export const whipLimiter = rateLimit({
   max: 60, // Up to 60 session starts/publishes per minute per IP
   standardHeaders: true,
   legacyHeaders: false,
+  passOnStoreError: true,
+  store: createRateLimitStore("whip"),
   skip: (req) => {
     // GET/OPTIONS/HEAD for reading streams must never be throttled
     return req.method === "GET" || req.method === "OPTIONS" || req.method === "HEAD";

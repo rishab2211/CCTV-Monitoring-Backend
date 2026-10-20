@@ -90,6 +90,9 @@ const envSchema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().default(1000),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().default(10),
 
+  // Redis (Optional — distributed rate limiting across cluster nodes)
+  REDIS_URL: z.string().optional(),
+
   // CORS
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
 

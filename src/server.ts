@@ -185,6 +185,10 @@ const startServer = async (): Promise<void> => {
           logger.info("✅ [Shutdown] MongoDB database connection closed cleanly");
         }
 
+        // Step 3: Disconnect Redis
+        const { disconnectRedis } = await import("./config/redis");
+        await disconnectRedis();
+
         const duration = Date.now() - shutdownStart;
         logger.info(`✨ [Shutdown] Graceful shutdown completed in ${duration}ms. Goodbye! 👋`);
         process.exit(0);
