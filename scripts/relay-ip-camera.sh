@@ -132,7 +132,6 @@ while [ "${RUNNING}" -eq 1 ]; do
     -loglevel warning \
     -timeout 15000000 \
     -buffer_size 4194304 \
-    -reorder_queue_size 100 \
     -fflags +genpts+discardcorrupt \
     -rtsp_transport tcp \
     -i "${LOCAL_RTSP}" \
