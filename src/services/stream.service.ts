@@ -93,7 +93,10 @@ const createStreamSessionInternal = async (
   const baseSlug = getCameraStreamPath(camera);
   const pathName = await resolveActiveStreamPath(camera);
   if (!isDirectPublishStream(camera) && camera.rtspUrl) {
-    await addMediaMTXPath(baseSlug, camera.rtspUrl);
+    const existingStatus = await getMediaMTXPathStatus(pathName);
+    if (!existingStatus?.ready) {
+      await addMediaMTXPath(baseSlug, camera.rtspUrl);
+    }
   }
 
   const sessionId = uuidv4();

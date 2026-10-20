@@ -42,6 +42,8 @@ export const mediamtxFetch = async <T>(
       const text = await res.text().catch(() => "");
       if (text.includes("path already exists")) {
         logger.debug(`[MediaMTX] Path '${path}' already exists. Updating via PATCH...`);
+      } else if (text.includes("path not found")) {
+        logger.debug(`[MediaMTX] Dynamic path '${path}' not in config (handled by regex).`);
       } else {
         logger.warn(`[MediaMTX] ${method} ${path} → ${res.status}: ${text}`);
       }
@@ -240,10 +242,25 @@ export const isDirectPublishStream = (camera: { rtspUrl?: string }): boolean => 
     // WebRTC WHIP/WHEP or HLS direct endpoints
     if (parsed.pathname.includes("/webrtc/") || parsed.pathname.includes("/hls/")) return true;
     if (parsed.pathname.endsWith("/whip") || parsed.pathname.endsWith("/whep")) return true;
+
+    // Check if host is a local/private network IP address (e.g. 192.168.x.x, 10.x.x.x)
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "::1" ||
+      host.endsWith(".local") ||
+      /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(host) ||
+      /^192\.168\.\d{1,3}\.\d{1,3}$/.test(host)
+    ) {
+      return true; // Local/private cameras are pushed to VPS via on-prem relay bridge, not pulled directly
+    }
   } catch {
     // Dynamic match for any host/IP on port 8554 or /webrtc/
     if (/^rtsp:\/\/(?:\[[^\]]+\]|[^/:]+):8554\//i.test(camera.rtspUrl)) return true;
     if (/\/webrtc\/[a-zA-Z0-9_.-]+/i.test(camera.rtspUrl)) return true;
+    if (/(?:192\.168\.|10\.|172\.(?:1[6-9]|2\d|3[0-1])\.|localhost|127\.0\.0\.1)/i.test(camera.rtspUrl)) return true;
   }
   return false;
 };

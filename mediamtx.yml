@@ -5,6 +5,10 @@ apiAddress: :9997
 logLevel: info
 logDestinations: [stdout]
 
+# Timeout of read/write operations to prevent dropping publishers on momentary Wi-Fi jitter or keyframe intervals
+readTimeout: 30s
+writeTimeout: 30s
+
 rtsp: yes
 rtspAddress: :8554
 rtspTransports: [tcp, udp]
@@ -36,6 +40,10 @@ hlsSegmentDuration: 1s
 hlsSegmentCount: 7
 
 paths:
+  all_others:
+    source: publisher
+    maxReaders: 50
+
   all:
     source: publisher
     maxReaders: 50

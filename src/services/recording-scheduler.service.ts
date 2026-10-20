@@ -6,7 +6,7 @@
  */
 import { Camera } from "../models/Camera";
 import { RecordingSchedule } from "../models/RecordingSchedule";
-import { getCameraStreamPath, mediamtxFetch } from "../config/mediamtx.service";
+import { getCameraStreamPath, mediamtxFetch, toIngestPath } from "../config/mediamtx.service";
 import { IRecordingScheduleRule } from "../types";
 import { logger } from "../utils/logger";
 
@@ -71,7 +71,7 @@ export const syncRecordingSchedules = async (): Promise<void> => {
       const shouldRecord = isFeatureEnabled && isScheduleRuleActive(rules, now);
 
       const pathSlug = getCameraStreamPath(camera);
-      const rawPath = pathSlug.startsWith("raw_") ? pathSlug : `raw_${pathSlug}`;
+      const rawPath = toIngestPath(pathSlug);
 
       const currentState = activeRecordingStates.get(rawPath);
 

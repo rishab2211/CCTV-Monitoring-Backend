@@ -38,8 +38,8 @@ class SocketService {
         credentials: true,
       },
       transports: ["websocket", "polling"],
-      pingTimeout: 30000,
-      pingInterval: 10000,
+      pingTimeout: 60000,
+      pingInterval: 25000,
       allowUpgrades: true,
     });
 
@@ -143,15 +143,10 @@ class SocketService {
       socket.on("disconnect", async () => {
         logger.debug(`[Socket.IO] Client disconnected: ${user.userId}`);
 
-        // Immediately close active stream sessions for this user to eliminate phantom viewer counts
-        try {
-          const { reapUserStreamSessions } = await import("./stream.service");
-          await reapUserStreamSessions(user.userId);
-        } catch (err: any) {
-          logger.debug(`[Socket.IO] Stream session disconnect cleanup error: ${err.message}`);
-        }
-
-        // Only cleanup talkback sessions for roles that can initiate them
+        // Only cleanup talkback sessions for roles that can initiate them.
+        // NOTE: Viewer stream sessions are intentionally NOT reaped here because Socket.IO
+        // reconnects/transports should never kill active WebRTC media streams. Abandoned
+        // stream sessions are handled via stream heartbeat and reapStaleSessions() (3m threshold).
         if (["operator", "admin", "super_admin", "franchise_admin"].includes(user.role)) {
           try {
             const { handleOperatorDisconnect } = await import("./talkback.service");

@@ -105,14 +105,14 @@ export const otpLimiter = rateLimit({
  */
 export const whipLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 60, // Up to 60 session starts/publishes per minute per IP
+  max: 120, // Up to 120 session starts/publishes per minute per IP
   standardHeaders: true,
   legacyHeaders: false,
   passOnStoreError: true,
   store: createRateLimitStore("whip"),
   skip: (req) => {
-    // GET/OPTIONS/HEAD for reading streams must never be throttled
-    return req.method === "GET" || req.method === "OPTIONS" || req.method === "HEAD";
+    // GET/OPTIONS/HEAD for reading streams and PATCH for WHEP ICE candidate exchange must never be throttled
+    return req.method === "GET" || req.method === "OPTIONS" || req.method === "HEAD" || req.method === "PATCH";
   },
   handler: (_req, _res, next) => {
     next(
