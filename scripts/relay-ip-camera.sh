@@ -73,7 +73,7 @@ sleep 2
 if [ "${CODEC}" = "hevc" ] || [ "${CODEC}" = "h265" ]; then
   echo "⚠️  Camera video is HEVC (H.265). Web browsers require H.264 for WebRTC."
   echo "   Enabling ultra-fast zero-latency H.264 transcode (-c:v libx264)..."
-  V_ENCODER=(-c:v libx264 -preset ultrafast -tune zerolatency)
+  V_ENCODER=(-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 25 -threads 4)
 else
   echo "✅ Camera video is ${CODEC}. Using stream copy (-c:v copy)."
   V_ENCODER=(-c:v copy)
@@ -115,14 +115,15 @@ while [ "${RUNNING}" -eq 1 ]; do
   ffmpeg \
     -loglevel warning \
     -timeout 15000000 \
+    -buffer_size 2048000 \
     -fflags +genpts+discardcorrupt \
     -rtsp_transport tcp \
     -i "${LOCAL_RTSP}" \
     "${V_ENCODER[@]}" \
-    -avoid_negative_ts make_zero \
     -c:a libopus \
     -b:a 64k \
     -af "aresample=async=1:first_pts=0" \
+    -buffer_size 2048000 \
     -rtsp_transport tcp \
     -f rtsp \
     "${VPS_RTSP}" &
