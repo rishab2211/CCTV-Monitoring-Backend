@@ -117,8 +117,8 @@ else
 fi
 
 if [ -n "${AUDIO_TRACK}" ]; then
-  echo "🔊 Camera audio detected (${AUDIO_TRACK}). Relaying as Opus audio."
-  A_ENCODER=(-map 0:a:0 -c:a libopus -b:a 48k -ar 48000 -ac 1 -af "aresample=48000:async=1:first_pts=0")
+  echo "🔊 Camera audio detected (${AUDIO_TRACK}). Relaying as WebRTC-compliant Opus (48kHz stereo)..."
+  A_ENCODER=(-map 0:a:0? -c:a libopus -b:a 64k -ar 48000 -ac 2 -af "aresample=48000:async=1:first_pts=0")
 else
   echo "🔇 No audio track detected on camera. Running video-only (-an)."
   A_ENCODER=(-an)
