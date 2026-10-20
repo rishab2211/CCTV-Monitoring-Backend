@@ -19,8 +19,8 @@ const BACKEND_URL = process.env.BACKEND_URL || "https://api-cctv-backend.duckdns
 const ONVIF_PORT = process.env.ONVIF_PORT || 8899;
 const ONVIF_ENDPOINT = `http://${CAMERA_IP}:${ONVIF_PORT}/onvif/ptz_service`;
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@cctv.com";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin@123";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@cctvmonitor.com";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin@1234";
 
 let ONVIF_PROFILE_TOKEN = process.env.ONVIF_PROFILE_TOKEN || "000";
 
@@ -99,129 +99,162 @@ function buildStopXml(stopZoom = false) {
 </soap:Envelope>`;
 }
 
-// Mutex lock to guarantee strictly sequential SOAP execution on embedded camera CPU
-let onvifLock = Promise.resolve();
+// Rate-limited, deduplicated, single-concurrency PTZ state machine
+// Protects low-power embedded camera CPUs (Xiongmai/Anyka/Goke) from watchdog resets and RTSP starvation
+let activeMotorState = {
+  moving: false,
+  direction: null,
+  speed: 0,
+  isZoom: false,
+};
 
-async function sendOnvifCommand(xml) {
-  // Chain through sequential lock
-  const run = async () => {
-    try {
-      const res = await fetch(ONVIF_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/soap+xml; charset=utf-8" },
-        body: xml,
-        signal: AbortSignal.timeout(2500),
-      });
-      // 150ms cooling pause to prevent overwhelming the single-core camera CPU and dropping RTSP frames
-      await new Promise((r) => setTimeout(r, 150));
-      return res.status === 200;
-    } catch (err) {
-      console.error(`❌ ONVIF Dispatch Error: ${err.message}`);
-      return false;
-    }
-  };
+let pendingCommand = null;
+let isWorkerRunning = false;
+let lastCommandTime = 0;
+const MIN_CMD_INTERVAL_MS = 150; // Pause between consecutive ONVIF calls to prevent starving RTSP daemon
+const MIN_MOVE_PULSE_MS = 250;   // Minimum duration to allow motor a physical step before stopping
 
-  onvifLock = onvifLock.then(run, run);
-  return onvifLock;
+async function dispatchSoap(xml) {
+  try {
+    const res = await fetch(ONVIF_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/soap+xml; charset=utf-8" },
+      body: xml,
+      signal: AbortSignal.timeout(2000), // Strict 2s timeout to never hang
+    });
+    return res.status === 200;
+  } catch (err) {
+    console.error(`❌ ONVIF Dispatch Error: ${err.message}`);
+    return false;
+  }
 }
 
-let currentDirection = null;
-let movementStartTime = 0;
-let pendingStopTimer = null;
-let lastWasZoom = false;
+async function runPtzWorker() {
+  if (isWorkerRunning) return;
+  isWorkerRunning = true;
 
-async function handlePtzDirection(direction, speed = 32) {
-  const normSpeed = Math.min(Math.max(speed / 64, 0.4), 1.0);
+  while (pendingCommand) {
+    const cmd = pendingCommand;
+    pendingCommand = null;
 
+    // Enforce cooldown interval between requests to protect camera's micro-httpd
+    const elapsedSinceLast = Date.now() - lastCommandTime;
+    if (elapsedSinceLast < MIN_CMD_INTERVAL_MS) {
+      await new Promise((r) => setTimeout(r, MIN_CMD_INTERVAL_MS - elapsedSinceLast));
+    }
+
+    if (cmd.action === "stop") {
+      if (activeMotorState.moving) {
+        console.log("🛑 Motor STOP");
+        const stopZoom = activeMotorState.isZoom;
+        activeMotorState = { moving: false, direction: null, speed: 0, isZoom: false };
+        await dispatchSoap(buildStopXml(stopZoom));
+        lastCommandTime = Date.now();
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    } else if (cmd.action === "move") {
+      const normSpeed = Math.min(Math.max((cmd.speed || 32) / 64, 0.4), 1.0);
+      let x = 0.0;
+      let y = 0.0;
+      let zoom = null;
+
+      switch (cmd.direction) {
+        case "left":
+          x = -normSpeed;
+          break;
+        case "right":
+          x = normSpeed;
+          break;
+        case "up":
+          y = normSpeed;
+          break;
+        case "down":
+          y = -normSpeed;
+          break;
+        case "upleft":
+          x = -normSpeed;
+          y = normSpeed;
+          break;
+        case "upright":
+          x = normSpeed;
+          y = normSpeed;
+          break;
+        case "downleft":
+          x = -normSpeed;
+          y = -normSpeed;
+          break;
+        case "downright":
+          x = normSpeed;
+          y = -normSpeed;
+          break;
+        case "zoomin":
+          zoom = normSpeed;
+          break;
+        case "zoomout":
+          zoom = -normSpeed;
+          break;
+        default:
+          console.warn(`⚠️ Unknown PTZ direction: ${cmd.direction}`);
+          continue;
+      }
+
+      console.log(`🕹️ Moving [${cmd.direction.toUpperCase()}] at speed ${normSpeed.toFixed(2)}...`);
+      const isZoom = cmd.direction === "zoomin" || cmd.direction === "zoomout";
+      const success = await dispatchSoap(buildContinuousMoveXml(x, y, zoom));
+      lastCommandTime = Date.now();
+
+      if (success) {
+        activeMotorState = { moving: true, direction: cmd.direction, speed: normSpeed, isZoom };
+        // Pulse window: keep motor stepping for at least MIN_MOVE_PULSE_MS
+        // This ensures tap-to-move buttons make a distinct visible step
+        await new Promise((r) => setTimeout(r, MIN_MOVE_PULSE_MS));
+      } else {
+        // If the camera failed or timed out, reset active state to avoid getting stuck
+        activeMotorState = { moving: false, direction: null, speed: 0, isZoom: false };
+        await new Promise((r) => setTimeout(r, 400)); // Back off slightly on error
+      }
+    }
+  }
+
+  isWorkerRunning = false;
+}
+
+function handlePtzDirection(direction, speed = 32) {
   if (direction === "stop") {
-    if (pendingStopTimer) {
-      clearTimeout(pendingStopTimer);
-      pendingStopTimer = null;
+    // If motor is already completely stopped and nothing pending, drop immediately
+    if (!activeMotorState.moving && !pendingCommand) {
+      return;
     }
-    // If motor is not currently reported moving, do nothing
-    if (!currentDirection) {
-      return true;
+    // If pending command is already a stop, drop duplicate
+    if (pendingCommand && pendingCommand.action === "stop") {
+      return;
     }
-
-    const elapsed = Date.now() - movementStartTime;
-    const minStepMs = 350; // Allow motor to complete at least a visible step
-    const stopZoom = lastWasZoom;
-
-    const executeStop = async () => {
-      console.log("🛑 Motor STOP");
-      currentDirection = null;
-      lastWasZoom = false;
-      return await sendOnvifCommand(buildStopXml(stopZoom));
-    };
-
-    if (elapsed < minStepMs) {
-      pendingStopTimer = setTimeout(executeStop, minStepMs - elapsed);
-      return true;
+    pendingCommand = { action: "stop" };
+  } else {
+    // Deduplication: if motor is already moving in the exact same direction and no pending stop, drop
+    if (
+      activeMotorState.moving &&
+      activeMotorState.direction === direction &&
+      !pendingCommand
+    ) {
+      return;
     }
-
-    return await executeStop();
+    // If identical move command is already pending, drop duplicate
+    if (
+      pendingCommand &&
+      pendingCommand.action === "move" &&
+      pendingCommand.direction === direction
+    ) {
+      return;
+    }
+    pendingCommand = { action: "move", direction, speed };
   }
 
-  // Deduplicate: If user sends the same direction that is already actively moving, ignore
-  if (currentDirection === direction) {
-    return true;
-  }
-
-  if (pendingStopTimer) {
-    clearTimeout(pendingStopTimer);
-    pendingStopTimer = null;
-  }
-
-  currentDirection = direction;
-  movementStartTime = Date.now();
-  lastWasZoom = (direction === "zoomin" || direction === "zoomout");
-
-  let x = 0.0;
-  let y = 0.0;
-  let zoom = null;
-
-  switch (direction) {
-    case "left":
-      x = -normSpeed;
-      break;
-    case "right":
-      x = normSpeed;
-      break;
-    case "up":
-      y = normSpeed;
-      break;
-    case "down":
-      y = -normSpeed;
-      break;
-    case "upleft":
-      x = -normSpeed;
-      y = normSpeed;
-      break;
-    case "upright":
-      x = normSpeed;
-      y = normSpeed;
-      break;
-    case "downleft":
-      x = -normSpeed;
-      y = -normSpeed;
-      break;
-    case "downright":
-      x = normSpeed;
-      y = -normSpeed;
-      break;
-    case "zoomin":
-      zoom = normSpeed;
-      break;
-    case "zoomout":
-      zoom = -normSpeed;
-      break;
-    default:
-      console.warn(`⚠️ Unknown PTZ direction: ${direction}`);
-      return false;
-  }
-
-  console.log(`🕹️ Moving [${direction.toUpperCase()}] at speed ${normSpeed.toFixed(2)}...`);
-  return await sendOnvifCommand(buildContinuousMoveXml(x, y, zoom));
+  // Trigger worker asynchronously
+  runPtzWorker().catch((err) => {
+    console.error("PTZ Worker Error:", err);
+    isWorkerRunning = false;
+  });
 }
 
 async function resolveCameraId(token, identifier) {

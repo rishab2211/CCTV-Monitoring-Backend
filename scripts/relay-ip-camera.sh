@@ -82,18 +82,43 @@ fi
 
 # Auto-detect video codec
 echo "🔍 Probing camera stream codecs..."
-CODEC=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 -rtsp_transport tcp "${LOCAL_RTSP}" 2>/dev/null || echo "h264")
+CODEC=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 -analyzeduration 1000000 -probesize 1000000 -rtsp_transport tcp "${LOCAL_RTSP}" 2>/dev/null || echo "h264")
+AUDIO_TRACK=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 -analyzeduration 1000000 -probesize 1000000 -rtsp_transport tcp "${LOCAL_RTSP}" 2>/dev/null || echo "")
+
 # Allow camera embedded RTSP server to close probe connection cleanly
-sleep 2
+sleep 1
 
 if [ "${CODEC}" = "hevc" ] || [ "${CODEC}" = "h265" ]; then
   echo "⚠️  Camera video is HEVC (H.265). Web browsers require H.264 for WebRTC."
   echo "   Enabling ultra-fast zero-latency H.264 transcode (-c:v libx264)..."
-  echo "   💡 Tip: If your camera app supports H.264, switch to H.264 to bypass transcoding with 0% CPU!"
-  V_ENCODER=(-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 25 -keyint_min 25 -sc_threshold 0 -b:v 1500k -maxrate 2000k -bufsize 3000k)
+  echo "   💡 Pro-Tip: In your camera's Web UI or mobile app, switch Video Encode to H.264 for 0% CPU & 0ms lag!"
+  V_ENCODER=(
+    -c:v libx264
+    -preset ultrafast
+    -tune zerolatency
+    -profile:v baseline
+    -level 3.1
+    -pix_fmt yuv420p
+    -g 25
+    -keyint_min 25
+    -sc_threshold 0
+    -b:v 1800k
+    -maxrate 2200k
+    -bufsize 1000k
+    -x264-params "no-scenecut=1:sync-lookahead=0:rc-lookahead=0:repeat-headers=1:sliced-threads=1"
+    -fps_mode passthrough
+  )
 else
-  echo "✅ Camera video is ${CODEC}. Using stream copy (-c:v copy)."
+  echo "✅ Camera video is ${CODEC}. Using zero-copy passthrough (-c:v copy) for 0ms lag!"
   V_ENCODER=(-c:v copy)
+fi
+
+if [ -n "${AUDIO_TRACK}" ]; then
+  echo "🔊 Camera audio detected (${AUDIO_TRACK}). Relaying as Opus audio."
+  A_ENCODER=(-c:a libopus -b:a 48k -ar 48000 -ac 1 -af "aresample=async=1000")
+else
+  echo "🔇 No audio track detected on camera. Running video-only (-an)."
+  A_ENCODER=(-an)
 fi
 
 CAMERA_IP=$(printf "%s" "${LOCAL_RTSP}" | sed -E 's|.*@([^:/]+).*|\1|')
@@ -131,18 +156,20 @@ echo ""
 while [ "${RUNNING}" -eq 1 ]; do
   ffmpeg \
     -loglevel warning \
+    -hide_banner \
     -rtsp_transport tcp \
-    -timeout 10000000 \
+    -timeout 5000000 \
+    -reorder_queue_size 0 \
+    -max_delay 500000 \
     -buffer_size 2097152 \
+    -flags low_delay \
     -fflags +genpts+discardcorrupt+nobuffer \
     -err_detect ignore_err \
+    -probesize 1000000 \
+    -analyzeduration 1000000 \
     -i "${LOCAL_RTSP}" \
     "${V_ENCODER[@]}" \
-    -c:a libopus \
-    -b:a 48k \
-    -ar 48000 \
-    -ac 1 \
-    -af "aresample=async=1000" \
+    "${A_ENCODER[@]}" \
     -rtsp_transport tcp \
     -f rtsp \
     "${VPS_RTSP}" &
@@ -151,7 +178,27 @@ while [ "${RUNNING}" -eq 1 ]; do
   wait "${FFMPEG_PID}" || true
 
   if [ "${RUNNING}" -eq 1 ]; then
-    echo "⚠️ Camera stream disconnected or Wi-Fi packet dropped. Reconnecting in 1 second..."
-    sleep 1
+    echo "⚠️ Camera stream disconnected or Wi-Fi packet dropped."
+    # Check if the camera host IP is responding on LAN
+    if command -v ping > /dev/null 2>&1; then
+      if ! ping -c 1 -W 1 "${CAMERA_IP}" > /dev/null 2>&1; then
+        echo "⏳ Camera (${CAMERA_IP}) is unreachable (Wi-Fi dropped or rebooting). Waiting for camera to come online..."
+        while [ "${RUNNING}" -eq 1 ] && ! ping -c 1 -W 1 "${CAMERA_IP}" > /dev/null 2>&1; do
+          sleep 2
+        done
+        if [ "${RUNNING}" -eq 1 ]; then
+          echo "✅ Camera (${CAMERA_IP}) is back online! Allowing RTSP daemon 3s to initialize..."
+          sleep 3
+        fi
+      else
+        sleep 1
+      fi
+    else
+      sleep 1
+    fi
+
+    if [ "${RUNNING}" -eq 1 ]; then
+      echo "🔄 Reconnecting to camera RTSP stream..."
+    fi
   fi
 done
