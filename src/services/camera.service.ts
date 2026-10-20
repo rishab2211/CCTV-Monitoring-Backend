@@ -22,6 +22,8 @@ import {
   PTZCommandInput,
 } from "../validators/camera.validator";
 import crypto from "crypto";
+import { execFile } from "child_process";
+import util from "util";
 import { generateGb28181DeviceId } from "../utils/gb28181";
 import { dispatchPtzCommand } from "./gb28181/ptz.service";
 import { env } from "../config/env";
@@ -38,6 +40,45 @@ import {
 } from "../config/mediamtx.service";
 import { socketService } from "./socket.service";
 import * as notificationService from "./notification.service";
+
+const execFileAsync = util.promisify(execFile);
+
+/**
+ * Actively probe an RTSP stream via ffprobe to verify network reachability and codec compatibility.
+ */
+export const probeRtspConnectivity = async (rtspUrl: string): Promise<{
+  reachable: boolean;
+  codec?: string;
+  resolution?: string;
+  error?: string;
+}> => {
+  try {
+    const { stdout } = await execFileAsync(
+      "ffprobe",
+      [
+        "-v", "error",
+        "-rtsp_transport", "tcp",
+        "-stimeout", "4000000", // 4s timeout in microseconds
+        "-show_entries", "stream=codec_name,width,height",
+        "-of", "json",
+        rtspUrl,
+      ],
+      { timeout: 5000 }
+    );
+    const parsed = JSON.parse(stdout);
+    const videoStream = parsed?.streams?.find((s: any) => s.codec_name && s.width);
+    return {
+      reachable: true,
+      codec: videoStream?.codec_name,
+      resolution: videoStream?.width && videoStream?.height ? `${videoStream.width}x${videoStream.height}` : undefined,
+    };
+  } catch (err: any) {
+    return {
+      reachable: false,
+      error: err.message || "RTSP stream unreachable or timed out",
+    };
+  }
+};
 
 // ─── Ownership/Access Helper ──────────────────────────────────────────────────
 
@@ -632,10 +673,12 @@ export const updateCameraStatus = async (
     timestamp: new Date().toISOString(),
   };
   const eventName = status === "online" ? "camera_online" : "camera_offline";
-  socketService.emitGlobal(eventName, eventPayload);
   socketService.emitToCamera(camera._id.toString(), eventName, eventPayload);
   if (camera.franchiseId) {
     socketService.emitToFranchise(camera.franchiseId.toString(), eventName, eventPayload);
+  }
+  if (camera.customerId) {
+    socketService.emitToUser(camera.customerId.toString(), eventName, eventPayload);
   }
 
   logger.info(`📶 Camera status set to ${status}: ${camera.name}`);
@@ -682,10 +725,12 @@ export const updateCameraHealth = async (
     status: "online",
     timestamp: new Date().toISOString(),
   };
-  socketService.emitGlobal("camera_online", onlinePayload);
   socketService.emitToCamera(camera._id.toString(), "camera_online", onlinePayload);
   if (camera.franchiseId) {
     socketService.emitToFranchise(camera.franchiseId.toString(), "camera_online", onlinePayload);
+  }
+  if (camera.customerId) {
+    socketService.emitToUser(camera.customerId.toString(), "camera_online", onlinePayload);
   }
   socketService.emitToCamera(camera._id.toString(), "camera_health", {
     cameraId: camera._id.toString(),
@@ -1122,6 +1167,21 @@ export const provisionCamera = async (
     }),
   };
 
+  // Optional RTSP connectivity probe
+  let probeResult: { reachable: boolean; codec?: string; resolution?: string; error?: string } | undefined = undefined;
+  if (input.probeRtsp && resolvedRtspUrl) {
+    logger.info(`🔍 Probing RTSP stream for camera "${camera.name}"...`);
+    probeResult = await probeRtspConnectivity(resolvedRtspUrl);
+    if (probeResult.reachable) {
+      camera.status = "online";
+      camera.health.lastPing = new Date();
+      await camera.save();
+      logger.info(`✅ RTSP probe successful for "${camera.name}": codec=${probeResult.codec}, res=${probeResult.resolution}`);
+    } else {
+      logger.warn(`⚠️ RTSP probe failed for "${camera.name}": ${probeResult.error}`);
+    }
+  }
+
   logActivity({
     userId: createdBy === "system" ? camera._id : new mongoose.Types.ObjectId(createdBy),
     action: "CAMERA_CREATED",
@@ -1133,6 +1193,7 @@ export const provisionCamera = async (
 
   return {
     camera,
+    probeResult,
     streamConfig: {
       streamSlug: cleanSlug,
       ingestPath: livePath,
@@ -1143,6 +1204,28 @@ export const provisionCamera = async (
     gb28181Config,
     relayCommand,
     bashRelayCommand,
+    setupGuide: {
+      tier1_direct_sip: {
+        title: "Tier 1: Direct SIP/GB28181 Ingest (Zero Port Forwarding / NAT Traversal)",
+        instructions: "Configure these parameters in your camera's web UI under Platform Access / GB28181 settings:",
+        sipServer: vpsHost,
+        sipPort: 5060,
+        serverDomain: "3402000000",
+        serverId: "34020000002000000001",
+        deviceId: gbDeviceId,
+        password: gbPassword,
+      },
+      tier2_nat_relay: {
+        title: "Tier 2: On-Prem RTSP Relay (For cameras behind residential routers / NAT)",
+        dockerCommand: relayCommand,
+        bashCommand: bashRelayCommand,
+        ffmpegCommand: `ffmpeg -rtsp_transport tcp -i "${resolvedRtspUrl}" -c copy -f rtsp "${vpsIngestUrl}"`,
+      },
+      tier3_ptz_bridge: {
+        title: "Tier 3: Local ONVIF PTZ Relay Bridge (If PTZ motor control across NAT is needed)",
+        command: `ADMIN_EMAIL="<email>" ADMIN_PASSWORD="<password>" node scripts/onvif-ptz-bridge.js "${input.ip || "CAMERA_IP"}" "${camera._id}"`,
+      },
+    },
   };
 };
 

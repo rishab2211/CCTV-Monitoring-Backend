@@ -93,6 +93,7 @@ export const provisionCameraSchema = z.object({
       sipPassword: z.string().optional(),
     })
     .optional(),
+  probeRtsp: z.boolean().default(false).optional(),
   location: cameraLocationSchema,
   settings: cameraSettingsSchema,
 });
