@@ -60,8 +60,8 @@ fi
 VPS_RTSP="rtsp://${PUBLISH_TARGET}/${INGEST_PATH}"
 
 # Default admin platform credentials for the PTZ bridge
-export ADMIN_EMAIL="${ADMIN_EMAIL:-admin@cctv.com}"
-export ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin@123}"
+export ADMIN_EMAIL="${ADMIN_EMAIL:-admin@cctvmonitor.com}"
+export ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin@1234}"
 
 echo ""
 echo "=================================================================="
@@ -80,25 +80,29 @@ if ! command -v ffmpeg > /dev/null 2>&1; then
   exit 1
 fi
 
-# Auto-detect video codec
+# Auto-detect video & audio codecs in a single connection to protect camera socket pool
 echo "🔍 Probing camera stream codecs..."
-CODEC=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 -analyzeduration 1000000 -probesize 1000000 -rtsp_transport tcp "${LOCAL_RTSP}" 2>/dev/null || echo "h264")
-AUDIO_TRACK=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 -analyzeduration 1000000 -probesize 1000000 -rtsp_transport tcp "${LOCAL_RTSP}" 2>/dev/null || echo "")
+PROBE_INFO=$(ffprobe -v error -show_entries stream=codec_type,codec_name -of csv=p=0 -analyzeduration 1000000 -probesize 1000000 -rtsp_transport tcp "${LOCAL_RTSP}" 2>/dev/null || echo -e "video,h264")
+CODEC=$(printf "%s\n" "${PROBE_INFO}" | grep -m1 "^video" | cut -d',' -f2 || echo "h264")
+AUDIO_TRACK=$(printf "%s\n" "${PROBE_INFO}" | grep -m1 "^audio" | cut -d',' -f2 || echo "")
 
 # Allow camera embedded RTSP server to close probe connection cleanly
-sleep 1
+sleep 2
 
 if [ "${CODEC}" = "hevc" ] || [ "${CODEC}" = "h265" ]; then
   echo "⚠️  Camera video is HEVC (H.265). Web browsers require H.264 for WebRTC."
   echo "   Enabling ultra-fast zero-latency H.264 transcode (-c:v libx264)..."
   echo "   💡 Pro-Tip: In your camera's Web UI or mobile app, switch Video Encode to H.264 for 0% CPU & 0ms lag!"
   V_ENCODER=(
+    -map 0:v:0
     -c:v libx264
     -preset ultrafast
     -tune zerolatency
     -profile:v baseline
     -level 3.1
     -pix_fmt yuv420p
+    -r 25
+    -fps_mode cfr
     -g 25
     -keyint_min 25
     -sc_threshold 0
@@ -106,16 +110,15 @@ if [ "${CODEC}" = "hevc" ] || [ "${CODEC}" = "h265" ]; then
     -maxrate 2200k
     -bufsize 1000k
     -x264-params "no-scenecut=1:sync-lookahead=0:rc-lookahead=0:repeat-headers=1:sliced-threads=1"
-    -fps_mode passthrough
   )
 else
   echo "✅ Camera video is ${CODEC}. Using zero-copy passthrough (-c:v copy) for 0ms lag!"
-  V_ENCODER=(-c:v copy)
+  V_ENCODER=(-map 0:v:0 -c:v copy)
 fi
 
 if [ -n "${AUDIO_TRACK}" ]; then
   echo "🔊 Camera audio detected (${AUDIO_TRACK}). Relaying as Opus audio."
-  A_ENCODER=(-c:a libopus -b:a 48k -ar 48000 -ac 1 -af "aresample=async=1000")
+  A_ENCODER=(-map 0:a:0 -c:a libopus -b:a 48k -ar 48000 -ac 1 -af "aresample=48000:async=1:first_pts=0")
 else
   echo "🔇 No audio track detected on camera. Running video-only (-an)."
   A_ENCODER=(-an)
@@ -170,6 +173,7 @@ while [ "${RUNNING}" -eq 1 ]; do
     -i "${LOCAL_RTSP}" \
     "${V_ENCODER[@]}" \
     "${A_ENCODER[@]}" \
+    -avoid_negative_ts make_zero \
     -rtsp_transport tcp \
     -f rtsp \
     "${VPS_RTSP}" &
