@@ -37,9 +37,17 @@ export const createRecordingChunk = async (data: any) => {
   const camera = await Camera.findOne({ _id: data.cameraId, isDeleted: false });
   if (!camera) throw ApiError.notFound("Camera");
 
+  let expiresAt = data.expiresAt;
+  if (!expiresAt) {
+    const retentionDays = camera.settings?.recordingRetentionDays ?? 30;
+    const baseTime = data.startTime ? new Date(data.startTime).getTime() : Date.now();
+    expiresAt = new Date(baseTime + retentionDays * 24 * 60 * 60 * 1000);
+  }
+
   const recording = await Recording.create({
     ...data,
     franchiseId: camera.franchiseId,
+    expiresAt,
   });
   return recording;
 };

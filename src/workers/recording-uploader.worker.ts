@@ -198,9 +198,15 @@ interface RetryState {
   lastAttempt: number;
 }
 const retryTracker = new Map<string, RetryState>();
+const inFlightProcessing = new Set<string>();
 
 // ─── Single File Processor ────────────────────────────────────────────────────
 export const processSingleSegment = async (filePath: string): Promise<boolean> => {
+  if (inFlightProcessing.has(filePath)) {
+    return false;
+  }
+  inFlightProcessing.add(filePath);
+
   try {
     if (!fs.existsSync(filePath)) return false;
     const stats = fs.statSync(filePath);
@@ -287,7 +293,11 @@ export const processSingleSegment = async (filePath: string): Promise<boolean> =
         publicUrl = uploadRes.publicUrl;
 
         // Unlink local spool file only after successful cloud upload
-        fs.unlinkSync(filePath);
+        try {
+          fs.unlinkSync(filePath);
+        } catch (unlinkErr) {
+          logger.warn(`[RecordingSweeper] Spool unlink warning for ${filePath}: ${(unlinkErr as Error).message}`);
+        }
         retryTracker.delete(filePath);
       } catch (uploadErr) {
         // Track retry attempt and keep local file intact for next pass
@@ -347,6 +357,8 @@ export const processSingleSegment = async (filePath: string): Promise<boolean> =
   } catch (err) {
     logger.error(`[RecordingSweeper] Error processing segment ${filePath}: ${(err as Error).message}`);
     return false;
+  } finally {
+    inFlightProcessing.delete(filePath);
   }
 };
 
