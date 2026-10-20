@@ -112,8 +112,8 @@ async function sendOnvifCommand(xml) {
         body: xml,
         signal: AbortSignal.timeout(2500),
       });
-      // 50ms cooling pause to prevent overwhelming the single-core camera CPU
-      await new Promise((r) => setTimeout(r, 50));
+      // 150ms cooling pause to prevent overwhelming the single-core camera CPU and dropping RTSP frames
+      await new Promise((r) => setTimeout(r, 150));
       return res.status === 200;
     } catch (err) {
       console.error(`❌ ONVIF Dispatch Error: ${err.message}`);

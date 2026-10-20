@@ -553,6 +553,12 @@ STEP 13 — Write Nginx Config for the API
   # CCTV Monitoring Backend API
   # Certbot will automatically add the HTTPS server block in Step 16.
 
+  # WebSocket Connection Upgrade Mapping (must be defined before or inside http/server context)
+  map $http_upgrade $connection_upgrade {
+      default upgrade;
+      ''      close;
+  }
+
   server {
       listen 80;
       listen [::]:80;
@@ -568,9 +574,9 @@ STEP 13 — Write Nginx Config for the API
           proxy_pass         http://127.0.0.1:8080;
           proxy_http_version 1.1;
 
-          # WebSocket upgrade headers
+          # Dynamic WebSocket upgrade headers (prevents sending Connection: upgrade on polling)
           proxy_set_header   Upgrade           $http_upgrade;
-          proxy_set_header   Connection        "upgrade";
+          proxy_set_header   Connection        $connection_upgrade;
 
           # Host and client IP headers
           proxy_set_header   Host              $host;

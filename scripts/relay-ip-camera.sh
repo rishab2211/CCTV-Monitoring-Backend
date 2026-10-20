@@ -89,7 +89,8 @@ sleep 2
 if [ "${CODEC}" = "hevc" ] || [ "${CODEC}" = "h265" ]; then
   echo "⚠️  Camera video is HEVC (H.265). Web browsers require H.264 for WebRTC."
   echo "   Enabling ultra-fast zero-latency H.264 transcode (-c:v libx264)..."
-  V_ENCODER=(-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 25 -threads 4 -b:v 2000k -maxrate 2500k -bufsize 4000k)
+  echo "   💡 Tip: If your camera app supports H.264, switch to H.264 to bypass transcoding with 0% CPU!"
+  V_ENCODER=(-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 25 -keyint_min 25 -sc_threshold 0 -b:v 1500k -maxrate 2000k -bufsize 3000k)
 else
   echo "✅ Camera video is ${CODEC}. Using stream copy (-c:v copy)."
   V_ENCODER=(-c:v copy)
@@ -130,18 +131,21 @@ echo ""
 while [ "${RUNNING}" -eq 1 ]; do
   ffmpeg \
     -loglevel warning \
-    -timeout 15000000 \
-    -buffer_size 4194304 \
-    -fflags +genpts+discardcorrupt \
     -rtsp_transport tcp \
+    -stimeout 5000000 \
+    -buffer_size 2097152 \
+    -fflags +genpts+discardcorrupt+nobuffer \
+    -flags low_delay \
+    -err_detect ignore_err \
     -i "${LOCAL_RTSP}" \
+    -map 0:v:0 \
     "${V_ENCODER[@]}" \
+    -map 0:a? \
     -c:a libopus \
-    -b:a 64k \
+    -b:a 48k \
     -ar 48000 \
-    -af "aresample=async=1000" \
-    -buffer_size 4194304 \
-    -pkt_size 1200 \
+    -ac 1 \
+    -af "aresample=async=1:first_pts=0" \
     -rtsp_transport tcp \
     -f rtsp \
     "${VPS_RTSP}" &
@@ -150,7 +154,7 @@ while [ "${RUNNING}" -eq 1 ]; do
   wait "${FFMPEG_PID}" || true
 
   if [ "${RUNNING}" -eq 1 ]; then
-    echo "⚠️ Camera stream disconnected or Wi-Fi packet dropped. Reconnecting in 4 seconds..."
-    sleep 4
+    echo "⚠️ Camera stream disconnected or Wi-Fi packet dropped. Reconnecting in 1 second..."
+    sleep 1
   fi
 done
