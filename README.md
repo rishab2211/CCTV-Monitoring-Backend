@@ -34,6 +34,7 @@
 - [Getting Started](#-getting-started)
 - [Environment Variables](#-environment-variables)
 - [Running the Server](#-running-the-server)
+- [Documentation & Guides](#-documentation--technical-guides)
 - [Testing with Postman](#-testing-with-postman)
 - [Deployment](#-deployment)
 
@@ -621,6 +622,15 @@ bun run build
 ```bash
 curl http://localhost:5000/api/v1/health
 ```
+
+---
+
+## 📚 Documentation & Technical Guides
+
+- **[Field Technician & Camera Setup Guide](./TECHNICIAN_APP_AND_CAMERA_SETUP_GUIDE.md)** — Complete on-site technician mobile app lifecycle, atomic camera provisioning, multi-tier video ingestion (GB28181 SIP, On-Prem RTSP Relays, ONVIF PTZ Bridges), QR pairing, checklists, and sign-offs.
+- **[Standardized Camera Onboarding Guide](./STANDARDIZED_CAMERA_ONBOARDING_GUIDE.md)** — Standardized MediaMTX dynamic path templates (`raw_` vs `live_`), audio transcoding to Opus, and smartphone camera streaming.
+- **[Exhaustive Testing Guide](./TESTING_GUIDE.md)** — All 20 API modules, schemas, edge cases, RBAC matrices, and tenant isolation verification.
+- **[Live Testing Guide](./LIVE_TESTING_GUIDE.md)** — Phase-by-phase manual verification and integration test procedures.
 
 ---
 
